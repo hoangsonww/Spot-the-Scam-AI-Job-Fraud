@@ -1,0 +1,181 @@
+project:
+  name: spot_the_scam
+  random_seed: 42
+  num_workers: 4
+  experiment_name: baseline
+data:
+  raw_dir: data
+  processed_dir: data/processed
+  raw_filename: fake_job_postings.csv
+  alternate_raw_filename: Fake_Real_Job_Posting.csv
+  target_column: fraudulent
+  id_column: job_id
+  text_fields:
+  - title
+  - company_profile
+  - description
+  - requirements
+  - benefits
+  categorical_fields:
+  - employment_type
+  - required_experience
+  - required_education
+  - industry
+  - function
+  numeric_fields: []
+  drop_columns:
+  - salary_range
+  - department
+  - job_id
+  - location
+  leakage_columns:
+  - job_id
+  - salary_range
+  - location
+  expected_columns:
+  - job_id
+  - title
+  - location
+  - department
+  - salary_range
+  - company_profile
+  - description
+  - requirements
+  - benefits
+  - telecommuting
+  - has_company_logo
+  - has_questions
+  - employment_type
+  - required_experience
+  - required_education
+  - industry
+  - function
+  - fraudulent
+  gray_zone_width: 0.1
+splits:
+  train: 0.7
+  val: 0.15
+  test: 0.15
+  stratify: true
+  seed: 42
+preprocessing:
+  lowercase_text: true
+  strip_html: true
+  strip_urls: true
+  normalize_whitespace: true
+  fill_missing: <missing>
+  max_text_length: 5000
+  duplicate_threshold: 0.95
+  max_vocabulary_size: 50000
+  min_df: 3
+  max_df: 0.8
+features:
+  tabular:
+    include_text_length: true
+    include_uppercase_ratio: true
+    include_digit_count: true
+    include_currency_token: true
+    include_exclamation_count: true
+    include_question_count: true
+    include_scamming_terms: true
+    include_url_count: true
+  scamming_terms:
+  - wire transfer
+  - quick money
+  - urgent hire
+  - limited time
+  - send resume
+  - ssn
+  - background check
+  - processing fee
+  - bank account
+  - credit card
+models:
+  classical:
+    tfidf:
+      ngram_range:
+      - 1
+      - 2
+      min_df: 3
+      max_df: 0.8
+      sublinear_tf: true
+      lowercase: true
+    logistic_regression:
+      Cs:
+      - 0.1
+      - 1.0
+      - 10.0
+      penalty: l2
+      class_weight: balanced
+      max_iter: 500
+    linear_svm:
+      Cs:
+      - 0.1
+      - 1.0
+      - 10.0
+      class_weight: balanced
+      max_iter: 2000
+    lightgbm:
+      num_leaves:
+      - 31
+      - 63
+      max_depth:
+      - -1
+      learning_rate:
+      - 0.05
+      - 0.1
+      n_estimators:
+      - 200
+      - 400
+      subsample:
+      - 0.8
+      - 1.0
+      colsample_bytree:
+      - 0.8
+      - 1.0
+      class_weight: balanced
+  transformer:
+    model_name: distilbert-base-uncased
+    max_length: 128
+    epochs: 3
+    batch_size: 16
+    learning_rate: 3e-5
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    gradient_accumulation: 1
+    early_stopping_patience: 2
+    fp16: true
+calibration:
+  methods:
+  - platt
+  - isotonic
+gray_zone:
+  width: 0.1
+  positive_label: fraud
+  negative_label: legit
+  review_label: review
+evaluation:
+  thresholds:
+    optimize_metric: f1
+    metric_class: 1
+  metrics:
+  - f1
+  - precision
+  - recall
+  - roc_auc
+  - average_precision
+  - brier
+  curves:
+    pr_curve: true
+    roc_curve: true
+    calibration_curve: true
+  inference_latency_runs: 3
+  slice_columns:
+  - employment_type
+  - required_experience
+  - required_education
+  - industry
+  - function
+inference:
+  batch_size: 128
+  num_workers: 2

@@ -1,0 +1,48 @@
+Metadata-Version: 2.4
+Name: spot-the-scam
+Version: 0.1.0
+Summary: Uncertainty-aware classifier for fraudulent job postings.
+Author: Spot the Scam Team
+Requires-Python: >=3.9
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: numpy>=1.23.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: joblib>=1.3.0
+Requires-Dist: beautifulsoup4>=4.12.0
+Requires-Dist: scikit-learn>=1.2.0
+Requires-Dist: lightgbm>=4.0.0
+Requires-Dist: xgboost>=1.7.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: plotly>=5.15.0
+Requires-Dist: shap>=0.43.0
+Requires-Dist: lime>=0.2.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: typer>=0.9.0
+Requires-Dist: rich>=13.0.0
+Requires-Dist: fastapi>=0.110.0
+Requires-Dist: uvicorn[standard]>=0.27.0
+Requires-Dist: pydantic>=2.6.0
+Requires-Dist: transformers>=4.38.0
+Requires-Dist: datasets>=2.16.0
+Requires-Dist: accelerate>=0.25.0
+Requires-Dist: evaluate>=0.4.1
+Requires-Dist: sentencepiece>=0.1.99
+Requires-Dist: torch>=2.2.0
+Requires-Dist: torchvision>=0.17.0
+Requires-Dist: torchaudio>=2.2.0
+Requires-Dist: safetensors>=0.4.2
+Requires-Dist: imbalanced-learn>=0.12.0
+Requires-Dist: kaggle>=1.6.0
+Requires-Dist: diskcache>=5.6.1
+Requires-Dist: jinja2>=3.1.2
+Requires-Dist: orjson>=3.9.15
+Requires-Dist: httpx>=0.27.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: pre-commit>=3.6.0; extra == "dev"
+Requires-Dist: black>=24.1.0; extra == "dev"
+Requires-Dist: ruff>=0.3.0; extra == "dev"
+Requires-Dist: mypy>=1.8.0; extra == "dev"

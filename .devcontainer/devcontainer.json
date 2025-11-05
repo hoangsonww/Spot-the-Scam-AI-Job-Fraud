@@ -1,0 +1,36 @@
+{
+  "name": "Spot the Scam",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "api",
+  "workspaceFolder": "/app",
+  "overrideCommand": true,
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    }
+  },
+  "postCreateCommand": "pip install -e .[dev] && npm install --prefix frontend",
+  "forwardPorts": [8000, 3000],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/artifacts,target=/app/artifacts,type=bind",
+    "source=${localWorkspaceFolder}/experiments,target=/app/experiments,type=bind",
+    "source=${localWorkspaceFolder}/data,target=/app/data,type=bind"
+  ]
+}

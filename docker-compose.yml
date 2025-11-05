@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./artifacts:/app/artifacts
+      - ./experiments:/app/experiments
+      - ./data:/app/data:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
