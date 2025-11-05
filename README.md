@@ -1,4 +1,4 @@
-# Spot the Scam
+# Spot the Scam - Job Posting Fraud Detector
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.121-009688?logo=fastapi&logoColor=white)
