@@ -88,6 +88,28 @@ export type TokenFrequencyResponse = {
   }[];
 };
 
+export type ThresholdMetricPoint = {
+  threshold: number;
+  precision: number;
+  recall: number;
+  f1: number;
+};
+
+export type ThresholdMetricsResponse = {
+  points: ThresholdMetricPoint[];
+};
+
+export type LatencySummaryPoint = {
+  batch_size: number;
+  latency_p50_ms: number;
+  latency_p95_ms: number;
+  throughput_rps: number;
+};
+
+export type LatencySummaryResponse = {
+  items: LatencySummaryPoint[];
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -114,6 +136,14 @@ export async function fetchTokenFrequency(limit = 20): Promise<TokenFrequencyRes
   return request<TokenFrequencyResponse>(`/insights/token-frequency?limit=${limit}`);
 }
 
+export async function fetchThresholdMetrics(limit = 50): Promise<ThresholdMetricsResponse> {
+  return request<ThresholdMetricsResponse>(`/insights/threshold-metrics?limit=${limit}`);
+}
+
+export async function fetchLatencySummary(): Promise<LatencySummaryResponse> {
+  return request<LatencySummaryResponse>("/insights/latency");
+}
+
 export async function predictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {
   return request<PredictionBatchResponse>("/predict", {
     method: "POST",
@@ -136,4 +166,3 @@ export async function fetchHealth() {
 export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
-

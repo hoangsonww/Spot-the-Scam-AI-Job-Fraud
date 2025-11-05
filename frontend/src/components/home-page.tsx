@@ -1,26 +1,14 @@
-"use client";
+"use client"
 
-import { useMemo, useState } from "react";
-import useSWR from "swr";
-import {
-  fetchMetadata,
-  fetchTokenFrequency,
-  fetchTokenImportance,
-  getApiBaseUrl,
-  JobPostingInput,
-  MetadataResponse,
-  PredictionResponse,
-  predictSingle,
-  TokenFrequencyResponse,
-  TokenImportanceResponse,
-} from "@/lib/api";
+import { useCallback, useId, useMemo, useState } from "react"
+import useSWR from "swr"
 import {
   Alert,
   AlertDescription,
   AlertTitle,
-} from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -28,577 +16,996 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Toggle } from "@/components/ui/toggle";
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Textarea } from "@/components/ui/textarea"
+import { Skeleton } from "@/components/ui/skeleton"
+import {
+  fetchMetadata,
+  fetchTokenFrequency,
+  fetchTokenImportance,
+  fetchThresholdMetrics,
+  fetchLatencySummary,
+  getApiBaseUrl,
+  predictSingle,
+  type JobPostingInput,
+  type MetadataResponse,
+  type PredictionResponse,
+  type TokenFrequencyResponse,
+  type TokenImportanceResponse,
+  type ThresholdMetricsResponse,
+  type LatencySummaryResponse,
+} from "@/lib/api"
+import {
+  Activity,
   AlertTriangle,
-  ClipboardList,
-  Loader2,
-  Sparkles,
-  TrendingDown,
-  TrendingUp,
-} from "lucide-react";
+  AlignVerticalSpaceBetween,
+  ArrowRight,
+  BarChart4,
+  Brain,
+  Flame,
+  LineChart as LineChartIcon,
+  ShieldCheck,
+} from "lucide-react"
 
-const defaultPosting: JobPostingInput = {
-  title: "",
-  description: "",
-  requirements: "",
-  company_profile: "",
-  benefits: "",
-  employment_type: "",
-  required_experience: "",
-  required_education: "",
-  industry: "",
-  function: "",
-  telecommuting: 0,
-  has_company_logo: 1,
-  has_questions: 0,
-};
+type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>
 
-const samplePosting: JobPostingInput = {
-  title: "Remote Data Entry Specialist",
+type FormFields = Pick<
+  JobPostingInput,
+  "title" | "company_profile" | "description" | "requirements" | "benefits"
+>
+
+const samplePosting: FormFields = {
+  title: "Remote Accounts Payable Specialist (Immediate Start)",
   company_profile:
-    "Global Processing Partners claims to provide remote clerical support for Fortune 500 clients. Employees are expected to handle sensitive documents and payments.",
+    "Nimbus Finance is a regional outsourcing firm supporting mid-market clients with day-to-day operations.",
   description:
-    "We are urgently hiring remote data entry specialists to process client payments. Work from home, full-time hours, competitive weekly pay. Applicants will be required to purchase a laptop from our approved vendor, which will be reimbursed with your first paycheck.",
+    "We are expanding our remote accounting pod to support new enterprise contracts. You will process invoices, maintain vendor ledgers, and support monthly close for North America clients.",
   requirements:
-    "Must be detail oriented and able to work without supervision. Comfortable handling large volumes of transactions. Familiarity with payment platforms and quick to learn company systems.",
+    "2+ years of accounts payable experience • Familiar with QuickBooks or NetSuite • Comfortable working remote with verified identity • Must pass background screening at hire.",
   benefits:
-    "Weekly payouts via wire transfer. Flexible hours. Career advancement opportunities.",
-  employment_type: "Full-time",
-  required_experience: "No experience",
-  required_education: "Not required",
-  industry: "Financial Services",
-  function: "Administrative",
-  telecommuting: 1,
-  has_company_logo: 0,
-  has_questions: 0,
-};
+    "Competitive hourly pay • 401(k) match after 90 days • Remote stipend • Bonus eligibility based on accuracy and throughput.",
+}
 
-const metricLabels: Record<keyof Required<MetadataResponse>["val_metrics"], string> = {
+const metricLabels: Record<MetricKey, string> = {
   f1: "F1",
   precision: "Precision",
   recall: "Recall",
   roc_auc: "ROC AUC",
   pr_auc: "PR AUC",
   brier: "Brier",
-};
-
-function formatPercent(value?: number) {
-  if (value === undefined || value === null) return "--";
-  return `${(value * 100).toFixed(1)}%`;
 }
 
-function MetricsTable({ metadata }: { metadata?: MetadataResponse }) {
-  if (!metadata) {
-    return (
-      <div className="space-y-2">
-        {[...Array(3)].map((_, idx) => (
-          <Skeleton key={idx} className="h-5 w-full" />
-        ))}
-      </div>
-    );
+function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
+  if (value === undefined || value === null) {
+    return "—"
   }
 
+  const formatter = new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 3,
+    minimumFractionDigits: options?.style === "percent" ? 1 : 2,
+    ...options,
+  })
+  return formatter.format(value)
+}
+
+function metricToPercent(value?: number | null) {
+  if (value === undefined || value === null) {
+    return 0
+  }
+  return Math.min(100, Math.max(0, Math.round(value * 100)))
+}
+
+export default function HomePage() {
+  const [form, setForm] = useState<FormFields>(samplePosting)
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const apiBaseUrl = useMemo(() => getApiBaseUrl(), [])
+
+  const {
+    data: metadata,
+    error: metadataError,
+    isLoading: isLoadingMetadata,
+  } = useSWR<MetadataResponse>("metadata", fetchMetadata, {
+    revalidateOnFocus: false,
+  })
+
+  const {
+    data: tokenImportance,
+    isLoading: isLoadingImportance,
+  } = useSWR<TokenImportanceResponse>(
+    "token-importance",
+    () => fetchTokenImportance(12),
+    { revalidateOnFocus: false }
+  )
+
+  const {
+    data: tokenFrequency,
+    isLoading: isLoadingFrequency,
+  } = useSWR<TokenFrequencyResponse>(
+    "token-frequency",
+    () => fetchTokenFrequency(12),
+    { revalidateOnFocus: false }
+  )
+
+  const {
+    data: thresholdMetrics,
+    isLoading: isLoadingThresholds,
+  } = useSWR<ThresholdMetricsResponse>(
+    "threshold-metrics",
+    () => fetchThresholdMetrics(40),
+    { revalidateOnFocus: false }
+  )
+
+  const {
+    data: latencySummary,
+    isLoading: isLoadingLatency,
+  } = useSWR<LatencySummaryResponse>(
+    "latency-summary",
+    () => fetchLatencySummary(),
+    { revalidateOnFocus: false }
+  )
+
+  const handleChange = useCallback(
+    (field: keyof FormFields) =>
+      (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const value = event.target.value
+        setForm((prev) => ({ ...prev, [field]: value }))
+      },
+    []
+  )
+
+  const resetToSample = useCallback(() => {
+    setForm(samplePosting)
+    setPrediction(null)
+    setError(null)
+  }, [])
+
+  const handlePredict = useCallback(
+    async (event: React.FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+      setIsSubmitting(true)
+      setError(null)
+
+      const payload: JobPostingInput = {
+        title: form.title.trim(),
+        company_profile: form.company_profile?.trim() || null,
+        description: form.description?.trim() || null,
+        requirements: form.requirements?.trim() || null,
+        benefits: form.benefits?.trim() || null,
+      }
+
+      try {
+        const result = await predictSingle(payload)
+        setPrediction(result)
+      } catch (predictError) {
+        const message =
+          predictError instanceof Error
+            ? predictError.message
+            : "Unable to score the job posting."
+        setError(message)
+        setPrediction(null)
+      } finally {
+        setIsSubmitting(false)
+      }
+    },
+    [form]
+  )
+
+  const metrics = useMemo(() => {
+    if (!metadata) {
+      return []
+    }
+    const entries: {
+      label: string
+      key: MetricKey
+      validation?: number | null
+      testing?: number | null
+    }[] = []
+
+    ;(Object.keys(metricLabels) as MetricKey[]).forEach((metric) => {
+      const validation = metadata.val_metrics?.[metric]
+      const testing = metadata.test_metrics?.[metric]
+      if (validation !== undefined || testing !== undefined) {
+        entries.push({
+          label: metricLabels[metric],
+          key: metric,
+          validation,
+          testing,
+        })
+      }
+    })
+
+    return entries
+  }, [metadata])
+
+  const thresholdSeries = useMemo(() => {
+    if (!thresholdMetrics?.points?.length) {
+      return []
+    }
+    return thresholdMetrics.points.map((point) => ({
+      x: point.threshold,
+      y: point.f1,
+    }))
+  }, [thresholdMetrics])
+
+  const latencyBars = useMemo(() => {
+    if (!latencySummary?.items?.length) {
+      return []
+    }
+
+    return latencySummary.items.map((item) => ({
+      batchSize: item.batch_size,
+      p50: item.latency_p50_ms,
+      p95: item.latency_p95_ms,
+      throughput: item.throughput_rps,
+    }))
+  }, [latencySummary])
+
+  const grayZoneDetails = useMemo(() => {
+    if (!metadata) {
+      return null
+    }
+
+    const policy = metadata.gray_zone
+    return [
+      { label: "Width", value: formatMetric(policy.width, { maximumFractionDigits: 2 }) },
+      { label: "Lower bound", value: formatMetric(policy.lower, { maximumFractionDigits: 2 }) },
+      { label: "Upper bound", value: formatMetric(policy.upper, { maximumFractionDigits: 2 }) },
+      { label: "Labels", value: `${policy.negative_label} → ${policy.review_label} → ${policy.positive_label}` },
+    ]
+  }, [metadata])
+
+  const predictionBadge = useMemo(() => {
+    if (!prediction) {
+      return { tone: "outline" as const, label: "Awaiting submission" }
+    }
+
+    const tone =
+      prediction.decision.toLowerCase() === "fraud"
+        ? "destructive"
+        : prediction.decision.toLowerCase() === "review"
+          ? "secondary"
+          : "default"
+
+    return { tone, label: prediction.decision }
+  }, [prediction])
+
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Split</TableHead>
-          {Object.values(metricLabels).map((label) => (
-            <TableHead key={label} className="text-right">
-              {label}
-            </TableHead>
-          ))}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {["val_metrics", "test_metrics"].map((split) => {
-          const row = metadata[split as keyof MetadataResponse] as MetadataResponse["val_metrics"];
-          const label = split === "val_metrics" ? "Validation" : "Test";
-          return (
-            <TableRow key={split}>
-              <TableCell className="font-medium">{label}</TableCell>
-              {Object.keys(metricLabels).map((metricKey) => {
-                const value = row?.[metricKey as keyof MetricSet];
-                const displayValue = metricKey === "brier" ? value?.toFixed(3) ?? "--" : formatPercent(value);
-                return (
-                  <TableCell key={metricKey} className="text-right">
-                    {displayValue}
-                  </TableCell>
-                );
-              })}
-            </TableRow>
-          );
-        })}
-      </TableBody>
-    </Table>
-  );
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-8">
+        <header className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Badge variant="secondary" className="w-fit">
+              <AlignVerticalSpaceBetween className="size-4" />
+              Model Risk Dashboard
+            </Badge>
+            <h1 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
+              Spot questionable job postings before they hit applicants.
+            </h1>
+            <p className="text-muted-foreground max-w-3xl text-base">
+              Score listings using the calibrated pipeline, inspect the features that drive
+              decisions, and keep an eye on model health metrics — all in one vertical flow.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
+              <ShieldCheck className="size-4 text-primary" />
+              Serving threshold:{" "}
+              <strong className="text-foreground">
+                {metadata ? formatMetric(metadata.threshold, { maximumFractionDigits: 3 }) : "…"}
+              </strong>
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
+              <Activity className="size-4 text-chart-2" />
+              API: <code className="font-mono text-xs">{apiBaseUrl}</code>
+            </span>
+            {metadata?.calibration_method ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
+                <Brain className="size-4 text-chart-3" />
+                Calibration: {metadata.calibration_method}
+              </span>
+            ) : null}
+          </div>
+        </header>
+
+        <section className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+          <div className="flex flex-col gap-6">
+            <Card className="backdrop-blur">
+              <CardHeader>
+                <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <span>Score a job posting</span>
+                  <Badge variant={predictionBadge.tone} className="uppercase tracking-wide">
+                    {predictionBadge.label}
+                  </Badge>
+                </CardTitle>
+                <CardDescription>
+                  Paste details from a listing. We keep the text local until you submit for scoring.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form className="flex flex-col gap-4" onSubmit={handlePredict}>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="title">Job title *</Label>
+                    <Input
+                      id="title"
+                      required
+                      value={form.title}
+                      onChange={handleChange("title")}
+                      placeholder="Fraud Prevention Specialist"
+                    />
+                  </div>
+                  <Tabs defaultValue="description" className="w-full">
+                    <TabsList>
+                      <TabsTrigger value="description">Description</TabsTrigger>
+                      <TabsTrigger value="requirements">Requirements</TabsTrigger>
+                      <TabsTrigger value="company">Company profile</TabsTrigger>
+                      <TabsTrigger value="benefits">Benefits</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="description" className="mt-2 flex flex-col gap-2">
+                      <Label htmlFor="description">Role overview</Label>
+                      <Textarea
+                        id="description"
+                        rows={8}
+                        value={form.description ?? ""}
+                        onChange={handleChange("description")}
+                        placeholder="Enter the main body of the job posting..."
+                      />
+                    </TabsContent>
+                    <TabsContent value="requirements" className="mt-2 flex flex-col gap-2">
+                      <Label htmlFor="requirements">Requirements</Label>
+                      <Textarea
+                        id="requirements"
+                        rows={6}
+                        value={form.requirements ?? ""}
+                        onChange={handleChange("requirements")}
+                        placeholder="Experience expectations, background checks, etc."
+                      />
+                    </TabsContent>
+                    <TabsContent value="company" className="mt-2 flex flex-col gap-2">
+                      <Label htmlFor="company_profile">Company profile</Label>
+                      <Textarea
+                        id="company_profile"
+                        rows={5}
+                        value={form.company_profile ?? ""}
+                        onChange={handleChange("company_profile")}
+                        placeholder="How the company presents itself in the listing."
+                      />
+                    </TabsContent>
+                    <TabsContent value="benefits" className="mt-2 flex flex-col gap-2">
+                      <Label htmlFor="benefits">Benefits</Label>
+                      <Textarea
+                        id="benefits"
+                        rows={4}
+                        value={form.benefits ?? ""}
+                        onChange={handleChange("benefits")}
+                        placeholder="Perks, compensation, or promises made in the posting."
+                      />
+                    </TabsContent>
+                  </Tabs>
+                  {error ? (
+                    <Alert variant="destructive" className="mt-2">
+                      <AlertTriangle className="size-4" />
+                      <AlertTitle>Scoring failed</AlertTitle>
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  ) : null}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                    <div className="text-muted-foreground text-xs">
+                      Fields marked * are required. We automatically apply your gray-zone policy.
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={resetToSample}
+                        disabled={isSubmitting}
+                      >
+                        Load sample
+                      </Button>
+                      <Button type="submit" disabled={isSubmitting}>
+                        Score posting
+                        <ArrowRight className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              </CardContent>
+              <CardFooter className="flex flex-col gap-4 border-t border-border/60 pt-6">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <MetricCallout
+                    label="Fraud probability"
+                    value={
+                      prediction
+                        ? formatMetric(prediction.probability_fraud, {
+                            style: "percent",
+                            maximumFractionDigits: 1,
+                          })
+                        : "—"
+                    }
+                    accent={prediction ? "text-chart-1" : undefined}
+                  />
+                  <MetricCallout
+                    label="Binary label"
+                    value={
+                      prediction
+                        ? prediction.binary_label === 1
+                          ? "Fraud"
+                          : "Legit"
+                        : "Pending"
+                    }
+                    accent={
+                      prediction
+                        ? prediction.binary_label === 1
+                          ? "text-destructive"
+                          : "text-chart-2"
+                        : undefined
+                    }
+                  />
+                  <MetricCallout
+                    label="Threshold applied"
+                    value={
+                      prediction
+                        ? formatMetric(prediction.threshold, { maximumFractionDigits: 3 })
+                        : metadata
+                          ? formatMetric(metadata.threshold, { maximumFractionDigits: 3 })
+                          : "—"
+                    }
+                    accent={prediction ? "text-chart-3" : undefined}
+                  />
+                </div>
+                {prediction ? (
+                  <div className="text-muted-foreground text-xs">
+                    Gray-zone band:{" "}
+                    <span className="font-medium text-foreground">
+                      {formatMetric(prediction.gray_zone.lower, { maximumFractionDigits: 3 })} -{" "}
+                      {formatMetric(prediction.gray_zone.upper, { maximumFractionDigits: 3 })}
+                    </span>{" "}
+                    ({prediction.gray_zone.negative_label} → {prediction.gray_zone.review_label} →{" "}
+                    {prediction.gray_zone.positive_label})
+                  </div>
+                ) : (
+                  <div className="grid gap-2 text-xs text-muted-foreground">
+                    <div>
+                      Gray-zone band:{" "}
+                      <span className="font-medium text-foreground">
+                        {metadata
+                          ? `${formatMetric(metadata.gray_zone.lower, { maximumFractionDigits: 3 })} - ${formatMetric(metadata.gray_zone.upper, { maximumFractionDigits: 3 })}`
+                          : "—"}
+                      </span>
+                    </div>
+                    <ul className="grid gap-1 pl-4 marker:text-primary list-disc">
+                      <li>Text goes through the same TF-IDF + tabular pipeline used during training.</li>
+                      <li>
+                        Calibrated probabilities are compared to the current threshold and gray-zone policy.
+                      </li>
+                      <li>
+                        Predictions return decision labels along with metadata so you can log or review them.
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </CardFooter>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <LineChartIcon className="size-5 text-chart-1" />
+                  Performance trends
+                </CardTitle>
+                <CardDescription>
+                  Threshold tuning and latency envelopes from the latest training benchmark.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-8">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-foreground">
+                      F1 vs. threshold
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Latest F1:{" "}
+                      <strong className="text-foreground">
+                        {thresholdSeries.length
+                          ? formatMetric(thresholdSeries[thresholdSeries.length - 1].y, {
+                              maximumFractionDigits: 3,
+                            })
+                          : "—"}
+                      </strong>
+                    </span>
+                  </div>
+                  {isLoadingThresholds ? (
+                    <Skeleton className="h-36 w-full" />
+                  ) : thresholdSeries.length ? (
+                    <LineChart
+                      points={thresholdSeries}
+                      color="var(--chart-1)"
+                      minY={0}
+                      maxY={1}
+                      formatX={(value) =>
+                        formatMetric(value, { maximumFractionDigits: 2 })
+                      }
+                      formatY={(value) => formatMetric(value, { maximumFractionDigits: 2 })}
+                    />
+                  ) : (
+                    <Alert>
+                      <AlertTitle>No threshold sweep found</AlertTitle>
+                      <AlertDescription>
+                        Run the training pipeline to regenerate threshold metrics and plots.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <Separator />
+
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-foreground">
+                      Latency envelopes
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Throughput @ batch 32:{" "}
+                      <strong className="text-foreground">
+                        {latencyBars.length
+                          ? formatMetric(
+                              latencyBars.find((bar) => bar.batchSize === 32)?.throughput,
+                              { maximumFractionDigits: 0, minimumFractionDigits: 0 }
+                            )
+                          : "—"}{" "}
+                        rps
+                      </strong>
+                    </span>
+                  </div>
+                  {isLoadingLatency ? (
+                    <Skeleton className="h-36 w-full" />
+                  ) : latencyBars.length ? (
+                    <LatencyChart bars={latencyBars} />
+                  ) : (
+                    <Alert>
+                      <AlertTitle>No latency benchmark</AlertTitle>
+                      <AlertDescription>
+                        Execute the benchmark suite to populate latency statistics.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart4 className="size-5 text-primary" />
+                  Model snapshot
+                </CardTitle>
+                <CardDescription>
+                  Validation and held-out test scores from the most recent training run.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {isLoadingMetadata ? (
+                  <div className="grid gap-3">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-11/12" />
+                    <Skeleton className="h-4 w-10/12" />
+                  </div>
+                ) : metadataError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertTitle>Metadata unavailable</AlertTitle>
+                    <AlertDescription>
+                      {metadataError instanceof Error
+                        ? metadataError.message
+                        : "Failed to load model metrics."}
+                    </AlertDescription>
+                  </Alert>
+                ) : metadata ? (
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <h2 className="text-lg font-semibold">{metadata.model_name}</h2>
+                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1">
+                          <Flame className="size-4 text-chart-4" />
+                          {metadata.model_type} · {metadata.feature_type}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1">
+                          <Activity className="size-4 text-chart-2" />
+                          Test ECE: {formatMetric(metadata.test_ece, { maximumFractionDigits: 3 })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid gap-3">
+                      {metrics.map((metric) => (
+                        <div key={metric.key} className="flex flex-col gap-1.5">
+                          <div className="flex items-end justify-between text-xs uppercase text-muted-foreground">
+                            <span>{metric.label}</span>
+                            <span>
+                              Val:{" "}
+                              <strong className="text-foreground">
+                                {formatMetric(metric.validation)}
+                              </strong>{" "}
+                              · Test:{" "}
+                              <strong className="text-foreground">
+                                {formatMetric(metric.testing)}
+                              </strong>
+                            </span>
+                          </div>
+                          <div className="relative h-2 rounded-full bg-muted">
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-full bg-primary/80 transition-all"
+                              style={{ width: `${metricToPercent(metric.testing) || 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
+              </CardContent>
+              {grayZoneDetails ? (
+                <>
+                  <Separator className="mt-2" />
+                  <CardFooter className="flex flex-col gap-2 pt-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Gray-zone policy
+                    </div>
+                    <dl className="grid gap-1 text-sm">
+                      {grayZoneDetails.map((item) => (
+                        <div
+                          key={item.label}
+                          className="flex items-center justify-between gap-2 text-muted-foreground"
+                        >
+                          <dt>{item.label}</dt>
+                          <dd className="font-medium text-foreground">{item.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </CardFooter>
+                </>
+              ) : null}
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="size-5 text-chart-5" />
+                  Feature signals
+                </CardTitle>
+                <CardDescription>
+                  Inspect how tokens influence the calibration stack across fraud (positive) and
+                  legitimate (negative) labels.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                <Tabs defaultValue="importance">
+                  <TabsList>
+                    <TabsTrigger value="importance">Token importance</TabsTrigger>
+                    <TabsTrigger value="frequency">Token frequency</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="importance" className="mt-3">
+                    {isLoadingImportance ? (
+                      <Skeleton className="h-36 w-full" />
+                    ) : tokenImportance ? (
+                      <div className="grid gap-4 lg:grid-cols-2">
+                        <TokenList
+                          title="Fraud-leaning tokens"
+                          tone="text-destructive"
+                          items={tokenImportance.positive}
+                        />
+                        <TokenList
+                          title="Legit-leaning tokens"
+                          tone="text-chart-2"
+                          items={tokenImportance.negative}
+                        />
+                      </div>
+                    ) : (
+                      <Alert>
+                        <AlertTitle>No token importance available</AlertTitle>
+                        <AlertDescription>
+                          The current artifacts do not expose token weights. Re-run training with
+                          reporting enabled.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </TabsContent>
+                  <TabsContent value="frequency" className="mt-3">
+                    {isLoadingFrequency ? (
+                      <Skeleton className="h-36 w-full" />
+                    ) : tokenFrequency ? (
+                      <div className="rounded-xl border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Token</TableHead>
+                              <TableHead className="text-right">Fraud count</TableHead>
+                              <TableHead className="text-right">Legit count</TableHead>
+                              <TableHead className="text-right">Δ</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {tokenFrequency.items.map((item) => (
+                              <TableRow key={item.token}>
+                                <TableCell className="font-medium">{item.token}</TableCell>
+                                <TableCell className="text-right">
+                                  {item.positive_count}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {item.negative_count}
+                                </TableCell>
+                                <TableCell
+                                  className={`text-right font-semibold ${
+                                    item.difference >= 0 ? "text-chart-1" : "text-chart-2"
+                                  }`}
+                                >
+                                  {item.difference >= 0 ? "+" : ""}
+                                  {item.difference}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <Alert>
+                        <AlertTitle>No frequency breakdown</AlertTitle>
+                        <AlertDescription>
+                          Run the training pipeline with insights enabled to populate frequency
+                          slices.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </main>
+    </div>
+  )
 }
 
-type MetricSet = MetadataResponse["val_metrics"];
-
-function DecisionBadge({ decision }: { decision?: string }) {
-  if (!decision) return null;
-  const normalized = decision.toLowerCase();
-  const variant = normalized === "fraud" ? "destructive" : normalized === "review" ? "outline" : "secondary";
-  return <Badge variant={variant}>{decision}</Badge>;
-}
-
-function BooleanToggle({
+function MetricCallout({
   label,
-  description,
   value,
-  onChange,
+  accent,
 }: {
-  label: string;
-  description?: string;
-  value: number;
-  onChange: (value: number) => void;
+  label: string
+  value: string
+  accent?: string
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <Label className="text-sm font-medium leading-none">{label}</Label>
-        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
+    <div className="rounded-lg border border-border/60 bg-card px-4 py-3 text-sm">
+      <div className="text-muted-foreground text-xs uppercase tracking-wide">{label}</div>
+      <div className={`text-lg font-semibold ${accent ?? "text-foreground"}`}>{value}</div>
+    </div>
+  )
+}
+
+type TokenWeightItem = TokenImportanceResponse["positive"][number]
+
+function TokenList({
+  title,
+  tone,
+  items,
+}: {
+  title: string
+  tone: string
+  items: TokenWeightItem[]
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {title}
+        </span>
+        <span className={`inline-flex items-center gap-1 text-xs font-medium ${tone}`}>
+          <ArrowRight className="size-4" />
+          Influence
+        </span>
       </div>
-      <Toggle
-        pressed={value === 1}
-        onPressedChange={(pressed) => onChange(pressed ? 1 : 0)}
-        aria-label={label}
-        className="min-w-[72px]"
+      <ul className="grid gap-2">
+        {items.slice(0, 12).map((token) => (
+          <li
+            key={`${title}-${token.term}`}
+            className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
+          >
+            <span className="font-medium text-foreground">{token.term}</span>
+            <span className={`${tone} font-semibold`}>
+              {formatMetric(token.weight, { maximumFractionDigits: 3 })}
+            </span>
+          </li>
+        ))}
+        {items.length === 0 ? (
+          <li className="text-muted-foreground text-sm">No tokens surfaced.</li>
+        ) : null}
+      </ul>
+    </div>
+  )
+}
+
+type ChartPoint = { x: number; y: number }
+
+function LineChart({
+  points,
+  color,
+  minY,
+  maxY,
+  formatX,
+  formatY,
+}: {
+  points: ChartPoint[]
+  color: string
+  minY?: number
+  maxY?: number
+  formatX?: (value: number) => string
+  formatY?: (value: number) => string
+}) {
+  const gradientId = useId()
+  if (!points.length) {
+    return null
+  }
+
+  const width = 420
+  const height = 160
+  const padding = 16
+
+  const xs = points.map((point) => point.x)
+  const ys = points.map((point) => point.y)
+
+  const minX = Math.min(...xs)
+  let maxX = Math.max(...xs)
+  let minDataY = Math.min(...ys)
+  let maxDataY = Math.max(...ys)
+
+  if (typeof minY === "number") {
+    minDataY = Math.min(minDataY, minY)
+  }
+  if (typeof maxY === "number") {
+    maxDataY = Math.max(maxDataY, maxY)
+  }
+
+  if (Math.abs(maxX - minX) < 1e-9) {
+    maxX = minX + 1
+  }
+  if (Math.abs(maxDataY - minDataY) < 1e-9) {
+    maxDataY = minDataY + 1
+  }
+
+  const scaleX = (value: number) =>
+    padding + ((value - minX) / (maxX - minX)) * (width - padding * 2)
+  const scaleY = (value: number) =>
+    height - padding - ((value - minDataY) / (maxDataY - minDataY)) * (height - padding * 2)
+
+  const pathData = points
+    .map((point, index) => {
+      const x = scaleX(point.x)
+      const y = scaleY(point.y)
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`
+    })
+    .join(" ")
+
+  const xFormatter = formatX ?? ((value: number) => value.toFixed(2))
+  const yFormatter = formatY ?? ((value: number) => value.toFixed(2))
+
+  return (
+    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-40 w-full"
+        aria-hidden="true"
+        role="img"
       >
-        {value === 1 ? "Yes" : "No"}
-      </Toggle>
+        <defs>
+          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.45" />
+            <stop offset="100%" stopColor={color} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path
+          d={`${pathData} L ${scaleX(points[points.length - 1].x)} ${scaleY(minDataY)} L ${scaleX(points[0].x)} ${scaleY(minDataY)} Z`}
+          fill={`url(#${gradientId})`}
+          stroke="none"
+        />
+        <path
+          d={pathData}
+          fill="none"
+          stroke={color}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+        <span>{xFormatter(minX)}</span>
+        <span>{xFormatter(maxX)}</span>
+      </div>
+      <div className="mt-1 flex justify-end text-xs text-muted-foreground">
+        <span>
+          Top:{" "}
+          <strong className="text-foreground">
+            {yFormatter(points.reduce((highest, point) => Math.max(highest, point.y), minDataY))}
+          </strong>
+        </span>
+      </div>
     </div>
-  );
+  )
 }
 
-function TokenTable({ title, items, emptyMessage }: { title: string; items?: { [key: string]: string | number }[]; emptyMessage: string }) {
-  return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="text-base font-semibold">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {!items || items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {Object.keys(items[0]).map((key) => (
-                  <TableHead key={key} className="capitalize">
-                    {key.replace(/_/g, " ")}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((row, idx) => (
-                <TableRow key={`${title}-${idx}`}>
-                  {Object.values(row).map((value, cellIdx) => (
-                    <TableCell key={cellIdx}>{typeof value === "number" ? value.toLocaleString() : value}</TableCell>
-                  ))}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-  );
+type LatencyBar = {
+  batchSize: number
+  p50: number
+  p95: number
+  throughput: number
 }
 
-function PredictionSummary({ prediction, metadata }: { prediction?: PredictionResponse | null; metadata?: MetadataResponse }) {
-  const band = prediction?.gray_zone;
-  const probability = prediction?.probability_fraud ?? 0;
+function LatencyChart({ bars }: { bars: LatencyBar[] }) {
+  if (!bars.length) {
+    return null
+  }
+
+  const maxLatency = bars.reduce((max, bar) => Math.max(max, bar.p95), 0) || 1
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-          <ShieldIcon decision={prediction?.decision} />
-          {prediction ? "Latest Prediction" : "Run the first prediction"}
-        </CardTitle>
-        <CardDescription>
-          {prediction
-            ? `This posting is classified as ${prediction.decision.toUpperCase()} with ${(probability * 100).toFixed(1)}% fraud probability.`
-            : "Submit a job posting description to receive a calibrated decision."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {prediction ? (
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <DecisionBadge decision={prediction.decision} />
-              <Badge variant="outline">Probability: {(probability * 100).toFixed(2)}%</Badge>
-              <Badge variant="outline">Threshold: {(prediction.threshold * 100).toFixed(2)}%</Badge>
+    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4">
+      <div className="mb-3 flex items-center gap-4 text-xs text-muted-foreground">
+        <span className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-chart-2" />
+          p50 latency
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-destructive/70" />
+          p95 latency
+        </span>
+      </div>
+      <div className="flex h-40 items-end gap-5">
+        {bars.map((bar) => {
+          const p95Height = Math.max(6, (bar.p95 / maxLatency) * 100)
+          const p50Height = Math.max(4, (bar.p50 / maxLatency) * 100)
+          return (
+            <div key={bar.batchSize} className="flex flex-col items-center gap-2">
+              <div className="relative flex h-32 w-10 items-end justify-center">
+                <div
+                  className="absolute bottom-0 w-6 rounded-md bg-destructive/70"
+                  style={{ height: `${p95Height}%` }}
+                />
+                <div
+                  className="absolute bottom-0 w-3 rounded-md bg-chart-2"
+                  style={{ height: `${p50Height}%` }}
+                />
+              </div>
+              <div className="text-xs font-medium text-foreground">×{bar.batchSize}</div>
+              <div className="text-[11px] text-muted-foreground">
+                {formatMetric(bar.throughput, {
+                  maximumFractionDigits: 0,
+                  minimumFractionDigits: 0,
+                })}{" "}
+                rps
+              </div>
             </div>
-            {band ? (
-              <div className="rounded-md border bg-muted/30 p-3 text-sm">
-                <p className="font-medium">Gray-zone policy</p>
-                <p className="text-muted-foreground">
-                  Review whenever probability is between {(band.lower * 100).toFixed(1)}% and {(band.upper * 100).toFixed(1)}%. Outside this band the
-                  decision is {band.positive_label?.toUpperCase()} / {band.negative_label?.toUpperCase()}.
-                </p>
-              </div>
-            ) : null}
-            {metadata?.test_metrics ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Calibration quality</AlertTitle>
-                <AlertDescription>
-                  Test ECE: {metadata?.test_ece !== undefined && metadata?.test_ece !== null ? metadata.test_ece.toFixed(3) : "--"}. Lower is better; consider retraining if this grows.
-                </AlertDescription>
-              </Alert>
-            ) : null}
-          </div>
-        ) : (
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p>
-              Provide a job posting title and description. The model will score the posting, apply the calibrated threshold, and surface a gray-zone decision for
-              human triage.
-            </p>
-            <p>Need inspiration? Use the sample posting to see how a suspicious advert is handled.</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ShieldIcon({ decision }: { decision?: string }) {
-  if (!decision) {
-    return <ClipboardList className="h-5 w-5" />;
-  }
-  const normalized = decision.toLowerCase();
-  if (normalized === "fraud") {
-    return <AlertTriangle className="h-5 w-5 text-destructive" />;
-  }
-  if (normalized === "review") {
-    return <Sparkles className="h-5 w-5 text-amber-500" />;
-  }
-  return <TrendingUp className="h-5 w-5 text-emerald-500" />;
-}
-
-export function HomePage() {
-  const [form, setForm] = useState<JobPostingInput>(defaultPosting);
-  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  const { data: metadata, isLoading: metadataLoading } = useSWR<MetadataResponse>("metadata", fetchMetadata, {
-    revalidateOnFocus: false,
-  });
-  const { data: tokenImportance } = useSWR<TokenImportanceResponse>("token-importance", () => fetchTokenImportance(15), {
-    revalidateOnFocus: false,
-  });
-  const { data: tokenFrequency } = useSWR<TokenFrequencyResponse>("token-frequency", () => fetchTokenFrequency(15), {
-    revalidateOnFocus: false,
-  });
-
-  const apiBase = useMemo(() => getApiBaseUrl(), []);
-
-  const updateField = <K extends keyof JobPostingInput>(key: K, value: JobPostingInput[K]) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const result = await predictSingle(form);
-      setPrediction(result);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Prediction failed");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const resetForm = () => {
-    setForm(defaultPosting);
-    setPrediction(null);
-  };
-
-  const loadSample = () => {
-    setForm(samplePosting);
-  };
-
-  return (
-    <div className="container mx-auto max-w-6xl space-y-6 py-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Spot the Scam Control Panel</h1>
-          <p className="text-muted-foreground">
-            Submit job postings, inspect calibrated metrics, and explore top warning signals surfaced by the classifier.
-          </p>
-          <p className="text-xs text-muted-foreground">API base: {apiBase}</p>
-        </div>
-        <Button variant="outline" onClick={loadSample} className="w-full gap-2 lg:w-auto">
-          <Sparkles className="h-4 w-4" />
-          Load sample scam posting
-        </Button>
+          )
+        })}
       </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle>Score a job posting</CardTitle>
-            <CardDescription>Provide key details and the model will return a calibrated fraud probability.</CardDescription>
-          </CardHeader>
-          <form onSubmit={handleSubmit}>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">Job title</Label>
-                <Input
-                  id="title"
-                  value={form.title}
-                  onChange={(event) => updateField("title", event.target.value)}
-                  required
-                  placeholder="e.g. Senior Financial Analyst"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company_profile">Company overview</Label>
-                <Textarea
-                  id="company_profile"
-                  value={form.company_profile ?? ""}
-                  onChange={(event) => updateField("company_profile", event.target.value)}
-                  rows={3}
-                  placeholder="What does the company say about itself?"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Job description</Label>
-                <Textarea
-                  id="description"
-                  value={form.description ?? ""}
-                  onChange={(event) => updateField("description", event.target.value)}
-                  required
-                  rows={6}
-                  placeholder="Core responsibilities, duties, and promises made in the posting."
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="requirements">Requirements</Label>
-                <Textarea
-                  id="requirements"
-                  value={form.requirements ?? ""}
-                  onChange={(event) => updateField("requirements", event.target.value)}
-                  rows={4}
-                  placeholder="Summarize requirements bullet points."
-                />
-              </div>
-
-              <Separator />
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => setShowAdvanced((prev) => !prev)}
-              >
-                {showAdvanced ? "Hide advanced fields" : "Show advanced fields"}
-              </Button>
-
-              {showAdvanced ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label>Benefits</Label>
-                      <Textarea
-                        value={form.benefits ?? ""}
-                        onChange={(event) => updateField("benefits", event.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Employment type</Label>
-                      <Input
-                        value={form.employment_type ?? ""}
-                        onChange={(event) => updateField("employment_type", event.target.value)}
-                        placeholder="Full-time, contract, ..."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Required experience</Label>
-                      <Input
-                        value={form.required_experience ?? ""}
-                        onChange={(event) => updateField("required_experience", event.target.value)}
-                        placeholder="e.g. 3+ years"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Required education</Label>
-                      <Input
-                        value={form.required_education ?? ""}
-                        onChange={(event) => updateField("required_education", event.target.value)}
-                        placeholder="e.g. Bachelor's"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Industry</Label>
-                      <Input
-                        value={form.industry ?? ""}
-                        onChange={(event) => updateField("industry", event.target.value)}
-                        placeholder="e.g. Information Technology"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Function</Label>
-                      <Input
-                        value={form.function ?? ""}
-                        onChange={(event) => updateField("function", event.target.value)}
-                        placeholder="e.g. Sales"
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <BooleanToggle
-                      label="Telecommuting allowed"
-                      description="Remote or work-from-home role."
-                      value={form.telecommuting ?? 0}
-                      onChange={(value) => updateField("telecommuting", value)}
-                    />
-                    <BooleanToggle
-                      label="Company logo present"
-                      description="Job advert displays a corporate logo."
-                      value={form.has_company_logo ?? 0}
-                      onChange={(value) => updateField("has_company_logo", value)}
-                    />
-                    <BooleanToggle
-                      label="Has application questions"
-                      description="Posting includes screening questions."
-                      value={form.has_questions ?? 0}
-                      onChange={(value) => updateField("has_questions", value)}
-                    />
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-            <CardFooter className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-              <Button type="button" variant="outline" onClick={resetForm} className="w-full sm:w-auto">
-                Reset
-              </Button>
-              <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
-                {submitting ? (
-                  <span className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Scoring...
-                  </span>
-                ) : (
-                  "Score posting"
-                )}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-
-        <div className="space-y-6">
-          <PredictionSummary prediction={prediction} metadata={metadata} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Model snapshot</CardTitle>
-              <CardDescription>
-                {metadataLoading
-                  ? "Loading metrics"
-                  : metadata
-                  ? `${metadata.model_name} (${metadata.model_type}, ${metadata.feature_type}) calibrated via ${metadata.calibration_method ?? "--"}`
-                  : "Start the API to load metadata."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {metadata ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                    <Badge variant="outline">Threshold {(metadata.threshold * 100).toFixed(2)}%</Badge>
-                    <Badge variant="outline">Gray-zone ±{(metadata.gray_zone.width * 100 / 2).toFixed(1)}%</Badge>
-                  </div>
-                  <MetricsTable metadata={metadata} />
-                </>
-              ) : (
-                <Skeleton className="h-24 w-full" />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Token insights</CardTitle>
-              <CardDescription>Top signals learned from the training data.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="positive" className="w-full">
-                <TabsList className="grid grid-cols-3">
-                  <TabsTrigger value="positive" className="flex items-center gap-1">
-                    <TrendingUp className="h-4 w-4" />
-                    Fraud cues
-                  </TabsTrigger>
-                  <TabsTrigger value="negative" className="flex items-center gap-1">
-                    <TrendingDown className="h-4 w-4" />
-                    Legit cues
-                  </TabsTrigger>
-                  <TabsTrigger value="frequency" className="flex items-center gap-1">
-                    <ClipboardList className="h-4 w-4" />
-                    Frequency
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="positive">
-                  <TokenTable
-                    title="Fraud-skewed n-grams"
-                    items={tokenImportance?.positive?.map((row) => ({ term: row.term, weight: row.weight.toFixed(4) }))}
-                    emptyMessage="Train the classical model to populate token importances."
-                  />
-                </TabsContent>
-                <TabsContent value="negative">
-                  <TokenTable
-                    title="Legitimate n-grams"
-                    items={tokenImportance?.negative?.map((row) => ({ term: row.term, weight: row.weight.toFixed(4) }))}
-                    emptyMessage="Train the classical model to populate token importances."
-                  />
-                </TabsContent>
-                <TabsContent value="frequency">
-                  <TokenTable
-                    title="Token frequency gap"
-                    items={tokenFrequency?.items?.map((row) => ({
-                      token: row.token,
-                      positive_count: row.positive_count,
-                      negative_count: row.negative_count,
-                      difference: row.difference,
-                    }))}
-                    emptyMessage="No frequency analysis available."
-                  />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
+      <div className="mt-3 flex w-full justify-between text-xs text-muted-foreground">
+        <span>0 ms</span>
+        <span>{formatMetric(maxLatency, { maximumFractionDigits: 0, minimumFractionDigits: 0 })} ms</span>
       </div>
-
-      {error ? (
-        <Alert variant="destructive">
-          <AlertTitle>Prediction failed</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      ) : null}
     </div>
-  );
+  )
 }
-
-export default HomePage;

@@ -10,14 +10,12 @@ from transformers import AutoModelForSequenceClassification
 from spot_scam.utils.logging import configure_logging
 from spot_scam.utils.paths import ARTIFACTS_DIR
 
-app = typer.Typer(add_completion=False)
 logger = configure_logging(__name__)
 
 
-@app.command()
-def transformer(
-    output_dir: Path = typer.Option(ARTIFACTS_DIR / "transformer" / "quantized", help="Destination for quantized weights."),
-    dtype: str = typer.Option("qint8", help="Target dtype (currently only qint8 supported)."),
+def main(
+    output_dir: Path = typer.Option(ARTIFACTS_DIR / "transformer" / "quantized", "--output-dir", help="Destination for quantized weights."),
+    dtype: str = typer.Option("qint8", "--dtype", help="Target dtype (currently only qint8 supported)."),
 ) -> None:
     """Quantize the fine-tuned transformer checkpoint using dynamic quantization."""
     best_dir = ARTIFACTS_DIR / "transformer" / "best"
@@ -54,7 +52,7 @@ def transformer(
 
 
 def entrypoint():
-    app()
+    typer.run(main)
 
 
 if __name__ == "__main__":

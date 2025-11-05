@@ -34,10 +34,14 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 Install Python dependencies (includes dev tooling):
 
 ```bash
-pip install -e .[dev]
+pip install -e '.[dev]'
 ```
 
+> [!TIP]
 > **Tip:** If you hit network restrictions, rerun with `pip install --no-cache-dir -e .[dev]`.
+
+> [!TIP]
+> Remove the quote marks around `.[dev]` if using Windows Command Prompt.
 
 ---
 
@@ -50,7 +54,10 @@ pip install -e .[dev]
 ./scripts/download_data.py
 ```
 
-The script downloads and extracts `fake_job_postings.csv` into `data/`. Raw files remain Git-ignored.
+The script downloads and extracts `fake_job_postings.csv` (and the alternate `Fake_Real_Job_Posting.csv`) into `data/`. Raw files remain Git-ignored.
+
+> [!TIP]
+> We have included the full datasets in `data/` for convenience. If you re-download, existing files will be overwritten.
 
 ---
 
@@ -91,12 +98,16 @@ PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 > - `artifacts/transformer/` — DistilBERT weights (if transformer was trained).  
 > - `experiments/report.md` — markdown report with figures/tables.  
 
+After training, you should get:
+
+![Training Complete](experiments/figs/output.png)
+
 ### 5.3 Optional Transformer Quantization
 
 Create an INT8 dynamic-quantized checkpoint for faster CPU inference:
 
 ```bash
-PYTHONPATH=src python -m spot_scam.pipeline.quantize transformer
+PYTHONPATH=src python -m spot_scam.pipeline.quantize
 # or `make quantize-transformer`
 ```
 
@@ -120,16 +131,23 @@ export SPOT_SCAM_USE_QUANTIZED=1
 PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
+If the dashboard runs on a different origin, enable CORS before launching the API:
+
+```bash
+export SPOT_SCAM_ALLOWED_ORIGINS="http://localhost:3000,https://your-domain.com"
+PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
+```
+
 ### Useful Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Simple health + model summary. |
-| `GET /metadata` | Model metadata, thresholds, metrics. |
-| `POST /predict` | Batch predictions (`{ "instances": [JobPostingInput, ...] }`). |
-| `POST /predict/single` | Single prediction (body is `JobPostingInput`). |
-| `GET /insights/token-importance` | Top TF‑IDF coefficients for fraud/legit terms. |
-| `GET /insights/token-frequency` | Token frequency differences between classes. |
+| Endpoint                         | Description                                                    |
+|----------------------------------|----------------------------------------------------------------|
+| `GET /health`                    | Simple health + model summary.                                 |
+| `GET /metadata`                  | Model metadata, thresholds, metrics.                           |
+| `POST /predict`                  | Batch predictions (`{ "instances": [JobPostingInput, ...] }`). |
+| `POST /predict/single`           | Single prediction (body is `JobPostingInput`).                 |
+| `GET /insights/token-importance` | Top TF‑IDF coefficients for fraud/legit terms.                 |
+| `GET /insights/token-frequency`  | Token frequency differences between classes.                   |
 
 Example curl:
 

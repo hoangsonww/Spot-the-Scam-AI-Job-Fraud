@@ -147,6 +147,26 @@ sequenceDiagram
     Persist->>CLI: append_run_record()
 ```
 
+### 4.1 Python Entrypoints
+
+```mermaid
+flowchart TD
+    A[Typer CLI
+    spot_scam.pipeline.train] --> B[load_config]
+    B --> C[load_raw_dataset & merge CSVs]
+    C --> D[preprocess_dataframe]
+    D --> E[create_splits & persist indices]
+    E --> F[build_feature_bundle]
+    F --> G[train_classical_models]
+    F --> H[train_transformer_model]
+    G --> I[select best model]
+    H --> I
+    I --> J[calibrate & evaluate]
+    J --> K[persist artifacts & metadata]
+    K --> L[generate reports & benchmarks]
+    L --> M[append tracking CSV]
+```
+
 ---
 
 ## 5. Artifacts & Reporting

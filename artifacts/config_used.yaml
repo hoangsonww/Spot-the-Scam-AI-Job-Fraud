@@ -6,8 +6,9 @@ project:
 data:
   raw_dir: data
   processed_dir: data/processed
-  raw_filename: fake_job_postings.csv
-  alternate_raw_filename: Fake_Real_Job_Posting.csv
+  raw_filenames:
+  - fake_job_postings.csv
+  - Fake_Real_Job_Posting.csv
   target_column: fraudulent
   id_column: job_id
   text_fields:
@@ -28,6 +29,8 @@ data:
   - department
   - job_id
   - location
+  - unnamed_0
+  - _source_file
   leakage_columns:
   - job_id
   - salary_range

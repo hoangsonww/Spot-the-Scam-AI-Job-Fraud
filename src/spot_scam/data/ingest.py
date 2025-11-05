@@ -14,26 +14,70 @@ logger = configure_logging(__name__)
 
 
 def load_raw_dataset(config: Dict, raw_dir: Optional[Path] = None) -> pd.DataFrame:
-    """
-    Load raw data from CSV, preferring the canonical filename with a fallback to an alternate name.
-    """
+    """Load and merge one or more CSV snapshots listed in the configuration."""
     data_conf = config["data"]
     directory = raw_dir or Path(data_conf["raw_dir"])
-    primary = directory / data_conf["raw_filename"]
-    alternate = directory / data_conf.get("alternate_raw_filename", "")
-    if primary.exists():
-        csv_path = primary
-    elif alternate.exists():
-        csv_path = alternate
-    else:
+    filenames = data_conf.get("raw_filenames") or []
+
+    if not filenames:
+        primary = data_conf.get("raw_filename")
+        alternate = data_conf.get("alternate_raw_filename")
+        filenames = [name for name in [primary, alternate] if name]
+
+    loaded_frames = []
+    for name in filenames:
+        path = directory / name
+        if not path.exists():
+            logger.warning("Dataset file missing: %s", path)
+            continue
+        logger.info("Loading raw dataset from %s", path)
+        frame = pd.read_csv(path)
+        frame = _normalize_columns(frame)
+        frame["_source_file"] = name
+        loaded_frames.append(frame)
+
+    if not loaded_frames:
         raise FileNotFoundError(
-            f"Could not locate dataset. Checked: {primary} and {alternate}. "
-            "Ensure the Kaggle dataset is downloaded into the data directory."
+            "No dataset CSVs found. Checked: "
+            + ", ".join(str(directory / name) for name in filenames)
         )
 
-    logger.info("Loading raw dataset from %s", csv_path)
-    df = pd.read_csv(csv_path)
-    return _normalize_columns(df)
+    df = pd.concat(loaded_frames, ignore_index=True, sort=False)
+
+    if "fraudulent" not in df.columns:
+        raise KeyError("Combined dataset is missing the 'fraudulent' label column.")
+
+    fraudulent_series = df["fraudulent"]
+    if fraudulent_series.dtype == object:
+        mapped = fraudulent_series.astype(str).str.strip().str.lower().map({"real": 0, "fake": 1})
+        df.loc[mapped.notna(), "fraudulent"] = mapped[mapped.notna()]
+
+    df["fraudulent"] = pd.to_numeric(df["fraudulent"], errors="coerce")
+    if df["fraudulent"].isna().any():  # pragma: no cover - defensive fallback
+        missing = df[df["fraudulent"].isna()].shape[0]
+        logger.warning("Detected %d rows with unknown fraudulent label; dropping them.", missing)
+        df = df.dropna(subset=["fraudulent"])
+    df["fraudulent"] = df["fraudulent"].astype(int)
+
+    key_columns = data_conf.get(
+        "dedup_key_columns",
+        ["title", "location", "requirements", "employment_type", "industry", "function", "fraudulent"],
+    )
+    for column in key_columns:
+        if column not in df.columns:
+            df[column] = pd.NA
+    key_values = (
+        df[key_columns]
+        .fillna("")
+        .astype(str)
+        .agg("||".join, axis=1)
+    )
+    before = len(df)
+    df = df.loc[~key_values.duplicated()].reset_index(drop=True)
+    if len(df) != before:
+        logger.info("Dropped %d potential duplicate rows after merging sources.", before - len(df))
+
+    return df
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -121,4 +165,3 @@ __all__ = [
     "fill_missing_values",
     "compute_row_checksum",
 ]
-

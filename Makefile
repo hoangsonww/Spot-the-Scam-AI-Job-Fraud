@@ -3,7 +3,7 @@ PYTHON ?= python3
 .PHONY: install train train-fast serve test lint frontend-install frontend
 
 install:
-	$(PYTHON) -m pip install -e .[dev]
+	$(PYTHON) -m pip install -e '.[dev]'
 
 train:
 	PYTHONPATH=src $(PYTHON) -m spot_scam.pipeline.train
@@ -27,4 +27,4 @@ frontend:
 	npm run dev --prefix frontend
 
 quantize-transformer:
-	PYTHONPATH=src $(PYTHON) -m spot_scam.pipeline.quantize transformer
+	PYTHONPATH=src $(PYTHON) -m spot_scam.pipeline.quantize

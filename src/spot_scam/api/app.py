@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 
 from spot_scam.api.schemas import (
     GrayZonePolicy,
@@ -17,12 +19,29 @@ from spot_scam.api.schemas import (
     TokenFrequencyResponse,
     TokenImportanceResponse,
     TokenWeight,
+    ThresholdMetricsResponse,
+    LatencySummaryResponse,
 )
 from spot_scam.inference.predictor import FraudPredictor
 from spot_scam.utils.logging import configure_logging
 
 logger = configure_logging(__name__)
 app = FastAPI(title="Spot the Scam API", version="1.0.0")
+
+default_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+allowed_origins_env = os.getenv("SPOT_SCAM_ALLOWED_ORIGINS")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+else:
+    allowed_origins = default_origins
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @lru_cache(maxsize=1)
@@ -70,6 +89,20 @@ def token_frequency(limit: int = Query(20, ge=1, le=200)) -> TokenFrequencyRespo
     predictor = get_predictor()
     freq = predictor.get_token_frequency(limit=limit)
     return TokenFrequencyResponse(items=[TokenFrequency(**item) for item in freq])
+
+
+@app.get("/insights/threshold-metrics", response_model=ThresholdMetricsResponse)
+def threshold_metrics(limit: int = Query(50, ge=5, le=200)) -> ThresholdMetricsResponse:
+    predictor = get_predictor()
+    metrics = predictor.get_threshold_metrics(limit=limit)
+    return ThresholdMetricsResponse(points=metrics)
+
+
+@app.get("/insights/latency", response_model=LatencySummaryResponse)
+def latency_summary() -> LatencySummaryResponse:
+    predictor = get_predictor()
+    summary = predictor.get_latency_summary()
+    return LatencySummaryResponse(items=summary)
 
 
 @app.post("/predict", response_model=PredictionBatchResponse)

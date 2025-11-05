@@ -109,6 +109,45 @@ class FraudPredictor:
             for _, row in df.iterrows()
         ]
 
+    def get_threshold_metrics(self, limit: int = 50) -> List[Dict[str, Any]]:
+        path = EXPERIMENTS_DIR / "tables" / "threshold_metrics.csv"
+        if not path.exists():
+            return []
+        df = pd.read_csv(path).head(limit)
+        return [
+            {
+                "threshold": float(row["threshold"]),
+                "precision": float(row["precision"]),
+                "recall": float(row["recall"]),
+                "f1": float(row["f1"]),
+            }
+            for _, row in df.iterrows()
+        ]
+
+    def get_latency_summary(self) -> List[Dict[str, Any]]:
+        path = EXPERIMENTS_DIR / "tables" / "benchmark_latency.csv"
+        if not path.exists():
+            return []
+        df = pd.read_csv(path)
+        if df.empty:
+            return []
+
+        summary_rows: List[Dict[str, Any]] = []
+        for batch_size, group in df.groupby("batch_size"):
+            latency_ms = group["latency_ms"].astype(float)
+            throughput_rps = group["throughput_rps"].astype(float)
+            summary_rows.append(
+                {
+                    "batch_size": int(batch_size),
+                    "latency_p50_ms": float(np.percentile(latency_ms, 50)),
+                    "latency_p95_ms": float(np.percentile(latency_ms, 95)),
+                    "throughput_rps": float(throughput_rps.mean()),
+                }
+            )
+
+        summary_rows.sort(key=lambda item: item["batch_size"])
+        return summary_rows
+
     def _load_metadata(self) -> Dict[str, Any]:
         path = self.artifacts_dir / "metadata.json"
         with path.open("r", encoding="utf-8") as handle:

@@ -22,6 +22,7 @@ src/spot_scam/features/text.py
 src/spot_scam/inference/predictor.py
 src/spot_scam/models/classical.py
 src/spot_scam/models/transformer.py
+src/spot_scam/pipeline/quantize.py
 src/spot_scam/pipeline/train.py
 src/spot_scam/policy/gray_zone.py
 src/spot_scam/tracking/logger.py

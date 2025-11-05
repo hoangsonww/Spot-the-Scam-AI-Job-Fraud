@@ -28,17 +28,22 @@ def compute_metrics(
     y_pred = (y_scores >= threshold).astype(int)
     results: Dict[str, float] = {}
 
+    unique_labels = np.unique(y_true)
+
     for metric_name in metrics_list:
         if metric_name == "f1":
-            results["f1"] = metrics.f1_score(y_true, y_pred, pos_label=positive_label)
+            results["f1"] = metrics.f1_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
         elif metric_name == "precision":
             results["precision"] = metrics.precision_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
         elif metric_name == "recall":
             results["recall"] = metrics.recall_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
         elif metric_name == "roc_auc":
-            results["roc_auc"] = metrics.roc_auc_score(y_true, y_scores)
+            try:
+                results["roc_auc"] = metrics.roc_auc_score(y_true, y_scores)
+            except ValueError:
+                results["roc_auc"] = float("nan")
         elif metric_name == "average_precision":
-            results["pr_auc"] = metrics.average_precision_score(y_true, y_scores)
+            results["pr_auc"] = metrics.average_precision_score(y_true, y_scores) if len(unique_labels) > 1 else 0.0
         elif metric_name == "brier":
             results["brier"] = metrics.brier_score_loss(y_true, y_scores, pos_label=positive_label)
         else:
@@ -52,6 +57,9 @@ def optimal_threshold(y_true: np.ndarray, y_scores: np.ndarray, metric: str = "f
     """
     Determine the optimal threshold on validation data for a specified metric.
     """
+    if len(np.unique(y_true)) < 2:
+        return 0.5
+
     precisions, recalls, thresholds = metrics.precision_recall_curve(y_true, y_scores)
 
     if metric == "f1":
@@ -86,4 +94,3 @@ def expected_calibration_error(y_true: np.ndarray, y_scores: np.ndarray, n_bins:
 
 
 __all__ = ["compute_metrics", "optimal_threshold", "expected_calibration_error", "MetricResults"]
-

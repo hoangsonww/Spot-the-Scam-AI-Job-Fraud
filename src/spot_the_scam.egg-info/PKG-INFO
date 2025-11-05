@@ -23,6 +23,7 @@ Requires-Dist: typer>=0.9.0
 Requires-Dist: rich>=13.0.0
 Requires-Dist: fastapi>=0.110.0
 Requires-Dist: uvicorn[standard]>=0.27.0
+Requires-Dist: tabulate>=0.9.0
 Requires-Dist: pydantic>=2.6.0
 Requires-Dist: transformers>=4.38.0
 Requires-Dist: datasets>=2.16.0

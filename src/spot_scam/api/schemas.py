@@ -98,6 +98,28 @@ class TokenFrequencyResponse(BaseModel):
     items: List[TokenFrequency]
 
 
+class ThresholdMetricPoint(BaseModel):
+    threshold: float
+    precision: float
+    recall: float
+    f1: float
+
+
+class ThresholdMetricsResponse(BaseModel):
+    points: List[ThresholdMetricPoint]
+
+
+class LatencySummaryPoint(BaseModel):
+    batch_size: int
+    latency_p50_ms: float
+    latency_p95_ms: float
+    throughput_rps: float
+
+
+class LatencySummaryResponse(BaseModel):
+    items: List[LatencySummaryPoint]
+
+
 __all__ = [
     "JobPostingInput",
     "PredictionBatchRequest",
@@ -107,4 +129,6 @@ __all__ = [
     "MetadataResponse",
     "TokenImportanceResponse",
     "TokenFrequencyResponse",
+    "ThresholdMetricsResponse",
+    "LatencySummaryResponse",
 ]

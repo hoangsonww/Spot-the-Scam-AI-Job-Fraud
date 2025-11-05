@@ -39,7 +39,7 @@ def compute_slice_metrics(
             logger.warning("Slice column '%s' not found in dataframe; skipping.", column)
             continue
 
-        for category, group in df.groupby(column):
+    for category, group in df.groupby(column, dropna=False, observed=False):
             mask = group.index
             subset_labels = labels[df.index.isin(mask)]
             subset_probs = probabilities[df.index.isin(mask)]
@@ -80,4 +80,3 @@ def slices_to_dataframe(slices: List[SliceMetric]) -> pd.DataFrame:
 
 
 __all__ = ["compute_slice_metrics", "slices_to_dataframe", "SliceMetric"]
-

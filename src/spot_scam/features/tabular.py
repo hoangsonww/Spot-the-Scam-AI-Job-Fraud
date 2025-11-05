@@ -67,13 +67,18 @@ def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
     binary_columns = ["telecommuting", "has_company_logo", "has_questions"]
     for column in binary_columns:
         if column in df.columns:
-            features[column] = df[column].fillna(0).astype(np.float32)
+            col = df[column].replace({"<missing>": 0}).fillna(0)
+            features[column] = pd.to_numeric(col, errors="coerce").fillna(0).astype(np.float32)
 
     # Additional metadata counts (presence)
     optional_columns = ["employment_type", "required_experience", "required_education", "industry", "function"]
     for column in optional_columns:
         if column in df.columns:
-            features[f"{column}_is_missing"] = df[column].isna().astype(np.float32)
+            raw = df[column]
+            mask = raw.isna()
+            raw_str = raw.astype(str).str.lower()
+            mask |= raw_str == "<missing>"
+            features[f"{column}_is_missing"] = mask.astype(np.float32)
 
     feature_df = pd.DataFrame(features, index=df.index)
     return feature_df
@@ -87,4 +92,3 @@ def _uppercase_ratio(text: str) -> float:
 
 
 __all__ = ["create_tabular_features"]
-
