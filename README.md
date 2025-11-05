@@ -40,4 +40,4 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details.
 
-> **Tip:** zsh users should quote extras when installing: `pip install -e '.[dev]'`.
+Project licensed under the MIT License. See [LICENSE](LICENSE) for details.

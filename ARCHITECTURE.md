@@ -1,4 +1,4 @@
-# Spot the Scam — Architecture Overview
+# Spot the Scam - Architecture Overview
 
 This document describes the technical architecture of Spot the Scam across data, modeling, inference, and presentation layers. It also highlights the major modules, data flow, and deployment footprint.
 
@@ -171,17 +171,17 @@ flowchart TD
 
 ## 5. Artifacts & Reporting
 
-| Location | Contents |
-|----------|----------|
-| `artifacts/model.joblib` | Calibrated estimator (used in inference). |
-| `artifacts/base_model.joblib` | Uncalibrated base (pre-calibration). |
-| `artifacts/features/` | TF-IDF vectorizer (`*.joblib`), scaler, feature names. |
-| `artifacts/transformer/` | DistilBERT checkpoints (`best/`, tokenizers). |
-| `artifacts/metadata.json` | Metrics summary, gray-zone policy, threshold. |
-| `artifacts/test_predictions.csv` | Final test set with decisions. |
-| `experiments/figs/` | PR curve, calibration curve, confusion matrix. |
-| `experiments/tables/` | Token importances, frequency analysis, slice metrics. |
-| `experiments/report.md` | Markdown report for quick consumption. |
+| Location                         | Contents                                               |
+|----------------------------------|--------------------------------------------------------|
+| `artifacts/model.joblib`         | Calibrated estimator (used in inference).              |
+| `artifacts/base_model.joblib`    | Uncalibrated base (pre-calibration).                   |
+| `artifacts/features/`            | TF-IDF vectorizer (`*.joblib`), scaler, feature names. |
+| `artifacts/transformer/`         | DistilBERT checkpoints (`best/`, tokenizers).          |
+| `artifacts/metadata.json`        | Metrics summary, gray-zone policy, threshold.          |
+| `artifacts/test_predictions.csv` | Final test set with decisions.                         |
+| `experiments/figs/`              | PR curve, calibration curve, confusion matrix.         |
+| `experiments/tables/`            | Token importances, frequency analysis, slice metrics.  |
+| `experiments/report.md`          | Markdown report for quick consumption.                 |
 
 ---
 
@@ -211,6 +211,8 @@ flowchart LR
     page --> HomePage
     HomePage --> UI
 ```
+
+![UI Screenshot](experiments/figs/ui.png)
 
 ### Frontend Highlights
 - App directory with `page.tsx` wrapper around `HomePage`.

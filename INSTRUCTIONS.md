@@ -1,4 +1,4 @@
-# Spot the Scam — Detailed Setup & Operations Guide
+# Spot the Scam - Detailed Setup & Operations Guide
 
 This guide walks through end-to-end setup, training, and serving of the Spot the Scam project. Follow the sections in order for a clean experience.
 
@@ -204,16 +204,16 @@ npm run lint
 
 From project root:
 
-| Command | Purpose |
-|---------|---------|
-| `make install` | Install Python dependencies (same as `pip install -e .[dev]`). |
-| `make train` | Run full training pipeline. |
-| `make train-fast` | Train classical models only. |
-| `make serve` | Launch FastAPI server on port 8000. |
-| `make test` | Execute unit tests with coverage. |
-| `make lint` | Run Ruff + Black checks. |
-| `make frontend-install` | Install frontend dependencies (`npm install`). |
-| `make frontend` | Start Next.js dev server (`npm run dev`). |
+| Command                 | Purpose                                                        |
+|-------------------------|----------------------------------------------------------------|
+| `make install`          | Install Python dependencies (same as `pip install -e .[dev]`). |
+| `make train`            | Run full training pipeline.                                    |
+| `make train-fast`       | Train classical models only.                                   |
+| `make serve`            | Launch FastAPI server on port 8000.                            |
+| `make test`             | Execute unit tests with coverage.                              |
+| `make lint`             | Run Ruff + Black checks.                                       |
+| `make frontend-install` | Install frontend dependencies (`npm install`).                 |
+| `make frontend`         | Start Next.js dev server (`npm run dev`).                      |
 
 ---
 
