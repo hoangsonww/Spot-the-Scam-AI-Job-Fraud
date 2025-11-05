@@ -9,7 +9,6 @@ venv/
 .coverage
 data/processed/*
 !data/processed/.gitkeep
-tracking/*
 !tracking/.gitkeep
 artifacts/*.joblib
 artifacts/*.npz
