@@ -46,6 +46,7 @@ import {
   type TokenImportanceResponse,
   type ThresholdMetricsResponse,
   type LatencySummaryResponse,
+  type FeatureContribution,
 } from "@/lib/api"
 import {
   Activity,
@@ -89,7 +90,7 @@ const metricLabels: Record<MetricKey, string> = {
 
 function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
   if (value === undefined || value === null) {
-    return "—"
+    return "-"
   }
 
   const formatter = new Intl.NumberFormat("en-US", {
@@ -98,6 +99,18 @@ function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions)
     ...options,
   })
   return formatter.format(value)
+}
+
+function formatContribution(value?: number | null) {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "0.000"
+  }
+  const formatter = new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  })
+  const formatted = formatter.format(value)
+  return value >= 0 ? `+${formatted}` : formatted
 }
 
 function metricToPercent(value?: number | null) {
@@ -297,7 +310,7 @@ export default function HomePage() {
             </h1>
             <p className="text-muted-foreground max-w-3xl text-base">
               Score listings using the calibrated pipeline, inspect the features that drive
-              decisions, and keep an eye on model health metrics — all in one vertical flow.
+              decisions, and keep an eye on model health metrics - all in one vertical flow.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
@@ -433,7 +446,7 @@ export default function HomePage() {
                             style: "percent",
                             maximumFractionDigits: 1,
                           })
-                        : "—"
+                        : "-"
                     }
                     accent={prediction ? "text-chart-1" : undefined}
                   />
@@ -461,7 +474,7 @@ export default function HomePage() {
                         ? formatMetric(prediction.threshold, { maximumFractionDigits: 3 })
                         : metadata
                           ? formatMetric(metadata.threshold, { maximumFractionDigits: 3 })
-                          : "—"
+                          : "-"
                     }
                     accent={prediction ? "text-chart-3" : undefined}
                   />
@@ -483,7 +496,7 @@ export default function HomePage() {
                       <span className="font-medium text-foreground">
                         {metadata
                           ? `${formatMetric(metadata.gray_zone.lower, { maximumFractionDigits: 3 })} - ${formatMetric(metadata.gray_zone.upper, { maximumFractionDigits: 3 })}`
-                          : "—"}
+                          : "-"}
                       </span>
                     </div>
                     <ul className="grid gap-1 pl-4 marker:text-primary list-disc">
@@ -497,8 +510,46 @@ export default function HomePage() {
                     </ul>
                   </div>
                 )}
-              </CardFooter>
-            </Card>
+            </CardFooter>
+          </Card>
+
+            {prediction ? (
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <AlignVerticalSpaceBetween className="size-5 text-chart-3" />
+                    Decision rationale
+                  </CardTitle>
+                  <CardDescription>
+                    Highlights of what pushed this posting toward or away from fraud.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <p className="text-sm text-muted-foreground">
+                    {prediction.explanation.summary ??
+                      "Positive contributions increase the fraud score, while negative ones back the legit decision."}
+                  </p>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <ContributionColumn
+                      title="Signals toward fraud"
+                      emptyLabel="No strong fraud drivers detected."
+                      items={prediction.explanation.top_positive}
+                    />
+                    <ContributionColumn
+                      title="Signals toward legit"
+                      emptyLabel="No strong legit counter signals."
+                      items={prediction.explanation.top_negative}
+                      direction="negative"
+                    />
+                  </div>
+                  {typeof prediction.explanation.intercept === "number" ? (
+                    <div className="text-xs text-muted-foreground">
+                      Model intercept: {formatContribution(prediction.explanation.intercept)}
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader className="pb-4">
@@ -523,7 +574,7 @@ export default function HomePage() {
                           ? formatMetric(thresholdSeries[thresholdSeries.length - 1].y, {
                               maximumFractionDigits: 3,
                             })
-                          : "—"}
+                          : "-"}
                       </strong>
                     </span>
                   </div>
@@ -565,7 +616,7 @@ export default function HomePage() {
                               latencyBars.find((bar) => bar.batchSize === 32)?.throughput,
                               { maximumFractionDigits: 0, minimumFractionDigits: 0 }
                             )
-                          : "—"}{" "}
+                          : "-"}{" "}
                         rps
                       </strong>
                     </span>
@@ -835,6 +886,53 @@ function TokenList({
         {items.length === 0 ? (
           <li className="text-muted-foreground text-sm">No tokens surfaced.</li>
         ) : null}
+      </ul>
+    </div>
+  )
+}
+
+function ContributionColumn({
+  title,
+  items,
+  direction = "positive",
+  emptyLabel,
+}: {
+  title: string
+  items: FeatureContribution[]
+  direction?: "positive" | "negative"
+  emptyLabel: string
+}) {
+  if (!items.length) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-semibold text-foreground">{title}</div>
+        <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-sm font-semibold text-foreground">{title}</div>
+      <ul className="grid gap-1.5">
+        {items.map((item) => (
+          <li
+            key={`${title}-${item.feature}-${item.source}`}
+            className="border-border/70 bg-card/60 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+          >
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-foreground">{item.feature}</span>
+              <span className="text-xs text-muted-foreground capitalize">{item.source}</span>
+            </div>
+            <span
+              className={
+                direction === "negative" ? "text-chart-2 text-sm font-semibold" : "text-destructive text-sm font-semibold"
+              }
+            >
+              {formatContribution(item.contribution)}
+            </span>
+          </li>
+        ))}
       </ul>
     </div>
   )

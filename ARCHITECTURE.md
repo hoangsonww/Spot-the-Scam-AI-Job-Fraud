@@ -26,10 +26,13 @@ flowchart TD
     A7 -->|Load| B3
     B3 --> B2 --> B1
 
-    subgraph Frontend
+    subgraph Frontend & Registry
         C1[Next.js Dashboard]
+        C2[MLflow Model Registry]
     end
     B1 <-->|REST| C1
+    A6 -->|Register| C2
+    C2 -->|pyfunc / ONNX| B1
 ```
 
 ---
@@ -93,6 +96,7 @@ graph LR
     I1 --> I2
     I1 --> I4
     I4 --> I3
+    I1 --> I5[explanations.local]
 ```
 
 ### Key Modules
@@ -119,7 +123,8 @@ graph LR
 - **Inference**  
   - `FraudPredictor`: loads artifacts, preprocessing pipelines, and gray-zone policy.  
   - `policy.gray_zone`: threshold band logic.  
-  - FastAPI routes (`api.app`) with typed schemas.
+  - FastAPI routes (`api.app`) with typed schemas, returning calibrated scores and local explanations per request.
+  - MLflow export utilities (`export/mlflow_logger.py`) package ONNX + preprocessing into a pyfunc model for serving parity.
 
 ---
 
@@ -217,7 +222,7 @@ flowchart LR
 ### Frontend Highlights
 - App directory with `page.tsx` wrapper around `HomePage`.
 - `lib/api.ts` centralizes REST calls (metadata, predictions, insights).
-- `home-page.tsx` uses SWR for metadata + insights, handles prediction form.
+- `home-page.tsx` uses SWR for metadata + insights, handles prediction form, and renders natural-language rationales for each decision alongside contribution lists.
 - shadcn components (Card, Tabs, Table, Badge, etc.) for cohesive styling.
 - `.env.local` controls `NEXT_PUBLIC_API_BASE_URL`.
 

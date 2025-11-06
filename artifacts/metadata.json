@@ -1,9 +1,9 @@
 {
-  "model_name": "logistic_regression_C10.0",
+  "model_name": "linear_svm_C1.0",
   "model_type": "classical",
   "feature_type": "tfidf+tabular",
   "calibration_method": "isotonic",
-  "threshold": 0.7188577524734902,
+  "threshold": 0.5452064366991646,
   "gray_zone": {
     "width": 0.1,
     "positive_label": "fraud",
@@ -11,26 +11,21 @@
     "review_label": "review"
   },
   "val_metrics": {
-    "f1": 0.7984790874524715,
-    "precision": 0.9210526315789473,
-    "recall": 0.7046979865771812,
-    "roc_auc": 0.9826263657368679,
-    "pr_auc": 0.853098511638591,
-    "brier": 0.01269145384512042
+    "f1": 0.8106060606060606,
+    "precision": 0.9385964912280702,
+    "recall": 0.7133333333333334,
+    "roc_auc": 0.9881615715936548,
+    "pr_auc": 0.8718187749510917,
+    "brier": 0.011708387025871228
   },
   "test_metrics": {
-    "f1": 0.758893280632411,
-    "precision": 0.9320388349514563,
-    "recall": 0.64,
-    "roc_auc": 0.9790480698432733,
-    "pr_auc": 0.8622154444203269,
-    "brier": 0.013163927359262771
+    "f1": 0.789272030651341,
+    "precision": 0.9196428571428571,
+    "recall": 0.6912751677852349,
+    "roc_auc": 0.9814421283668058,
+    "pr_auc": 0.8453520635351476,
+    "brier": 0.014119844039025718
   },
-  "test_ece": 0.0049819684754642815,
-  "extra": {},
-  "quantized": {
-    "available": true,
-    "dtype": "dynamic_int8",
-    "path": "transformer/quantized/model.pt"
-  }
+  "test_ece": 0.006142298360536347,
+  "extra": {}
 }

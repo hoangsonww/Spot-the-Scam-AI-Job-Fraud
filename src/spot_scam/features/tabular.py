@@ -67,8 +67,10 @@ def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
     binary_columns = ["telecommuting", "has_company_logo", "has_questions"]
     for column in binary_columns:
         if column in df.columns:
-            col = df[column].replace({"<missing>": 0}).fillna(0)
-            features[column] = pd.to_numeric(col, errors="coerce").fillna(0).astype(np.float32)
+            col = df[column]
+            col = col.mask(col == "<missing>")
+            numeric = pd.to_numeric(col, errors="coerce").fillna(0.0).astype(np.float32)
+            features[column] = numeric
 
     # Additional metadata counts (presence)
     optional_columns = ["employment_type", "required_experience", "required_education", "industry", "function"]

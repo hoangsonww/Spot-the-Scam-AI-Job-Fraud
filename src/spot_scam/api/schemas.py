@@ -24,23 +24,6 @@ class JobPostingInput(BaseModel):
     function: Optional[str] = Field(default=None)
 
 
-class PredictionResponse(BaseModel):
-    probability_fraud: float = Field(..., description="Calibrated probability of the posting being fraudulent.")
-    binary_label: int = Field(..., description="Thresholded label (1 = fraud).")
-    decision: str = Field(..., description="Final decision after applying the gray-zone policy.")
-    threshold: float = Field(..., description="Threshold used to assign binary_label.")
-    gray_zone: Dict[str, Any] = Field(..., description="Gray-zone policy summary.")
-    meta: Dict[str, Optional[str]] = Field(..., description="Metadata about the serving model.")
-
-
-class PredictionBatchRequest(BaseModel):
-    instances: List[JobPostingInput]
-
-
-class PredictionBatchResponse(BaseModel):
-    predictions: List[PredictionResponse]
-
-
 class HealthResponse(BaseModel):
     status: str
     model_type: str
@@ -98,6 +81,37 @@ class TokenFrequencyResponse(BaseModel):
     items: List[TokenFrequency]
 
 
+class FeatureContribution(BaseModel):
+    feature: str
+    source: str
+    contribution: float
+
+
+class PredictionExplanation(BaseModel):
+    top_positive: List[FeatureContribution] = Field(default_factory=list)
+    top_negative: List[FeatureContribution] = Field(default_factory=list)
+    intercept: Optional[float] = None
+    summary: Optional[str] = None
+
+
+class PredictionResponse(BaseModel):
+    probability_fraud: float = Field(..., description="Calibrated probability of the posting being fraudulent.")
+    binary_label: int = Field(..., description="Thresholded label (1 = fraud).")
+    decision: str = Field(..., description="Final decision after applying the gray-zone policy.")
+    threshold: float = Field(..., description="Threshold used to assign binary_label.")
+    gray_zone: Dict[str, Any] = Field(..., description="Gray-zone policy summary.")
+    meta: Dict[str, Optional[str]] = Field(..., description="Metadata about the serving model.")
+    explanation: PredictionExplanation = Field(..., description="Local explanation for the prediction.")
+
+
+class PredictionBatchRequest(BaseModel):
+    instances: List[JobPostingInput]
+
+
+class PredictionBatchResponse(BaseModel):
+    predictions: List[PredictionResponse]
+
+
 class ThresholdMetricPoint(BaseModel):
     threshold: float
     precision: float
@@ -131,4 +145,6 @@ __all__ = [
     "TokenFrequencyResponse",
     "ThresholdMetricsResponse",
     "LatencySummaryResponse",
+    "PredictionExplanation",
+    "FeatureContribution",
 ]

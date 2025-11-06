@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/spot_scam/__init__.py
@@ -16,6 +17,8 @@ src/spot_scam/evaluation/reporting.py
 src/spot_scam/explainability/local.py
 src/spot_scam/explainability/shapley.py
 src/spot_scam/explainability/textual.py
+src/spot_scam/export/__init__.py
+src/spot_scam/export/mlflow_logger.py
 src/spot_scam/features/builders.py
 src/spot_scam/features/tabular.py
 src/spot_scam/features/text.py

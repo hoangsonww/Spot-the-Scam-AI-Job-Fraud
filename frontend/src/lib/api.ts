@@ -24,6 +24,19 @@ export type PredictionMeta = {
   model_name?: string | null;
 };
 
+export type FeatureContribution = {
+  feature: string;
+  source: string;
+  contribution: number;
+};
+
+export type PredictionExplanation = {
+  top_positive: FeatureContribution[];
+  top_negative: FeatureContribution[];
+  intercept?: number | null;
+  summary?: string | null;
+};
+
 export type PredictionResponse = {
   probability_fraud: number;
   binary_label: number;
@@ -38,6 +51,7 @@ export type PredictionResponse = {
     review_label?: string;
   };
   meta: PredictionMeta;
+  explanation: PredictionExplanation;
 };
 
 export type PredictionBatchResponse = {

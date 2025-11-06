@@ -8,6 +8,8 @@
 ![NumPy](https://img.shields.io/badge/NumPy-1.26-013243?logo=numpy&logoColor=white)
 ![Plotly](https://img.shields.io/badge/Plotly-5.15-3F4F75?logo=plotly&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-4-00A0E9?logo=lightgbm&logoColor=white)
+![MLflow](https://img.shields.io/badge/MLflow-2.12-13B6FF?logo=mlflow&logoColor=white)
+![ONNX](https://img.shields.io/badge/ONNX-1.15-000000?logo=onnx&logoColor=white)
 ![PyTest](https://img.shields.io/badge/PyTest-7-ED8B00?logo=pytest&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-20.10-2496ED?logo=docker&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)
@@ -21,18 +23,29 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ## Features
 - **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
-- **Explainability & monitoring**: Token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
+- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments.
 
 ## Outputs
-- `artifacts/` — models, vectorizers, calibration metadata, final predictions.
-- `experiments/figs/` — PR & calibration curves, confusion matrices, score distributions, threshold vs metric sweeps, latency plots.
-- `experiments/tables/` — metrics summary, slice reports, token analyses, threshold metrics, latency benchmarks.
-- `INSTRUCTIONS.md` — step-by-step setup, training, serving, and frontend guidance.
-- `ARCHITECTURE.md` — detailed system architecture with flow diagrams.
+- `artifacts/` - models, vectorizers, calibration metadata, final predictions.
+- `experiments/figs/` - PR & calibration curves, confusion matrices, score distributions, threshold vs metric sweeps, latency plots.
+- `experiments/tables/` - metrics summary, slice reports, token analyses, threshold metrics, latency benchmarks.
+- `INSTRUCTIONS.md` - step-by-step setup, training, serving, and frontend guidance.
+- `ARCHITECTURE.md` - detailed system architecture with flow diagrams.
 
-## Quantization (optional)
+## Explainability & Model Packaging
+
+- Every prediction includes a **local explanation**: the API surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept so reviewers can understand the decision instantly. The Next.js dashboard renders these insights in the “Decision rationale” card.
+- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners currently emit a high-level summary placeholder.
+
+### ONNX + MLflow
+
+- The training pipeline automatically converts the selected model to ONNX and logs a ready-to-serve MLflow pyfunc package (vectorizer, scaler, ONNX graph, metadata, and decision policy).
+- Check `mlruns/` for runs and registered models. Use `mlflow models serve -m runs:/<RUN_ID>/model` to spin up a local pyfunc service with the same behavior as the FastAPI endpoint.
+- Running on GPU? Install `onnxruntime-gpu` inside your virtualenv (matching the CPU package version) so ONNX Runtime registers CUDA devices. Otherwise set `ORT_DISABLE_DEVICE_DISCOVERY=1` to silence the CPU-only warning.
+
+### Quantization (optional)
 - To create an int8 dynamic-quantized transformer checkpoint: `make quantize-transformer`
 - Serve the quantized model by setting `SPOT_SCAM_USE_QUANTIZED=1` before starting the API.
 - Configure CORS (if hosting the UI elsewhere) with `SPOT_SCAM_ALLOWED_ORIGINS="https://your-domain.com,http://localhost:3000"`.

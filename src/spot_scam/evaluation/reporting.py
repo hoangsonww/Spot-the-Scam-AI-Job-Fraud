@@ -22,7 +22,7 @@ def render_markdown_report(
     Produce a concise markdown report enumerating core metrics, calibration, and slice analysis.
     """
     lines = []
-    lines.append(f"# Spot the Scam Report — {metadata.get('model_name', 'Unknown Model')}")
+    lines.append(f"# Spot the Scam Report - {metadata.get('model_name', 'Unknown Model')}")
     lines.append("")
     lines.append("## Configuration Snapshot")
     lines.append(f"- Model: **{metadata.get('model_name')}** ({metadata.get('model_type')})")

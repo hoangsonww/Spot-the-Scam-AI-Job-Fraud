@@ -4,6 +4,17 @@ project:
   num_workers: 4
   experiment_name: "baseline"
 
+mlflow:
+  enabled: true
+  tracking_uri: "file:./mlruns"
+  registry_uri: null
+  experiment: "spot-the-scam"
+  export:
+    opset: 17
+    dynamic_quantization: true
+    prefer_quantized: true
+    calibration_sample_size: 512
+
 data:
   raw_dir: "data"
   processed_dir: "data/processed"

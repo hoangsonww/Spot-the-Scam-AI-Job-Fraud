@@ -18,7 +18,18 @@ def top_tfidf_terms(vectorizer, classifier, *, top_n: int = 25) -> Dict[str, pd.
         raise AttributeError("Classifier does not expose coefficients for interpretability.")
 
     feature_names = np.array(vectorizer.get_feature_names_out())
-    coefficients = classifier.coef_.ravel()
+    coefficients = np.asarray(classifier.coef_).ravel()
+
+    if coefficients.shape[0] != feature_names.shape[0]:
+        aligned = min(coefficients.shape[0], feature_names.shape[0])
+        logger.debug(
+            "Aligning TF-IDF coefficients (%d) with feature names (%d); using first %d entries.",
+            coefficients.shape[0],
+            feature_names.shape[0],
+            aligned,
+        )
+        coefficients = coefficients[:aligned]
+        feature_names = feature_names[:aligned]
 
     top_positive_idx = np.argsort(coefficients)[-top_n:][::-1]
     top_negative_idx = np.argsort(coefficients)[:top_n]

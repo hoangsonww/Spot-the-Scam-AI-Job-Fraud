@@ -163,6 +163,9 @@ class FraudPredictor:
         self.vectorizer = joblib.load(self.artifacts_dir / "features" / "tfidf_vectorizer.joblib")
         self.scaler = joblib.load(self.artifacts_dir / "features" / "tabular_scaler.joblib")
         self.feature_names: List[str] = list(joblib.load(self.artifacts_dir / "features" / "tabular_feature_names.joblib"))
+        base_path = self.artifacts_dir / "base_model.joblib"
+        self.base_model = joblib.load(base_path) if base_path.exists() else None
+        self.tfidf_feature_names = self.vectorizer.get_feature_names_out()
 
     def _load_transformer_artifacts(self) -> None:
         extra = self.metadata.get("extra", {})
@@ -205,9 +208,13 @@ class FraudPredictor:
         processed_df, _ = preprocess_dataframe(df_raw, self.config)
 
         if self.model_type == "classical":
-            probabilities = self._predict_classical(processed_df)
+            classical_output = self._predict_classical(processed_df)
+            probabilities = classical_output["probabilities"]
+            explanations = classical_output["explanations"]
         elif self.model_type == "transformer":
-            probabilities = self._predict_transformer(processed_df)
+            transformer_output = self._predict_transformer(processed_df)
+            probabilities = transformer_output["probabilities"]
+            explanations = transformer_output["explanations"]
         else:
             raise ValueError(f"Unsupported model type: {self.model_type}")
 
@@ -216,7 +223,7 @@ class FraudPredictor:
         labels = (probabilities >= self.threshold).astype(int)
 
         outputs = []
-        for record, prob, label, decision in zip(records, probabilities, labels, decisions):
+        for idx, (record, prob, label, decision) in enumerate(zip(records, probabilities, labels, decisions)):
             outputs.append(
                 {
                     "probability_fraud": float(prob),
@@ -225,11 +232,12 @@ class FraudPredictor:
                     "threshold": self.threshold,
                     "gray_zone": band,
                     "meta": {"model_type": self.model_type, "model_name": self.metadata.get("model_name")},
+                    "explanation": explanations[idx] if explanations else {},
                 }
             )
         return outputs
 
-    def _predict_classical(self, processed_df: pd.DataFrame) -> np.ndarray:
+    def _predict_classical(self, processed_df: pd.DataFrame) -> Dict[str, Any]:
         tfidf_features = self.vectorizer.transform(processed_df["text_all"])
         tabular_df = create_tabular_features(processed_df, self.config)
         tabular_df = tabular_df.reindex(columns=self.feature_names, fill_value=0.0)
@@ -237,22 +245,36 @@ class FraudPredictor:
         tabular_sparse = sparse.csr_matrix(tabular_scaled)
 
         if self.feature_type == "tfidf+tabular":
-            X = sparse.hstack([tfidf_features, tabular_sparse]).tocsr()
+            feature_matrix = sparse.hstack([tfidf_features, tabular_sparse]).tocsr()
         elif self.feature_type == "tabular":
-            X = tabular_sparse
+            feature_matrix = tabular_sparse
         elif self.feature_type == "tfidf":
-            X = tfidf_features
+            feature_matrix = tfidf_features
         else:
             raise ValueError(f"Unsupported feature_type: {self.feature_type}")
 
         if hasattr(self.model, "predict_proba"):
-            probabilities = self.model.predict_proba(X)[:, 1]
+            probabilities = self.model.predict_proba(feature_matrix)[:, 1]
         else:
-            scores = self.model.decision_function(X)
+            scores = self.model.decision_function(feature_matrix)
             probabilities = 1.0 / (1.0 + np.exp(-scores))
-        return probabilities
 
-    def _predict_transformer(self, processed_df: pd.DataFrame) -> np.ndarray:
+        if hasattr(self.model, "decision_function"):
+            raw_scores = self.model.decision_function(feature_matrix)
+        else:
+            eps = 1e-6
+            probs = np.clip(probabilities, eps, 1 - eps)
+            raw_scores = np.log(probs / (1 - probs))
+
+        explanations = self._build_classical_explanations(tfidf_features, tabular_sparse)
+
+        return {
+            "probabilities": probabilities,
+            "raw_scores": raw_scores,
+            "explanations": explanations,
+        }
+
+    def _predict_transformer(self, processed_df: pd.DataFrame) -> Dict[str, Any]:
         texts = processed_df["text_all"].tolist()
         encodings = self.tokenizer(
             texts,
@@ -265,7 +287,140 @@ class FraudPredictor:
         with torch.no_grad():
             outputs = self.model(**encodings)
             probabilities = torch.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
-        return probabilities
+
+        raw_scores = outputs.logits[:, 1].cpu().numpy()
+
+        explanations = [
+            {
+                "top_positive": [],
+                "top_negative": [],
+                "intercept": None,
+                "summary": f"Transformer probability {prob:.1%}; token-level attributions are not yet available.",
+            }
+            for prob in probabilities
+        ]
+
+        return {
+            "probabilities": probabilities,
+            "raw_scores": raw_scores,
+            "explanations": explanations,
+        }
+
+    def _build_classical_explanations(
+        self,
+        tfidf_matrix: sparse.csr_matrix,
+        tabular_matrix: sparse.csr_matrix,
+        top_k: int = 5,
+    ) -> List[Dict[str, Any]]:
+        if getattr(self, "base_model", None) is None or not hasattr(self.base_model, "coef_"):
+            summary = "Explanation available for linear models with accessible coefficients."
+            return [
+                {"top_positive": [], "top_negative": [], "intercept": None, "summary": summary}
+                for _ in range(tfidf_matrix.shape[0])
+            ]
+
+        coef = np.asarray(self.base_model.coef_).ravel()
+        intercept = float(np.asarray(getattr(self.base_model, "intercept_", [0.0])).ravel()[0])
+        tfidf_names = self.tfidf_feature_names
+        tfidf_dim = len(tfidf_names)
+        tabular_dim = tabular_matrix.shape[1]
+        explanations: List[Dict[str, Any]] = []
+
+        def humanize(name: str) -> str:
+            return (
+                name.replace("scam_term_", "")
+                .replace("_", " ")
+                .replace("  ", " ")
+                .strip()
+            )
+
+        def list_to_text(items: List[str]) -> str:
+            if not items:
+                return ""
+            if len(items) == 1:
+                return items[0]
+            if len(items) == 2:
+                return f"{items[0]} and {items[1]}"
+            return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+        if coef.shape[0] < tfidf_dim + tabular_dim:
+            aligned = coef.shape[0]
+            tfidf_dim = min(tfidf_dim, aligned)
+            tabular_dim = max(0, aligned - tfidf_dim)
+
+        tfidf_coef = coef[:tfidf_dim]
+        tabular_coef = coef[tfidf_dim:tfidf_dim + tabular_dim]
+
+        for i in range(tfidf_matrix.shape[0]):
+            contributions: List[Dict[str, Any]] = []
+
+            row = tfidf_matrix.getrow(i).tocoo()
+            for col, value in zip(row.col, row.data):
+                if col >= tfidf_dim:
+                    continue
+                contrib = float(value * tfidf_coef[col])
+                if contrib == 0.0:
+                    continue
+                contributions.append(
+                    {
+                        "feature": tfidf_names[col],
+                        "source": "token",
+                        "contribution": contrib,
+                    }
+                )
+
+            if tabular_dim > 0:
+                tab_row = tabular_matrix.getrow(i).toarray().ravel()
+                for idx, value in enumerate(tab_row):
+                    if idx >= tabular_dim or value == 0.0:
+                        continue
+                    contrib = float(value * tabular_coef[idx])
+                    if contrib == 0.0:
+                        continue
+                    feature_name = (
+                        self.feature_names[idx]
+                        if idx < len(self.feature_names)
+                        else f"tabular_feature_{idx}"
+                    )
+                    contributions.append(
+                        {
+                            "feature": feature_name,
+                            "source": "tabular",
+                            "contribution": contrib,
+                        }
+                    )
+
+            positives = [item for item in contributions if item["contribution"] > 0]
+            positives.sort(key=lambda item: item["contribution"], reverse=True)
+            negatives = [item for item in contributions if item["contribution"] < 0]
+            negatives.sort(key=lambda item: item["contribution"])
+
+            pos_names = [humanize(item["feature"]) for item in positives[:3]]
+            neg_names = [humanize(item["feature"]) for item in negatives[:3]]
+
+            summary_parts: List[str] = []
+            if pos_names:
+                summary_parts.append(f"{list_to_text(pos_names).capitalize()} pushed the score toward fraud")
+            if neg_names:
+                summary_parts.append(f"{list_to_text(neg_names).capitalize()} reinforced the legit decision")
+            if len(summary_parts) > 1:
+                summary_text = "; ".join(summary_parts)
+            else:
+                summary_text = summary_parts[0] if summary_parts else "No strong drivers were found for this decision."
+
+            if summary_text and not summary_text.endswith("."):
+                summary_text = summary_text + "."
+
+            explanations.append(
+                {
+                    "top_positive": positives[:top_k],
+                    "top_negative": negatives[:top_k],
+                    "intercept": intercept,
+                    "summary": summary_text,
+                }
+            )
+
+        return explanations
 
 
 __all__ = ["FraudPredictor"]

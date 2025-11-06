@@ -4,6 +4,7 @@ Version: 0.1.0
 Summary: Uncertainty-aware classifier for fraudulent job postings.
 Author: Spot the Scam Team
 Requires-Python: >=3.9
+License-File: LICENSE
 Requires-Dist: pandas>=2.0.0
 Requires-Dist: numpy>=1.23.0
 Requires-Dist: scipy>=1.10.0
@@ -40,6 +41,12 @@ Requires-Dist: diskcache>=5.6.1
 Requires-Dist: jinja2>=3.1.2
 Requires-Dist: orjson>=3.9.15
 Requires-Dist: httpx>=0.27.0
+Requires-Dist: mlflow>=2.11.0
+Requires-Dist: onnx>=1.15.0
+Requires-Dist: onnxruntime>=1.17.0
+Requires-Dist: onnxmltools>=1.11.0
+Requires-Dist: skl2onnx>=1.15.0
+Requires-Dist: optimum[onnxruntime]>=1.17.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.4.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
@@ -47,3 +54,4 @@ Requires-Dist: pre-commit>=3.6.0; extra == "dev"
 Requires-Dist: black>=24.1.0; extra == "dev"
 Requires-Dist: ruff>=0.3.0; extra == "dev"
 Requires-Dist: mypy>=1.8.0; extra == "dev"
+Dynamic: license-file

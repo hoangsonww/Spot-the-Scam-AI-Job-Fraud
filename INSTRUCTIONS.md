@@ -93,10 +93,10 @@ PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 ```
 
 > **Outputs:**  
-> - `artifacts/metadata.json` — summary (metrics, threshold, gray-zone).  
-> - `artifacts/model.joblib` — calibrated estimator for inference.  
-> - `artifacts/transformer/` — DistilBERT weights (if transformer was trained).  
-> - `experiments/report.md` — markdown report with figures/tables.  
+> - `artifacts/metadata.json` - summary (metrics, threshold, gray-zone).  
+> - `artifacts/model.joblib` - calibrated estimator for inference.  
+> - `artifacts/transformer/` - DistilBERT weights (if transformer was trained).  
+> - `experiments/report.md` - markdown report with figures/tables.  
 
 After training, you should get:
 
@@ -112,6 +112,24 @@ PYTHONPATH=src python -m spot_scam.pipeline.quantize
 ```
 
 This writes `artifacts/transformer/quantized/model.pt` and updates metadata. Quantization is opt-in; the standard (FP32) weights remain default.
+
+### 5.4 Automatic ONNX + MLflow Export (OPTIONAL)
+
+Every completed training run attempts to:
+
+1. Convert the selected winner to ONNX (both classical and transformer variants are supported).
+2. Package preprocessing assets (TF‑IDF vectorizer, scaler, tokenizer) alongside the executable ONNX graph.
+3. Log a full MLflow pyfunc model at `runs:/<RUN_ID>/model`, bundling the gray-zone policy so served predictions behave like the API.
+
+Artifacts land inside the configured tracking URI (defaults to `mlruns/`). You can inspect them via the MLflow UI or serve locally:
+
+```bash
+mlflow models serve --env-manager local -m runs:/<RUN_ID>/model -p 8080
+```
+
+Use `--env-manager local` so MLflow reuses the existing `.venv` (the default `virtualenv` manager expects `pyenv` to be installed system-wide).
+
+Set `mlflow.enabled: false` in `configs/defaults.yaml` if you need to disable export.
 
 ---
 
@@ -189,7 +207,7 @@ npm run dev
 
 Visit `http://localhost:3000` to access the dashboard:
 - Submit job postings for scoring.
-- Review calibrated metrics and gray-zone band.
+- Review calibrated metrics, decision rationale, and gray-zone band.
 - Inspect token-level insights (requires classical model artifacts).
 
 ### 7.4 Linting (optional)

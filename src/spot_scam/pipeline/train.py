@@ -40,6 +40,7 @@ from spot_scam.utils.paths import ARTIFACTS_DIR, FIGS_DIR, TABLES_DIR, EXPERIMEN
 from spot_scam.evaluation.reporting import render_markdown_report
 from spot_scam.explainability.textual import top_tfidf_terms, token_frequency_analysis
 from spot_scam.explainability.shapley import compute_tabular_shap
+from spot_scam.export import log_model_to_mlflow, MLFlowExportError
 
 app = typer.Typer(add_completion=False)
 logger = configure_logging(__name__)
@@ -128,6 +129,10 @@ def run(
         bundle=bundle,
     )
     append_run_record(best_model_artifacts, config)
+    try:
+        log_model_to_mlflow(best_model_artifacts, bundle, config, splits)
+    except MLFlowExportError as exc:
+        logger.warning("Skipping MLflow export: %s", exc)
     typer.echo("Training complete. Best model: " + best_model_artifacts.name)
 
 

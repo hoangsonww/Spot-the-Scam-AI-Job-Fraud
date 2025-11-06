@@ -23,3 +23,4 @@ yarn-debug.log*
 artifacts/transformer/*/model.safetensors
 artifacts/transformer/*/*.pt
 artifacts/transformer/*/*.bin
+mlruns/
