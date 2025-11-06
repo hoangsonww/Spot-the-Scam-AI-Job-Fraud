@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
+import csv
 from functools import lru_cache
-from typing import List, Dict
+from typing import Dict, List, Tuple
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Body
@@ -13,6 +14,8 @@ from spot_scam.api.schemas import (
     HealthResponse,
     JobPostingInput,
     MetadataResponse,
+    ModelSummary,
+    ModelsResponse,
     MetricSet,
     PredictionBatchRequest,
     PredictionBatchResponse,
@@ -38,7 +41,7 @@ from spot_scam.tracking.predictions import (
     load_predictions_dataframe,
 )
 from spot_scam.tracking.feedback import append_feedback
-from spot_scam.utils.paths import ensure_directories
+from spot_scam.utils.paths import TRACKING_DIR, ensure_directories
 
 logger = configure_logging(__name__)
 app = FastAPI(title="Spot the Scam API", version="1.0.0")
@@ -87,6 +90,74 @@ def metadata() -> MetadataResponse:
         test_metrics=MetricSet(**meta.get("test_metrics", {})),
         test_ece=meta.get("test_ece"),
     )
+
+
+def _parse_float(value: str | None) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@app.get("/models", response_model=ModelsResponse)
+def list_models(limit: int = Query(20, ge=1, le=200)) -> ModelsResponse:
+    """
+    Return the most recent tracked runs for each trained model configuration.
+    """
+    path = TRACKING_DIR / "runs.csv"
+    if not path.exists():
+        return ModelsResponse(items=[])
+
+    records: Dict[Tuple[str, str], ModelSummary] = {}
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            model_name = (row.get("model_name") or "").strip()
+            if not model_name:
+                continue
+            config_hash = (row.get("config_hash") or "").strip()
+            key = (model_name, config_hash)
+
+            timestamp_raw = row.get("timestamp")
+            try:
+                timestamp = datetime.fromisoformat(timestamp_raw) if timestamp_raw else None
+            except ValueError:
+                timestamp = None
+
+            summary = ModelSummary(
+                model_name=model_name,
+                model_type=(row.get("model_type") or "").strip(),
+                calibration_method=(row.get("calibration_method") or "").strip() or None,
+                threshold=_parse_float(row.get("threshold")),
+                timestamp=timestamp,
+                validation=MetricSet(
+                    f1=_parse_float(row.get("val_f1")),
+                    precision=_parse_float(row.get("val_precision")),
+                    recall=_parse_float(row.get("val_recall")),
+                ),
+                test=MetricSet(
+                    f1=_parse_float(row.get("test_f1")),
+                    precision=_parse_float(row.get("test_precision")),
+                    recall=_parse_float(row.get("test_recall")),
+                ),
+            )
+
+            existing = records.get(key)
+            if existing and existing.timestamp and summary.timestamp:
+                if summary.timestamp <= existing.timestamp:
+                    continue
+            elif existing and not summary.timestamp:
+                continue
+
+            records[key] = summary
+
+    items = list(records.values())
+    items.sort(key=lambda item: item.test.f1 or 0.0, reverse=True)
+    if limit and len(items) > limit:
+        items = items[:limit]
+    return ModelsResponse(items=items)
 
 
 @app.get("/insights/token-importance", response_model=TokenImportanceResponse)

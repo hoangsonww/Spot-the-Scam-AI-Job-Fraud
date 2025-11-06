@@ -89,6 +89,20 @@ export type MetadataResponse = {
   test_ece?: number | null;
 };
 
+export type ModelSummary = {
+  model_name: string;
+  model_type: string;
+  calibration_method?: string | null;
+  threshold?: number | null;
+  timestamp?: string | null;
+  validation: MetricSet;
+  test: MetricSet;
+};
+
+export type ModelsResponse = {
+  items: ModelSummary[];
+};
+
 export type TokenImportanceResponse = {
   positive: { term: string; weight: number }[];
   negative: { term: string; weight: number }[];
@@ -196,6 +210,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function fetchMetadata(): Promise<MetadataResponse> {
   return request<MetadataResponse>("/metadata");
+}
+
+export async function fetchModelSummaries(limit = 20): Promise<ModelsResponse> {
+  return request<ModelsResponse>(`/models?limit=${limit}`);
 }
 
 export async function fetchTokenImportance(limit = 20): Promise<TokenImportanceResponse> {

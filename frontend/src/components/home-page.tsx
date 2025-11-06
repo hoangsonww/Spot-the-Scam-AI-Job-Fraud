@@ -39,10 +39,12 @@ import {
   fetchThresholdMetrics,
   fetchLatencySummary,
   fetchSliceMetrics,
+  fetchModelSummaries,
   getApiBaseUrl,
   predictSingle,
   type JobPostingInput,
   type MetadataResponse,
+  type ModelsResponse,
   type PredictionResponse,
   type TokenFrequencyResponse,
   type TokenImportanceResponse,
@@ -159,6 +161,17 @@ function metricToPercent(value?: number | null) {
   return Math.min(100, Math.max(0, Math.round(value * 100)))
 }
 
+function formatTimestamp(value?: string | null) {
+  if (!value) {
+    return "-"
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return "-"
+  }
+  return parsed.toLocaleString()
+}
+
 export default function HomePage() {
   const [form, setForm] = useState<FormFields>(samplePosting)
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
@@ -173,6 +186,16 @@ export default function HomePage() {
   } = useSWR<MetadataResponse>("metadata", fetchMetadata, {
     revalidateOnFocus: false,
   })
+
+  const {
+    data: modelsResponse,
+    error: modelsError,
+    isLoading: isLoadingModels,
+  } = useSWR<ModelsResponse>(
+    "models",
+    () => fetchModelSummaries(50),
+    { revalidateOnFocus: false }
+  )
 
   const {
     data: tokenImportance,
@@ -308,6 +331,8 @@ export default function HomePage() {
 
     return entries
   }, [metadata])
+
+  const modelSummaries = useMemo(() => modelsResponse?.items ?? [], [modelsResponse])
 
   const thresholdSeries = useMemo(() => {
     if (!thresholdMetrics?.points?.length) {
@@ -909,6 +934,110 @@ export default function HomePage() {
                   </CardFooter>
                 </>
               ) : null}
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <AlignVerticalSpaceBetween className="size-5 text-chart-1" />
+                  Model leaderboard
+                </CardTitle>
+                <CardDescription>
+                  Recent training runs captured in the lightweight tracker. Sorted by test F1.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingModels ? (
+                  <div className="grid gap-2">
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-5 w-11/12" />
+                    <Skeleton className="h-5 w-10/12" />
+                  </div>
+                ) : modelsError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertTitle>Model leaderboard unavailable</AlertTitle>
+                    <AlertDescription>
+                      {modelsError instanceof Error
+                        ? modelsError.message
+                        : "Failed to load model records."}
+                    </AlertDescription>
+                  </Alert>
+                ) : modelSummaries.length ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Model</TableHead>
+                          <TableHead className="text-right">Val F1</TableHead>
+                          <TableHead className="text-right">Test F1</TableHead>
+                          <TableHead className="text-right">Test Precision</TableHead>
+                          <TableHead className="text-right">Test Recall</TableHead>
+                          <TableHead className="text-right">Threshold</TableHead>
+                          <TableHead>Updated</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {modelSummaries.map((summary, index) => (
+                          <TableRow
+                            key={`${summary.model_name}-${summary.timestamp ?? index}`}
+                            className={
+                              metadata?.model_name === summary.model_name
+                                ? "bg-muted/60"
+                                : undefined
+                            }
+                          >
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-foreground">
+                                    {summary.model_name}
+                                  </span>
+                                  {metadata?.model_name === summary.model_name ? (
+                                    <Badge variant="secondary" className="text-[10px] uppercase">
+                                      Serving
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {summary.model_type}
+                                  {summary.calibration_method
+                                    ? ` · ${summary.calibration_method}`
+                                    : ""}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatMetric(summary.validation?.f1)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatMetric(summary.test?.f1)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {formatMetric(summary.test?.precision)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {formatMetric(summary.test?.recall)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {summary.threshold !== undefined && summary.threshold !== null
+                                ? formatMetric(summary.threshold, { maximumFractionDigits: 3 })
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatTimestamp(summary.timestamp)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    No tracked model runs yet. Train a model to populate this leaderboard.
+                  </div>
+                )}
+              </CardContent>
             </Card>
 
             <Card>
