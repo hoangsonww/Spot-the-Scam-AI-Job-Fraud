@@ -64,11 +64,10 @@ jobs:
             echo "- Uploaded artifact: \`training-artifacts\` (artifacts/, experiments/, mlruns/)"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  preview-model:
-    name: "🧪 Preview Model Image"
+  build-model:
+    name: "🔨 Build Model Image"
     runs-on: ubuntu-latest
     needs: model
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -101,11 +100,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=model,compression=zstd
           outputs: type=cacheonly
 
-  preview-api:
-    name: "🧪 Preview API Image"
+  build-api:
+    name: "🔨 Build API Image"
     runs-on: ubuntu-latest
     needs: model
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -127,11 +125,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=api,compression=zstd
           outputs: type=cacheonly
 
-  preview-frontend:
-    name: "🧪 Preview Frontend Image"
+  build-frontend:
+    name: "🔨 Build Frontend Image"
     runs-on: ubuntu-latest
     needs: model
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
@@ -156,7 +153,7 @@ jobs:
   push-model:
     name: "🐳 Push Model Image"
     runs-on: ubuntu-latest
-    needs: preview-model
+    needs: build-model
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -195,9 +192,9 @@ jobs:
           context: docker/model
           file: docker/model/Dockerfile
           push: true
-          tags:
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ github.sha }}
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:latest
           cache-from: type=gha,scope=model
           cache-to: type=gha,mode=max,scope=model
 
@@ -211,7 +208,7 @@ jobs:
   push-api:
     name: "🐳 Push API Image"
     runs-on: ubuntu-latest
-    needs: preview-api
+    needs: build-api
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -239,9 +236,9 @@ jobs:
           context: .
           file: Dockerfile
           push: true
-          tags:
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ github.sha }}
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:latest
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
 
@@ -255,7 +252,7 @@ jobs:
   push-frontend:
     name: "🐳 Push Frontend Image"
     runs-on: ubuntu-latest
-    needs: preview-frontend
+    needs: build-frontend
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -283,9 +280,9 @@ jobs:
           context: frontend
           file: frontend/Dockerfile
           push: true
-          tags:
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ github.sha }}
-            - ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:latest
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:latest
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
 
