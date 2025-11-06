@@ -61,7 +61,6 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
   - `experiments/tables/slice_metrics_baseline.csv`
   - `experiments/tables/slice_metrics_feedback_delta.csv`
 - The review UI and nav badge automatically reflect queue size via `/cases` and `/feedback` endpoints.
-- API additions: `GET /cases` (queue), `POST /feedback` (append-only log), plus existing `/insights/*` endpoints for supporting analytics.
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams.
 
