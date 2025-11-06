@@ -148,6 +148,30 @@ class FraudPredictor:
         summary_rows.sort(key=lambda item: item["batch_size"])
         return summary_rows
 
+    def get_slice_metrics(self, limit: int = 6) -> List[Dict[str, Any]]:
+        path = EXPERIMENTS_DIR / "tables" / "slice_metrics.csv"
+        if not path.exists():
+            return []
+        df = pd.read_csv(path)
+        if df.empty:
+            return []
+        if "f1" in df.columns:
+            df = df.sort_values(by="f1", ascending=True)
+        df = df.head(limit)
+        metrics: List[Dict[str, Any]] = []
+        for _, row in df.iterrows():
+            metrics.append(
+                {
+                    "slice": str(row.get("slice", "")),
+                    "category": str(row.get("category", "")),
+                    "count": int(row.get("count", 0) or 0),
+                    "f1": float(row["f1"]) if pd.notna(row.get("f1")) else None,
+                    "precision": float(row["precision"]) if pd.notna(row.get("precision")) else None,
+                    "recall": float(row["recall"]) if pd.notna(row.get("recall")) else None,
+                }
+            )
+        return metrics
+
     def _load_metadata(self) -> Dict[str, Any]:
         path = self.artifacts_dir / "metadata.json"
         with path.open("r", encoding="utf-8") as handle:

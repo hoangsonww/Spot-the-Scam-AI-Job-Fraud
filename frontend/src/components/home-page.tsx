@@ -37,6 +37,7 @@ import {
   fetchTokenImportance,
   fetchThresholdMetrics,
   fetchLatencySummary,
+  fetchSliceMetrics,
   getApiBaseUrl,
   predictSingle,
   type JobPostingInput,
@@ -47,6 +48,7 @@ import {
   type ThresholdMetricsResponse,
   type LatencySummaryResponse,
   type FeatureContribution,
+  type SliceMetricsResponse,
 } from "@/lib/api"
 import {
   Activity,
@@ -58,17 +60,42 @@ import {
   Flame,
   LineChart as LineChartIcon,
   ShieldCheck,
+  Target,
 } from "lucide-react"
 
 type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>
 
+type BadgeTone = "default" | "destructive" | "secondary" | "outline"
+
+type ToggleField = "telecommuting" | "has_company_logo" | "has_questions"
+
 type FormFields = Pick<
   JobPostingInput,
-  "title" | "company_profile" | "description" | "requirements" | "benefits"
->
+  | "title"
+  | "company_profile"
+  | "description"
+  | "requirements"
+  | "benefits"
+  | "location"
+  | "employment_type"
+  | "required_experience"
+  | "required_education"
+  | "industry"
+  | "function"
+> & {
+  telecommuting: boolean
+  has_company_logo: boolean
+  has_questions: boolean
+}
 
 const samplePosting: FormFields = {
   title: "Remote Accounts Payable Specialist (Immediate Start)",
+  location: "Remote",
+  employment_type: "Contract",
+  required_experience: "2+ years",
+  required_education: "Associate Degree",
+  industry: "Accounting",
+  function: "Finance",
   company_profile:
     "Nimbus Finance is a regional outsourcing firm supporting mid-market clients with day-to-day operations.",
   description:
@@ -77,6 +104,9 @@ const samplePosting: FormFields = {
     "2+ years of accounts payable experience • Familiar with QuickBooks or NetSuite • Comfortable working remote with verified identity • Must pass background screening at hire.",
   benefits:
     "Competitive hourly pay • 401(k) match after 90 days • Remote stipend • Bonus eligibility based on accuracy and throughput.",
+  telecommuting: true,
+  has_company_logo: true,
+  has_questions: false,
 }
 
 const metricLabels: Record<MetricKey, string> = {
@@ -111,6 +141,14 @@ function formatContribution(value?: number | null) {
   })
   const formatted = formatter.format(value)
   return value >= 0 ? `+${formatted}` : formatted
+}
+
+function normalizeTextField(value?: string | null): string | null {
+  if (value === undefined || value === null) {
+    return null
+  }
+  const trimmed = value.trim()
+  return trimmed.length ? trimmed : null
 }
 
 function metricToPercent(value?: number | null) {
@@ -171,6 +209,16 @@ export default function HomePage() {
     { revalidateOnFocus: false }
   )
 
+  const {
+    data: sliceMetrics,
+    error: sliceMetricsError,
+    isLoading: isLoadingSliceMetrics,
+  } = useSWR<SliceMetricsResponse>(
+    "slice-metrics",
+    () => fetchSliceMetrics(6),
+    { revalidateOnFocus: false }
+  )
+
   const handleChange = useCallback(
     (field: keyof FormFields) =>
       (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -180,8 +228,15 @@ export default function HomePage() {
     []
   )
 
+  const handleToggleChange = useCallback(
+    (field: ToggleField) => (event: React.ChangeEvent<HTMLInputElement>) => {
+      setForm((prev) => ({ ...prev, [field]: event.target.checked }))
+    },
+    []
+  )
+
   const resetToSample = useCallback(() => {
-    setForm(samplePosting)
+    setForm(() => ({ ...samplePosting }))
     setPrediction(null)
     setError(null)
   }, [])
@@ -194,10 +249,19 @@ export default function HomePage() {
 
       const payload: JobPostingInput = {
         title: form.title.trim(),
-        company_profile: form.company_profile?.trim() || null,
-        description: form.description?.trim() || null,
-        requirements: form.requirements?.trim() || null,
-        benefits: form.benefits?.trim() || null,
+        location: normalizeTextField(form.location),
+        company_profile: normalizeTextField(form.company_profile),
+        description: normalizeTextField(form.description),
+        requirements: normalizeTextField(form.requirements),
+        benefits: normalizeTextField(form.benefits),
+        employment_type: normalizeTextField(form.employment_type),
+        required_experience: normalizeTextField(form.required_experience),
+        required_education: normalizeTextField(form.required_education),
+        industry: normalizeTextField(form.industry),
+        function: normalizeTextField(form.function),
+        telecommuting: form.telecommuting ? 1 : 0,
+        has_company_logo: form.has_company_logo ? 1 : 0,
+        has_questions: form.has_questions ? 1 : 0,
       }
 
       try {
@@ -281,17 +345,21 @@ export default function HomePage() {
     ]
   }, [metadata])
 
-  const predictionBadge = useMemo(() => {
+  const predictionBadge = useMemo((): { tone: BadgeTone; label: string } => {
     if (!prediction) {
-      return { tone: "outline" as const, label: "Awaiting submission" }
+      return { tone: "outline", label: "Awaiting submission" }
     }
 
-    const tone =
-      prediction.decision.toLowerCase() === "fraud"
-        ? "destructive"
-        : prediction.decision.toLowerCase() === "review"
-          ? "secondary"
-          : "default"
+    const normalizedDecision = prediction.decision.toLowerCase()
+    let tone: BadgeTone
+
+    if (normalizedDecision === "fraud") {
+      tone = "destructive"
+    } else if (normalizedDecision === "review") {
+      tone = "secondary"
+    } else {
+      tone = "default"
+    }
 
     return { tone, label: prediction.decision }
   }, [prediction])
@@ -408,6 +476,115 @@ export default function HomePage() {
                       />
                     </TabsContent>
                   </Tabs>
+                  <Separator className="my-1" />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input
+                        id="location"
+                        value={form.location ?? ""}
+                        onChange={handleChange("location")}
+                        placeholder="Remote · Austin, TX · Hybrid"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="employment_type">Employment type</Label>
+                      <Input
+                        id="employment_type"
+                        value={form.employment_type ?? ""}
+                        onChange={handleChange("employment_type")}
+                        placeholder="Full-time, Contract, Internship…"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="required_experience">Required experience</Label>
+                      <Input
+                        id="required_experience"
+                        value={form.required_experience ?? ""}
+                        onChange={handleChange("required_experience")}
+                        placeholder="e.g., 2+ years, Entry level"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="required_education">Required education</Label>
+                      <Input
+                        id="required_education"
+                        value={form.required_education ?? ""}
+                        onChange={handleChange("required_education")}
+                        placeholder="e.g., Bachelor's, High School Diploma"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="industry">Industry</Label>
+                      <Input
+                        id="industry"
+                        value={form.industry ?? ""}
+                        onChange={handleChange("industry")}
+                        placeholder="Industry context (Finance, Healthcare…)"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="function">Function</Label>
+                      <Input
+                        id="function"
+                        value={form.function ?? ""}
+                        onChange={handleChange("function")}
+                        placeholder="Functional area (Sales, Engineering…)"
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
+                    <div className="mb-3 flex flex-col gap-1">
+                      <span className="text-sm font-medium text-foreground">Metadata flags</span>
+                      <span className="text-xs text-muted-foreground">
+                        These booleans align with the training data and directly influence the model&apos;s tabular features.
+                      </span>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-1 size-4 accent-primary"
+                          checked={form.has_company_logo}
+                          onChange={handleToggleChange("has_company_logo")}
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="font-medium text-foreground">Displays company logo</span>
+                          <span className="text-xs text-muted-foreground">
+                            Mark when the listing shows an authentic employer logo.
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-1 size-4 accent-primary"
+                          checked={form.telecommuting}
+                          onChange={handleToggleChange("telecommuting")}
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="font-medium text-foreground">Telecommuting / remote</span>
+                          <span className="text-xs text-muted-foreground">
+                            Set when the job can be performed remotely.
+                          </span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          className="mt-1 size-4 accent-primary"
+                          checked={form.has_questions}
+                          onChange={handleToggleChange("has_questions")}
+                        />
+                        <span className="flex flex-col gap-0.5">
+                          <span className="font-medium text-foreground">Screening questions included</span>
+                          <span className="text-xs text-muted-foreground">
+                            Enable when applicants must answer custom questions.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                   {error ? (
                     <Alert variant="destructive" className="mt-2">
                       <AlertTriangle className="size-4" />
@@ -825,6 +1002,84 @@ export default function HomePage() {
                 </Tabs>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="size-5 text-chart-4" />
+                  Slices to review
+                </CardTitle>
+                <CardDescription>
+                  Lowest F1 slices from the latest evaluation so you can focus manual audits where the
+                  model struggles most.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {isLoadingSliceMetrics ? (
+                  <div className="grid gap-3">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ) : sliceMetricsError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertTitle>Slice metrics unavailable</AlertTitle>
+                    <AlertDescription>
+                      {sliceMetricsError instanceof Error
+                        ? sliceMetricsError.message
+                        : "Failed to load slice-level performance."}
+                    </AlertDescription>
+                  </Alert>
+                ) : sliceMetrics && sliceMetrics.items.length ? (
+                  <ul className="grid gap-3">
+                    {sliceMetrics.items.map((item) => (
+                      <li
+                        key={`${item.slice}-${item.category}`}
+                        className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-foreground">
+                              {item.category && item.category !== "<missing>" ? item.category : "Missing value"}
+                            </span>
+                            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {item.slice}
+                            </span>
+                          </div>
+                          <Badge variant="outline">n={item.count}</Badge>
+                        </div>
+                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>F1</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.f1, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Precision</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.precision, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Recall</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.recall, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Slice metrics are not available yet. Re-run the evaluation suite to surface
+                    segment-level performance.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </section>
       </main>
@@ -1061,8 +1316,8 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
   const maxLatency = bars.reduce((max, bar) => Math.max(max, bar.p95), 0) || 1
 
   return (
-    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4">
-      <div className="mb-3 flex items-center gap-4 text-xs text-muted-foreground">
+    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-chart-2" />
           p50 latency
@@ -1072,19 +1327,22 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
           p95 latency
         </span>
       </div>
-      <div className="flex h-40 items-end gap-5">
+      <div className="flex h-48 items-end justify-between gap-4">
         {bars.map((bar) => {
           const p95Height = Math.max(6, (bar.p95 / maxLatency) * 100)
           const p50Height = Math.max(4, (bar.p50 / maxLatency) * 100)
           return (
-            <div key={bar.batchSize} className="flex flex-col items-center gap-2">
-              <div className="relative flex h-32 w-10 items-end justify-center">
+            <div
+              key={bar.batchSize}
+              className="flex min-w-[56px] flex-1 flex-col items-center gap-2"
+            >
+              <div className="relative flex h-32 w-full max-w-[72px] items-end justify-center">
                 <div
-                  className="absolute bottom-0 w-6 rounded-md bg-destructive/70"
+                  className="absolute bottom-0 w-3/5 max-w-[36px] rounded-md bg-destructive/70"
                   style={{ height: `${p95Height}%` }}
                 />
                 <div
-                  className="absolute bottom-0 w-3 rounded-md bg-chart-2"
+                  className="absolute bottom-0 w-2/5 max-w-[24px] rounded-md bg-chart-2"
                   style={{ height: `${p50Height}%` }}
                 />
               </div>

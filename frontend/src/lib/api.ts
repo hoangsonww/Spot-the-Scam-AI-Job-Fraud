@@ -124,6 +124,19 @@ export type LatencySummaryResponse = {
   items: LatencySummaryPoint[];
 };
 
+export type SliceMetric = {
+  slice: string;
+  category: string;
+  count: number;
+  f1?: number | null;
+  precision?: number | null;
+  recall?: number | null;
+};
+
+export type SliceMetricsResponse = {
+  items: SliceMetric[];
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -156,6 +169,10 @@ export async function fetchThresholdMetrics(limit = 50): Promise<ThresholdMetric
 
 export async function fetchLatencySummary(): Promise<LatencySummaryResponse> {
   return request<LatencySummaryResponse>("/insights/latency");
+}
+
+export async function fetchSliceMetrics(limit = 6): Promise<SliceMetricsResponse> {
+  return request<SliceMetricsResponse>(`/insights/slice-metrics?limit=${limit}`);
 }
 
 export async function predictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {
