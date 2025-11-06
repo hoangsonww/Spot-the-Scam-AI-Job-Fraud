@@ -25,7 +25,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
-- **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for commands and CI publishing flow).
+- **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
 
 ## Outputs
 - `artifacts/` - models, vectorizers, calibration metadata, final predictions.

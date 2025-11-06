@@ -55,10 +55,82 @@ jobs:
             mlruns/**
           if-no-files-found: warn
 
+  model-image:
+    name: Build model artifact image
+    runs-on: ubuntu-latest
+    needs: model
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download training artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: training-artifacts
+          path: .
+
+      - name: Prepare model build context
+        run: |
+          rm -rf docker/model/artifacts docker/model/experiments docker/model/mlruns
+          cp pyproject.toml docker/model/
+          cp README.md docker/model/
+          mv artifacts docker/model/
+          mv experiments docker/model/
+          mv mlruns docker/model/
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure model image metadata
+        id: model_meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/spot-the-scam-model
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=pr
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=Spot the Scam Model Artifacts
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build model image
+        id: model_build
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/model
+          file: docker/model/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          load: ${{ github.event_name != 'push' }}
+          tags: ${{ steps.model_meta.outputs.tags }}
+          labels: ${{ steps.model_meta.outputs.labels }}
+          cache-from: type=gha,scope=model
+          cache-to: type=gha,mode=max,scope=model
+
+      - name: List model image (PR checks)
+        if: github.event_name != 'push'
+        run: docker image ls
+
+      - name: Log model image digest
+        if: steps.model_build.outputs.digest != ''
+        run: |
+          echo "Model image digest: ${{ steps.model_build.outputs.digest }}"
+
   build:
     name: Build ${{ matrix.target.name }} image
     runs-on: ubuntu-latest
-    needs: model
+    needs: model-image
     strategy:
       matrix:
         target:

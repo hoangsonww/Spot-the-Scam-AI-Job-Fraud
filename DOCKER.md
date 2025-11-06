@@ -8,6 +8,7 @@ This guide covers local container workflows, GitHub Actions automation, and publ
 
 | Image | Description | Default tag scheme |
 |-------|-------------|--------------------|
+| `spot-the-scam-model` | Packaged training artifacts (classical winner, reports, MLflow run) | `latest`, `<git-sha>` |
 | `spot-the-scam-api` | FastAPI inference + insights service | `latest`, `<git-sha>` |
 | `spot-the-scam-frontend` | Next.js dashboard | `latest`, `<git-sha>` |
 
@@ -73,15 +74,19 @@ PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 
    docker tag spot-the-scam-frontend:latest ghcr.io/<OWNER>/spot-the-scam-frontend:latest
    docker push ghcr.io/<OWNER>/spot-the-scam-frontend:latest
+
+   docker tag spot-the-scam-model:latest ghcr.io/<OWNER>/spot-the-scam-model:latest
+   docker push ghcr.io/<OWNER>/spot-the-scam-model:latest
    ```
 
 ---
 
 ## 4. GitHub Actions Automation
 
-The workflow at `.github/workflows/docker-publish.yml` now performs three checks on every push/PR:
+The workflow at `.github/workflows/docker-publish.yml` now performs four stages on every push/PR:
 
 - **Train classical model artifacts:** installs Python 3.12, runs `python -m spot_scam.pipeline.train --skip-transformer`, and uploads the resulting `artifacts/`, `experiments/`, and `mlruns/` directories so you can download them from the run summary.
+- **Build model container:** packages those artifacts into `spot-the-scam-model` and publishes to GHCR.
 - **Build API container:** uses Docker Buildx to build/push `spot-the-scam-api`.
 - **Build frontend container:** uses Docker Buildx to build/push `spot-the-scam-frontend`.
 
@@ -104,6 +109,7 @@ To inspect runs or re-trigger builds, visit the **Actions → “Build & Publish
 ## 5. Pulling Images
 
 ```bash
+docker pull ghcr.io/<OWNER>/spot-the-scam-model:latest
 docker pull ghcr.io/<OWNER>/spot-the-scam-api:latest
 docker pull ghcr.io/<OWNER>/spot-the-scam-frontend:latest
 ```
@@ -112,6 +118,13 @@ Run the API image standalone:
 
 ```bash
 docker run --rm -p 8000:8000 ghcr.io/<OWNER>/spot-the-scam-api:latest
+```
+
+Inspect the model artifact bundle:
+
+```bash
+docker run --rm -it ghcr.io/<OWNER>/spot-the-scam-model:latest bash
+# artifacts are available under /app/artifacts, MLflow runs under /app/mlruns
 ```
 
 Front the API with the dashboard:
