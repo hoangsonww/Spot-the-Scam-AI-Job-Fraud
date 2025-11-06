@@ -48,9 +48,8 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ### Quantization (optional)
 - To create an int8 dynamic-quantized transformer checkpoint: `make quantize-transformer`
 - Serve the quantized model by setting `SPOT_SCAM_USE_QUANTIZED=1` before starting the API.
-- Configure CORS (if hosting the UI elsewhere) with `SPOT_SCAM_ALLOWED_ORIGINS="https://your-domain.com,http://localhost:3000"`.
 - Non-quantized models remain the default.
 
-See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details.
+See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams.
 
 Project licensed under the MIT License. See [LICENSE](LICENSE) for details.
