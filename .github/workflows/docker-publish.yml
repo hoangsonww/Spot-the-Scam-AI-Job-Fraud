@@ -1,0 +1,83 @@
+name: Build & Publish Containers
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.target.name }} image
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - name: api
+            context: .
+            file: Dockerfile
+            description: FastAPI inference service
+          - name: frontend
+            context: frontend
+            file: frontend/Dockerfile
+            description: Next.js dashboard
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/spot-the-scam-${{ matrix.target.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=pr
+            type=sha,format=short
+          labels: |
+            org.opencontainers.image.title=Spot the Scam ${{ matrix.target.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Build container
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.file }}
+          push: ${{ github.event_name == 'push' }}
+          load: ${{ github.event_name != 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: List images (PR checks)
+        if: github.event_name != 'push'
+        run: docker image ls
+
+      - name: Log build digest
+        if: steps.build.outputs.digest != ''
+        run: echo "Built image digest: ${{ steps.build.outputs.digest }}"
