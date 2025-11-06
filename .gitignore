@@ -28,3 +28,4 @@ mlruns/
 /tracking/predictions/
 /tracking/feedback/
 /tracking/cases/
+full_train.log
