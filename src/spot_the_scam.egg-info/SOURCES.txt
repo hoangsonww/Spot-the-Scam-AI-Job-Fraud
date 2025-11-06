@@ -28,7 +28,10 @@ src/spot_scam/models/transformer.py
 src/spot_scam/pipeline/quantize.py
 src/spot_scam/pipeline/train.py
 src/spot_scam/policy/gray_zone.py
+src/spot_scam/tracking/feedback.py
 src/spot_scam/tracking/logger.py
+src/spot_scam/tracking/predictions.py
+src/spot_scam/tracking/storage.py
 src/spot_scam/utils/logging.py
 src/spot_scam/utils/paths.py
 src/spot_the_scam.egg-info/PKG-INFO

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import os
 from functools import lru_cache
+from typing import List, Dict
+from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 
 from spot_scam.api.schemas import (
@@ -22,9 +24,21 @@ from spot_scam.api.schemas import (
     ThresholdMetricsResponse,
     LatencySummaryResponse,
     SliceMetricsResponse,
+    CasesResponse,
+    ReviewCase,
+    ReviewCasePayload,
+    PredictionExplanation,
+    FeedbackIn,
 )
 from spot_scam.inference.predictor import FraudPredictor
 from spot_scam.utils.logging import configure_logging
+from spot_scam.tracking.predictions import (
+    log_predictions,
+    get_review_queue,
+    load_predictions_dataframe,
+)
+from spot_scam.tracking.feedback import append_feedback
+from spot_scam.utils.paths import ensure_directories
 
 logger = configure_logging(__name__)
 app = FastAPI(title="Spot the Scam API", version="1.0.0")
@@ -105,6 +119,71 @@ def latency_summary() -> LatencySummaryResponse:
     summary = predictor.get_latency_summary()
     return LatencySummaryResponse(items=summary)
 
+
+@app.post("/feedback", status_code=201)
+def post_feedback(
+    items: List[FeedbackIn] = Body(...),
+) -> Dict[str, int]:
+    ensure_directories()
+    if not items:
+        raise HTTPException(status_code=400, detail="Empty feedback payload.")
+    if len(items) > 100:
+        raise HTTPException(status_code=400, detail="Feedback batch exceeds limit of 100.")
+
+    predictions_df = load_predictions_dataframe()
+    known_ids = set(predictions_df["request_id"]) if not predictions_df.empty else set()
+
+    rows = []
+    for entry in items:
+        data = entry.model_dump()
+        if known_ids and data["request_id"] not in known_ids:
+            raise HTTPException(status_code=404, detail=f"Unknown request_id {data['request_id']}.")
+        data["created_at"] = datetime.utcnow().isoformat()
+        rows.append(data)
+
+    append_feedback(rows)
+    return {"inserted": len(rows)}
+
+
+@app.get("/cases", response_model=CasesResponse)
+def review_cases(
+    policy: str = Query("gray-zone", description="Sampling policy (gray-zone, entropy)."),
+    limit: int = Query(25, ge=1, le=200),
+    predictor: FraudPredictor = Depends(get_predictor),
+) -> CasesResponse:
+    band = predictor.get_gray_zone_band()
+    queue = get_review_queue(
+        policy=policy,
+        limit=limit,
+        threshold=float(predictor.threshold),
+        gray_zone_width=float(band["width"]),
+    )
+
+    items = []
+    for raw in queue["items"]:
+        explanation = raw.get("explanation") or {}
+        payload = raw.get("payload") or {}
+        try:
+            created_at = datetime.fromisoformat(raw["created_at"])
+        except Exception:
+            created_at = datetime.utcnow()
+        items.append(
+            ReviewCase(
+                request_id=str(raw["request_id"]),
+                created_at=created_at,
+                probability=float(raw["probability"]),
+                predicted_label=str(raw["predicted_label"]),
+                model_version=str(raw["model_version"]),
+                threshold=float(raw.get("threshold") or 0.0),
+                text_hash=str(raw["text_hash"]),
+                features_hash=str(raw["features_hash"]),
+                payload=ReviewCasePayload.model_validate(payload),
+                explanation=PredictionExplanation.model_validate(explanation),
+            )
+        )
+
+    return CasesResponse(total_pending=int(queue["total_pending"]), items=items)
+
 @app.get("/insights/slice-metrics", response_model=SliceMetricsResponse)
 def slice_metrics(limit: int = Query(6, ge=1, le=50)) -> SliceMetricsResponse:
     predictor = get_predictor()
@@ -118,8 +197,22 @@ def predict(
     predictor: FraudPredictor = Depends(get_predictor),
 ) -> PredictionBatchResponse:
     payload = [item.model_dump() for item in request.instances]
-    predictions = predictor.predict(payload)
-    return PredictionBatchResponse(predictions=[PredictionResponse(**pred) for pred in predictions])
+    predictions, contexts = predictor.predict(payload, return_context=True)
+    model_name = predictor.metadata.get("model_name", predictor.metadata.get("model_type", "unknown"))
+
+    logged_records = log_predictions(
+        payloads=payload,
+        processed_text=[ctx["text_all"] for ctx in contexts],
+        tabular_features=[ctx["tabular_features"] for ctx in contexts],
+        predictions=predictions,
+        model_name=model_name,
+    )
+
+    enriched = []
+    for pred, record in zip(predictions, logged_records):
+        enriched.append(PredictionResponse(**{**pred, "request_id": record["request_id"]}))
+
+    return PredictionBatchResponse(predictions=enriched)
 
 
 @app.post("/predict/single", response_model=PredictionResponse)
@@ -127,10 +220,19 @@ def predict_single(
     item: JobPostingInput,
     predictor: FraudPredictor = Depends(get_predictor),
 ) -> PredictionResponse:
-    predictions = predictor.predict([item.model_dump()])
+    predictions, contexts = predictor.predict([item.model_dump()], return_context=True)
     if not predictions:
         raise HTTPException(status_code=400, detail="No predictions generated.")
-    return PredictionResponse(**predictions[0])
+    model_name = predictor.metadata.get("model_name", predictor.metadata.get("model_type", "unknown"))
+    logged_records = log_predictions(
+        payloads=[item.model_dump()],
+        processed_text=[contexts[0]["text_all"]],
+        tabular_features=[contexts[0]["tabular_features"]],
+        predictions=predictions,
+        model_name=model_name,
+    )
+    enriched = {**predictions[0], "request_id": logged_records[0]["request_id"]}
+    return PredictionResponse(**enriched)
 
 
 __all__ = ["app"]

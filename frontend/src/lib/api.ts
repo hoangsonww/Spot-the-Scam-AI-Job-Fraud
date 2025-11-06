@@ -38,6 +38,7 @@ export type PredictionExplanation = {
 };
 
 export type PredictionResponse = {
+  request_id: string;
   probability_fraud: number;
   binary_label: number;
   decision: string;
@@ -137,6 +138,48 @@ export type SliceMetricsResponse = {
   items: SliceMetric[];
 };
 
+export type ReviewCase = {
+  request_id: string;
+  created_at: string;
+  probability: number;
+  predicted_label: string;
+  model_version: string;
+  threshold?: number | null;
+  text_hash: string;
+  features_hash: string;
+  payload: {
+    title?: string | null;
+    company_profile?: string | null;
+    description?: string | null;
+    requirements?: string | null;
+    benefits?: string | null;
+    location?: string | null;
+    employment_type?: string | null;
+    required_experience?: string | null;
+    required_education?: string | null;
+    industry?: string | null;
+    function?: string | null;
+  };
+  explanation: PredictionExplanation;
+};
+
+export type CasesResponse = {
+  total_pending: number;
+  items: ReviewCase[];
+};
+
+export type FeedbackPayload = {
+  request_id: string;
+  model_version: string;
+  proba: number;
+  predicted_label: "fraud" | "legit" | "review";
+  reviewer_label: "fraud" | "legit" | "unsure";
+  text_hash: string;
+  features_hash: string;
+  rationale?: string | null;
+  notes?: string | null;
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) },
@@ -173,6 +216,25 @@ export async function fetchLatencySummary(): Promise<LatencySummaryResponse> {
 
 export async function fetchSliceMetrics(limit = 6): Promise<SliceMetricsResponse> {
   return request<SliceMetricsResponse>(`/insights/slice-metrics?limit=${limit}`);
+}
+
+export async function fetchReviewCases(
+  limit = 25,
+  policy = "gray-zone"
+): Promise<CasesResponse> {
+  return request<CasesResponse>(`/cases?policy=${policy}&limit=${limit}`);
+}
+
+export async function fetchReviewCount(): Promise<number> {
+  const result = await fetchReviewCases(1);
+  return result.total_pending;
+}
+
+export async function submitFeedback(records: FeedbackPayload[]): Promise<void> {
+  await request<{ inserted: number }>("/feedback", {
+    method: "POST",
+    body: JSON.stringify(records),
+  });
 }
 
 export async function predictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {

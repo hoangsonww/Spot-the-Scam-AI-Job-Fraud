@@ -99,6 +99,13 @@ def train_transformer_model(
     num_labels = len(np.unique(train_df[config["data"]["target_column"]]))
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
 
+    # Detect platform for FP16 compatibility
+    import platform
+    use_fp16 = transformer_conf.get("fp16", False)
+    if use_fp16 and platform.system() == "Darwin":
+        logger.warning("Disabling FP16 on macOS due to MPS backend limitations")
+        use_fp16 = False
+
     training_args_kwargs = {
         "output_dir": str(output_dir / "transformer"),
         "learning_rate": learning_rate,
@@ -112,7 +119,8 @@ def train_transformer_model(
         "metric_for_best_model": "eval_loss",
         "greater_is_better": False,
         "seed": project_conf["random_seed"],
-        "fp16": transformer_conf.get("fp16", False),
+        "fp16": use_fp16,
+        "max_grad_norm": transformer_conf.get("max_grad_norm", 1.0),
         "dataloader_num_workers": config["project"].get("num_workers", 2),
         "gradient_accumulation_steps": gradient_accumulation,
         "report_to": "none",
