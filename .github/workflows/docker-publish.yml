@@ -156,7 +156,7 @@ jobs:
   push-model:
     name: "🐳 Push Model Image"
     runs-on: ubuntu-latest
-    needs: model
+    needs: preview-model
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -211,7 +211,7 @@ jobs:
   push-api:
     name: "🐳 Push API Image"
     runs-on: ubuntu-latest
-    needs: model
+    needs: preview-api
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
@@ -255,7 +255,7 @@ jobs:
   push-frontend:
     name: "🐳 Push Frontend Image"
     runs-on: ubuntu-latest
-    needs: model
+    needs: preview-frontend
     if: github.event_name != 'pull_request'
     permissions:
       contents: read
