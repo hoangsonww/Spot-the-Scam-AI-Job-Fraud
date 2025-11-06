@@ -1247,7 +1247,7 @@ function TokenList({
   items: TokenWeightItem[]
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+    <div className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {title}
@@ -1261,10 +1261,12 @@ function TokenList({
         {items.slice(0, 12).map((token) => (
           <li
             key={`${title}-${token.term}`}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
+            className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
           >
-            <span className="font-medium text-foreground">{token.term}</span>
-            <span className={`${tone} font-semibold`}>
+            <span className="flex-1 min-w-0 break-words font-medium leading-snug text-foreground">
+              {token.term}
+            </span>
+            <span className={`${tone} shrink-0 text-right font-semibold tabular-nums`}>
               {formatMetric(token.weight, { maximumFractionDigits: 3 })}
             </span>
           </li>
@@ -1298,21 +1300,25 @@ export function ContributionColumn({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <div className="text-sm font-semibold text-foreground">{title}</div>
       <ul className="grid gap-1.5">
         {items.map((item) => (
           <li
             key={`${title}-${item.feature}-${item.source}`}
-            className="border-border/70 bg-card/60 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+            className="border-border/70 bg-card/60 flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm transition-colors hover:bg-card"
           >
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-foreground">{item.feature}</span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium text-foreground break-words leading-snug">
+                {item.feature}
+              </span>
               <span className="text-xs text-muted-foreground capitalize">{item.source}</span>
             </div>
             <span
               className={
-                direction === "negative" ? "text-chart-2 text-sm font-semibold" : "text-destructive text-sm font-semibold"
+                direction === "negative"
+                  ? "text-chart-2 shrink-0 text-right text-sm font-semibold tabular-nums"
+                  : "text-destructive shrink-0 text-right text-sm font-semibold tabular-nums"
               }
             >
               {formatContribution(item.contribution)}
