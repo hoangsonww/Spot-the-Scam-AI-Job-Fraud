@@ -80,4 +80,5 @@ jobs:
 
       - name: Log build digest
         if: steps.build.outputs.digest != ''
-        run: echo "Built image digest: ${{ steps.build.outputs.digest }}"
+        run: |
+          echo "Built image digest: ${{ steps.build.outputs.digest }}"
