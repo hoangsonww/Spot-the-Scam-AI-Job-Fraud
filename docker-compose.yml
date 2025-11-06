@@ -12,8 +12,11 @@ services:
       - ./artifacts:/app/artifacts
       - ./experiments:/app/experiments
       - ./data:/app/data:ro
+      - ./mlruns:/app/mlruns
     environment:
       - PYTHONUNBUFFERED=1
+      - MLFLOW_TRACKING_URI=file:///app/mlruns
+      - SPOT_SCAM_ALLOWED_ORIGINS=http://localhost:3000
 
   frontend:
     build:

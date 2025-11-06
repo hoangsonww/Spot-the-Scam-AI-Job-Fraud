@@ -253,7 +253,8 @@ docker compose up -d
 ```
 
 - FastAPI: <http://localhost:8000> · Next.js dashboard: <http://localhost:3000>.
-- Host directories `configs/`, `artifacts/`, `experiments/`, and `data/` are mounted for persistence. Ensure trained artifacts exist (or train inside the container) before relying on the API.
+- Host directories `configs/`, `artifacts/`, `experiments/`, `mlruns/`, and `data/` are mounted for persistence. Ensure trained artifacts exist (or train inside the container) before relying on the API.
+- The stack sets `MLFLOW_TRACKING_URI=file:///app/mlruns` so containerised jobs log to the shared `mlruns/` volume. CORS defaults allow the bundled frontend, but override via `SPOT_SCAM_ALLOWED_ORIGINS` if you expose the API elsewhere.
 - Execute ad-hoc tasks inside the API container:
 
 ```bash
