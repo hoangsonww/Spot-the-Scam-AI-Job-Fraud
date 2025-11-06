@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use Spot the Scam in your work, please cite it."
+title: "Spot the Scam: Calibrated Job-Posting Fraud Detection"
+abstract: |
+  Spot the Scam provides an end-to-end pipeline for detecting fraudulent job postings,
+  combining classical and transformer models, calibrated decision policies, explainability
+  tooling, and containerised deployment targets (API, frontend, and model artifacts).
+authors:
+  - family-names: "Nguyen"
+    given-names: "Son"
+    orcid: "https://orcid.org/0009-0002-7806-068X"
+date-released: "2025-11-05"
+version: "0.1.0"
+repository-code: "https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud"
+license: "MIT"
+keywords:
+  - fraud detection
+  - explainable AI
+  - mlops
+  - ONNX
+  - MLflow

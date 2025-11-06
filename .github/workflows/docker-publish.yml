@@ -55,6 +55,15 @@ jobs:
             mlruns/**
           if-no-files-found: warn
 
+      - name: Summarize training stage
+        run: |
+          {
+            echo "## Training Summary"
+            echo ""
+            echo "- Command: \`python -m spot_scam.pipeline.train --skip-transformer\`"
+            echo "- Uploaded artifact: \`training-artifacts\` (artifacts/, experiments/, mlruns/)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   model-image:
     name: Build model artifact image
     runs-on: ubuntu-latest
@@ -72,11 +81,10 @@ jobs:
       - name: Prepare model build context
         run: |
           rm -rf docker/model/artifacts docker/model/experiments docker/model/mlruns
-          cp pyproject.toml docker/model/
-          cp README.md docker/model/
           mv artifacts docker/model/
-          mv experiments docker/model/
-          mv mlruns docker/model/
+          rm -rf experiments mlruns
+          du -sh docker/model/artifacts || true
+          ls -R docker/model | head -n 20
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -126,6 +134,22 @@ jobs:
         if: steps.model_build.outputs.digest != ''
         run: |
           echo "Model image digest: ${{ steps.model_build.outputs.digest }}"
+
+      - name: Summarize model image stage
+        run: |
+          {
+            echo "## Model Artifact Image"
+            echo ""
+            echo "- Repository: \`ghcr.io/${{ github.repository_owner }}/spot-the-scam-model\`"
+            echo "- Tags:"
+            while IFS= read -r tag; do
+              [ -n "$tag" ] && echo "  - \`$tag\`"
+            done <<< "${{ steps.model_meta.outputs.tags }}"
+            if [ -n "${{ steps.model_build.outputs.digest }}" ]; then
+              echo "- Digest: \`${{ steps.model_build.outputs.digest }}\`"
+            fi
+            echo "- Contents: \`artifacts/\` (classical winner bundle)"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   build:
     name: Build ${{ matrix.target.name }} image
@@ -195,3 +219,18 @@ jobs:
         if: steps.build.outputs.digest != ''
         run: |
           echo "Built image digest: ${{ steps.build.outputs.digest }}"
+
+      - name: Summarize ${{ matrix.target.name }} stage
+        run: |
+          {
+            echo "## ${{ matrix.target.description }}"
+            echo ""
+            echo "- Repository: \`ghcr.io/${{ github.repository_owner }}/spot-the-scam-${{ matrix.target.name }}\`"
+            echo "- Tags:"
+            while IFS= read -r tag; do
+              [ -n "$tag" ] && echo "  - \`$tag\`"
+            done <<< "${{ steps.meta.outputs.tags }}"
+            if [ -n "${{ steps.build.outputs.digest }}" ]; then
+              echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
