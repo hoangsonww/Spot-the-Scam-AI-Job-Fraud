@@ -44,6 +44,7 @@ import {
   predictSingle,
   type JobPostingInput,
   type MetadataResponse,
+  type ModelSummary,
   type ModelsResponse,
   type PredictionResponse,
   type TokenFrequencyResponse,
@@ -57,7 +58,10 @@ import {
   Activity,
   AlertTriangle,
   AlignVerticalSpaceBetween,
+  ArrowDown,
   ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
   BarChart4,
   Brain,
   Flame,
@@ -119,6 +123,139 @@ export const metricLabels: Record<MetricKey, string> = {
   roc_auc: "ROC AUC",
   pr_auc: "PR AUC",
   brier: "Brier",
+}
+
+type SortDirection = "asc" | "desc"
+
+type SortConfig<K extends string> = {
+  key: K
+  direction: SortDirection
+}
+
+type LeaderboardSortKey =
+  | "model"
+  | "val_f1"
+  | "test_f1"
+  | "test_precision"
+  | "test_recall"
+  | "threshold"
+  | "timestamp"
+
+type TokenFrequencySortKey = "token" | "positive_count" | "negative_count" | "difference"
+
+function parseLeaderboardTimestamp(value?: string | null): number | null {
+  if (!value) {
+    return null
+  }
+  const parsed = new Date(value).getTime()
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+function extractLeaderboardSortValue(
+  summary: ModelSummary,
+  key: LeaderboardSortKey
+): string | number | null {
+  switch (key) {
+    case "model":
+      return summary.model_name?.toLowerCase() ?? null
+    case "val_f1":
+      return summary.validation?.f1 ?? null
+    case "test_f1":
+      return summary.test?.f1 ?? null
+    case "test_precision":
+      return summary.test?.precision ?? null
+    case "test_recall":
+      return summary.test?.recall ?? null
+    case "threshold":
+      return summary.threshold ?? null
+    case "timestamp":
+      return parseLeaderboardTimestamp(summary.timestamp)
+    default:
+      return null
+  }
+}
+
+function extractTokenFrequencySortValue(
+  item: TokenFrequencyResponse["items"][number],
+  key: TokenFrequencySortKey
+): string | number | null {
+  switch (key) {
+    case "token":
+      return item.token?.toLowerCase() ?? null
+    case "positive_count":
+      return item.positive_count ?? null
+    case "negative_count":
+      return item.negative_count ?? null
+    case "difference":
+      return item.difference ?? null
+    default:
+      return null
+  }
+}
+
+function compareSortValues(a: string | number | null, b: string | number | null): number {
+  const isMissing = (value: string | number | null) =>
+    value === null ||
+    value === undefined ||
+    (typeof value === "number" && Number.isNaN(value))
+
+  const aMissing = isMissing(a)
+  const bMissing = isMissing(b)
+
+  if (aMissing && bMissing) {
+    return 0
+  }
+  if (aMissing) {
+    return 1
+  }
+  if (bMissing) {
+    return -1
+  }
+  if (typeof a === "number" && typeof b === "number") {
+    return a - b
+  }
+  return String(a).localeCompare(String(b))
+}
+
+interface SortableHeadProps<K extends string> {
+  label: string
+  sortKey: K
+  currentSort: SortConfig<K> | null
+  onToggle: (key: K) => void
+  align?: "left" | "right"
+}
+
+function SortableTableHead<K extends string>({
+  label,
+  sortKey,
+  currentSort,
+  onToggle,
+  align = "left",
+}: SortableHeadProps<K>) {
+  const direction = currentSort?.key === sortKey ? currentSort.direction : null
+  const ariaSort =
+    direction === "asc" ? "ascending" : direction === "desc" ? "descending" : undefined
+  const alignmentClasses =
+    align === "right" ? "justify-end text-right" : "justify-start text-left"
+
+  return (
+    <TableHead className={align === "right" ? "text-right" : undefined} aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={() => onToggle(sortKey)}
+        className={`flex w-full items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${alignmentClasses}`}
+      >
+        <span>{label}</span>
+        {direction === "desc" ? (
+          <ArrowDown className="size-3.5" aria-hidden="true" />
+        ) : direction === "asc" ? (
+          <ArrowUp className="size-3.5" aria-hidden="true" />
+        ) : (
+          <ArrowUpDown className="size-3.5 opacity-60" aria-hidden="true" />
+        )}
+      </button>
+    </TableHead>
+  )
 }
 
 export function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
@@ -333,6 +470,90 @@ export default function HomePage() {
   }, [metadata])
 
   const modelSummaries = useMemo(() => modelsResponse?.items ?? [], [modelsResponse])
+
+  const [leaderboardSort, setLeaderboardSort] = useState<SortConfig<LeaderboardSortKey> | null>(
+    null
+  )
+
+  const toggleLeaderboardSort = useCallback((key: LeaderboardSortKey) => {
+    setLeaderboardSort((current) => {
+      if (!current || current.key !== key) {
+        return { key, direction: "desc" }
+      }
+      if (current.direction === "desc") {
+        return { key, direction: "asc" }
+      }
+      return null
+    })
+  }, [])
+
+  const sortedModelSummaries = useMemo(() => {
+    if (!leaderboardSort) {
+      return modelSummaries
+    }
+    const { key, direction } = leaderboardSort
+    return modelSummaries
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const comparison =
+          direction === "asc"
+            ? compareSortValues(
+                extractLeaderboardSortValue(a.item, key),
+                extractLeaderboardSortValue(b.item, key)
+              )
+            : compareSortValues(
+                extractLeaderboardSortValue(b.item, key),
+                extractLeaderboardSortValue(a.item, key)
+              )
+        if (comparison !== 0) {
+          return comparison
+        }
+        return a.index - b.index
+      })
+      .map(({ item }) => item)
+  }, [leaderboardSort, modelSummaries])
+
+  const [tokenFrequencySort, setTokenFrequencySort] =
+    useState<SortConfig<TokenFrequencySortKey> | null>(null)
+
+  const toggleTokenFrequencySort = useCallback((key: TokenFrequencySortKey) => {
+    setTokenFrequencySort((current) => {
+      if (!current || current.key !== key) {
+        return { key, direction: "desc" }
+      }
+      if (current.direction === "desc") {
+        return { key, direction: "asc" }
+      }
+      return null
+    })
+  }, [])
+
+  const sortedTokenFrequency = useMemo(() => {
+    const items = tokenFrequency?.items ?? []
+    if (!tokenFrequencySort) {
+      return items
+    }
+    const { key, direction } = tokenFrequencySort
+    return items
+      .map((item, index) => ({ item, index }))
+      .sort((a, b) => {
+        const comparison =
+          direction === "asc"
+            ? compareSortValues(
+                extractTokenFrequencySortValue(a.item, key),
+                extractTokenFrequencySortValue(b.item, key)
+              )
+            : compareSortValues(
+                extractTokenFrequencySortValue(b.item, key),
+                extractTokenFrequencySortValue(a.item, key)
+              )
+        if (comparison !== 0) {
+          return comparison
+        }
+        return a.index - b.index
+      })
+      .map(({ item }) => item)
+  }, [tokenFrequency?.items, tokenFrequencySort])
 
   const thresholdSeries = useMemo(() => {
     if (!thresholdMetrics?.points?.length) {
@@ -943,7 +1164,9 @@ export default function HomePage() {
                   Model leaderboard
                 </CardTitle>
                 <CardDescription>
-                  Recent training runs captured in the lightweight tracker. Sorted by test F1.
+                  Recent training runs captured in the lightweight tracker. Default order is Test F1
+                  (high to low). Click any column header to cycle descending, ascending, then back to
+                  the default.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -968,17 +1191,57 @@ export default function HomePage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Model</TableHead>
-                          <TableHead className="text-right">Val F1</TableHead>
-                          <TableHead className="text-right">Test F1</TableHead>
-                          <TableHead className="text-right">Test Precision</TableHead>
-                          <TableHead className="text-right">Test Recall</TableHead>
-                          <TableHead className="text-right">Threshold</TableHead>
-                          <TableHead>Updated</TableHead>
+                          <SortableTableHead
+                            label="Model"
+                            sortKey="model"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                          />
+                          <SortableTableHead
+                            label="Val F1"
+                            sortKey="val_f1"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                            align="right"
+                          />
+                          <SortableTableHead
+                            label="Test F1"
+                            sortKey="test_f1"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                            align="right"
+                          />
+                          <SortableTableHead
+                            label="Test Precision"
+                            sortKey="test_precision"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                            align="right"
+                          />
+                          <SortableTableHead
+                            label="Test Recall"
+                            sortKey="test_recall"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                            align="right"
+                          />
+                          <SortableTableHead
+                            label="Threshold"
+                            sortKey="threshold"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                            align="right"
+                          />
+                          <SortableTableHead
+                            label="Updated"
+                            sortKey="timestamp"
+                            currentSort={leaderboardSort}
+                            onToggle={toggleLeaderboardSort}
+                          />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {modelSummaries.map((summary, index) => (
+                        {sortedModelSummaries.map((summary, index) => (
                           <TableRow
                             key={`${summary.model_name}-${summary.timestamp ?? index}`}
                             className={
@@ -1088,17 +1351,44 @@ export default function HomePage() {
                       <Skeleton className="h-36 w-full" />
                     ) : tokenFrequency ? (
                       <div className="rounded-xl border">
+                        <div className="border-b px-4 py-2 text-xs text-muted-foreground">
+                          Default order is Δ (fraud minus legit) high to low. Click any column header
+                          to change the sort.
+                        </div>
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              <TableHead>Token</TableHead>
-                              <TableHead className="text-right">Fraud count</TableHead>
-                              <TableHead className="text-right">Legit count</TableHead>
-                              <TableHead className="text-right">Δ</TableHead>
+                              <SortableTableHead
+                                label="Token"
+                                sortKey="token"
+                                currentSort={tokenFrequencySort}
+                                onToggle={toggleTokenFrequencySort}
+                              />
+                              <SortableTableHead
+                                label="Fraud count"
+                                sortKey="positive_count"
+                                currentSort={tokenFrequencySort}
+                                onToggle={toggleTokenFrequencySort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Legit count"
+                                sortKey="negative_count"
+                                currentSort={tokenFrequencySort}
+                                onToggle={toggleTokenFrequencySort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Δ"
+                                sortKey="difference"
+                                currentSort={tokenFrequencySort}
+                                onToggle={toggleTokenFrequencySort}
+                                align="right"
+                              />
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {tokenFrequency.items.map((item) => (
+                            {sortedTokenFrequency.map((item) => (
                               <TableRow key={item.token}>
                                 <TableCell className="font-medium">{item.token}</TableCell>
                                 <TableCell className="text-right">
