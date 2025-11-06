@@ -1,7 +1,7 @@
 "use client"
 
-import { useCallback, useId, useMemo, useState } from "react"
-import useSWR from "swr"
+import { useCallback, useEffect, useId, useMemo, useState } from "react"
+import useSWR, { mutate as mutateGlobal } from "swr"
 import {
   Alert,
   AlertDescription,
@@ -62,6 +62,8 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
   BarChart4,
   Brain,
   Flame,
@@ -142,6 +144,8 @@ type LeaderboardSortKey =
   | "timestamp"
 
 type TokenFrequencySortKey = "token" | "positive_count" | "negative_count" | "difference"
+
+const LEADERBOARD_PAGE_SIZE = 10
 
 function parseLeaderboardTimestamp(value?: string | null): number | null {
   if (!value) {
@@ -428,6 +432,7 @@ export default function HomePage() {
       try {
         const result = await predictSingle(payload)
         setPrediction(result)
+        mutateGlobal("review-count", undefined, { revalidate: true })
       } catch (predictError) {
         const message =
           predictError instanceof Error
@@ -512,6 +517,34 @@ export default function HomePage() {
       })
       .map(({ item }) => item)
   }, [leaderboardSort, modelSummaries])
+
+  const [leaderboardPage, setLeaderboardPage] = useState(0)
+
+  useEffect(() => {
+    setLeaderboardPage(0)
+  }, [leaderboardSort, modelSummaries.length])
+
+  const leaderboardTotal = sortedModelSummaries.length
+  const totalPages = Math.max(1, Math.ceil(Math.max(leaderboardTotal, 1) / LEADERBOARD_PAGE_SIZE))
+
+  useEffect(() => {
+    setLeaderboardPage((prev) => Math.min(prev, totalPages - 1))
+  }, [totalPages])
+
+  const pageStartIndex = leaderboardPage * LEADERBOARD_PAGE_SIZE
+  const pageEndIndex = Math.min(pageStartIndex + LEADERBOARD_PAGE_SIZE, leaderboardTotal)
+  const paginatedModelSummaries = sortedModelSummaries.slice(pageStartIndex, pageEndIndex)
+
+  const goToPrevLeaderboardPage = useCallback(() => {
+    setLeaderboardPage((prev) => Math.max(prev - 1, 0))
+  }, [])
+
+  const goToNextLeaderboardPage = useCallback(() => {
+    setLeaderboardPage((prev) => Math.min(prev + 1, totalPages - 1))
+  }, [totalPages])
+
+  const canGoPrev = leaderboardPage > 0
+  const canGoNext = leaderboardPage < totalPages - 1
 
   const [tokenFrequencySort, setTokenFrequencySort] =
     useState<SortConfig<TokenFrequencySortKey> | null>(null)
@@ -1059,11 +1092,88 @@ export default function HomePage() {
                     </Alert>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2">
+                <Target className="size-5 text-chart-4" />
+                Slices to review
+              </CardTitle>
+              <CardDescription>
+                Lowest F1 slices from the latest evaluation so you can focus manual audits where the
+                model struggles most.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {isLoadingSliceMetrics ? (
+                <div className="grid gap-3">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : sliceMetricsError ? (
+                <Alert variant="destructive">
+                  <AlertTriangle className="size-4" />
+                  <AlertTitle>Slice metrics unavailable</AlertTitle>
+                  <AlertDescription>
+                    {sliceMetricsError instanceof Error
+                      ? sliceMetricsError.message
+                      : "Failed to load slice-level performance."}
+                  </AlertDescription>
+                </Alert>
+              ) : sliceMetrics && sliceMetrics.items.length ? (
+                <ul className="grid gap-3">
+                  {sliceMetrics.items.map((item) => (
+                    <li
+                      key={`${item.slice}-${item.category}`}
+                      className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-semibold text-foreground">
+                            {item.category && item.category !== "<missing>" ? item.category : "Missing value"}
+                          </span>
+                          <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                            {item.slice}
+                          </span>
+                        </div>
+                        <Badge variant="outline">n={item.count}</Badge>
+                      </div>
+                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>F1</span>
+                          <span className="font-medium text-foreground">
+                            {formatMetric(item.f1, { maximumFractionDigits: 3 })}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span>Precision</span>
+                          <span className="font-medium text-foreground">
+                            {formatMetric(item.precision, { maximumFractionDigits: 3 })}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span>Recall</span>
+                          <span className="font-medium text-foreground">
+                            {formatMetric(item.recall, { maximumFractionDigits: 3 })}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Slice metrics are not available yet. Re-run the evaluation suite to surface
+                  segment-level performance.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-          <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6">
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
@@ -1165,8 +1275,7 @@ export default function HomePage() {
                 </CardTitle>
                 <CardDescription>
                   Recent training runs captured in the lightweight tracker. Default order is Test F1
-                  (high to low). Click any column header to cycle descending, ascending, then back to
-                  the default.
+                  (high to low).
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1241,9 +1350,9 @@ export default function HomePage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedModelSummaries.map((summary, index) => (
+                        {paginatedModelSummaries.map((summary, index) => (
                           <TableRow
-                            key={`${summary.model_name}-${summary.timestamp ?? index}`}
+                            key={`${summary.model_name}-${summary.timestamp ?? pageStartIndex + index}`}
                             className={
                               metadata?.model_name === summary.model_name
                                 ? "bg-muted/60"
@@ -1294,6 +1403,38 @@ export default function HomePage() {
                         ))}
                       </TableBody>
                     </Table>
+                    <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-3 text-xs text-muted-foreground">
+                      <span>
+                        {leaderboardTotal
+                          ? `Showing ${pageStartIndex + 1}-${pageEndIndex} of ${leaderboardTotal}`
+                          : "No tracked model runs yet."}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          Page {Math.min(leaderboardPage + 1, totalPages)} of {totalPages}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={goToPrevLeaderboardPage}
+                            disabled={!canGoPrev || !leaderboardTotal}
+                            aria-label="Previous leaderboard page"
+                          >
+                            <ChevronLeft className="size-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={goToNextLeaderboardPage}
+                            disabled={!canGoNext || !leaderboardTotal}
+                            aria-label="Next leaderboard page"
+                          >
+                            <ChevronRight className="size-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground">
@@ -1424,83 +1565,6 @@ export default function HomePage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="size-5 text-chart-4" />
-                  Slices to review
-                </CardTitle>
-                <CardDescription>
-                  Lowest F1 slices from the latest evaluation so you can focus manual audits where the
-                  model struggles most.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {isLoadingSliceMetrics ? (
-                  <div className="grid gap-3">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                  </div>
-                ) : sliceMetricsError ? (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="size-4" />
-                    <AlertTitle>Slice metrics unavailable</AlertTitle>
-                    <AlertDescription>
-                      {sliceMetricsError instanceof Error
-                        ? sliceMetricsError.message
-                        : "Failed to load slice-level performance."}
-                    </AlertDescription>
-                  </Alert>
-                ) : sliceMetrics && sliceMetrics.items.length ? (
-                  <ul className="grid gap-3">
-                    {sliceMetrics.items.map((item) => (
-                      <li
-                        key={`${item.slice}-${item.category}`}
-                        className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-foreground">
-                              {item.category && item.category !== "<missing>" ? item.category : "Missing value"}
-                            </span>
-                            <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                              {item.slice}
-                            </span>
-                          </div>
-                          <Badge variant="outline">n={item.count}</Badge>
-                        </div>
-                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span>F1</span>
-                            <span className="font-medium text-foreground">
-                              {formatMetric(item.f1, { maximumFractionDigits: 3 })}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span>Precision</span>
-                            <span className="font-medium text-foreground">
-                              {formatMetric(item.precision, { maximumFractionDigits: 3 })}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between gap-2">
-                            <span>Recall</span>
-                            <span className="font-medium text-foreground">
-                              {formatMetric(item.recall, { maximumFractionDigits: 3 })}
-                            </span>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Slice metrics are not available yet. Re-run the evaluation suite to surface
-                    segment-level performance.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </section>
       </main>

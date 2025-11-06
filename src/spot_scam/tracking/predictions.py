@@ -117,12 +117,20 @@ def load_feedback_dataframe() -> pd.DataFrame:
     return df
 
 
+def load_active_sample_dataframe() -> pd.DataFrame:
+    df = _load_active_sample()
+    if df is None:
+        return pd.DataFrame()
+    return df
+
+
 def get_review_queue(
     *,
     policy: str,
     limit: int,
     threshold: float,
     gray_zone_width: float,
+    offset: int = 0,
 ) -> Dict[str, object]:
     """
     Return a filtered queue of predictions awaiting human review.
@@ -176,7 +184,11 @@ def get_review_queue(
     preds["explanation"] = preds.get("explanation", "{}").fillna("{}")
 
     total_pending = len(preds)
-    preds = preds.sort_values("created_at", ascending=False).head(limit)
+    preds = preds.sort_values("created_at", ascending=False)
+    if offset:
+        preds = preds.iloc[offset:]
+    if limit:
+        preds = preds.head(limit)
 
     items: List[Dict[str, object]] = []
     for _, row in preds.iterrows():
@@ -204,5 +216,6 @@ __all__ = [
     "log_predictions",
     "load_predictions_dataframe",
     "load_feedback_dataframe",
+    "load_active_sample_dataframe",
     "get_review_queue",
 ]

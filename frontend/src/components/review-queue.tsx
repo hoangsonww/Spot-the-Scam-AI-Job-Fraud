@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR, { mutate as mutateGlobal } from "swr";
 import {
   fetchReviewCases,
@@ -30,27 +30,61 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 
 function deriveHeadline(payload: ReviewCase["payload"]) {
   return payload.title ?? "Untitled job posting";
 }
 
+function formatUtcTimestamp(value: string): string {
+  if (!value) {
+    return "-";
+  }
+  const hasZone = /[zZ]|[+-]\d\d:\d\d$/.test(value);
+  const normalized = hasZone ? value : `${value}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 export default function ReviewQueue() {
+  const PAGE_SIZE = 5;
   const [selectedNotes, setSelectedNotes] = useState<Record<string, string>>({});
   const [selectedRationale, setSelectedRationale] = useState<Record<string, string>>({});
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [page, setPage] = useState(0);
 
   const {
     data,
     isLoading,
     mutate,
     error,
-  } = useSWR("review-cases", () => fetchReviewCases(25));
+  } = useSWR(["review-cases", PAGE_SIZE, page], ([, limit, pageIndex]) =>
+    fetchReviewCases(limit as number, "gray-zone", (pageIndex as number) * (limit as number)),
+    { keepPreviousData: true }
+  );
 
   const cases = data?.items ?? [];
   const totalPending = data?.total_pending ?? 0;
+  const totalPages = totalPending > 0 ? Math.ceil(totalPending / PAGE_SIZE) : 1;
+  const currentPage = Math.min(page, totalPages - 1);
+
+  useEffect(() => {
+    if (page !== currentPage) {
+      setPage(currentPage);
+    }
+  }, [currentPage, page]);
+
+  const startIndex = totalPending === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const endIndex = totalPending === 0 ? 0 : Math.min(totalPending, currentPage * PAGE_SIZE + cases.length);
+
+  const goPrev = () => {
+    setPage((prev) => Math.max(prev - 1, 0));
+  };
+
+  const goNext = () => {
+    setPage((prev) => Math.min(prev + 1, totalPages - 1));
+  };
 
   const handleSubmit = async (
     item: ReviewCase,
@@ -78,7 +112,8 @@ export default function ReviewQueue() {
         items: cases.filter((c) => c.request_id !== item.request_id),
       };
       mutate(optimistic, { revalidate: true });
-      mutateGlobal("review-count");
+      const nextCount = Math.max(0, totalPending - 1);
+      mutateGlobal("review-count", nextCount, { revalidate: true });
 
       setToast({
         type: "success",
@@ -107,7 +142,7 @@ export default function ReviewQueue() {
     }
   };
 
-  const emptyState = !isLoading && !cases.length;
+  const emptyState = !isLoading && !cases.length && totalPending === 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
@@ -165,6 +200,7 @@ export default function ReviewQueue() {
             {cases.map((item) => {
               const headline = deriveHeadline(item.payload);
               const isSubmitting = submittingId === item.request_id;
+              const localizedCreatedAt = formatUtcTimestamp(item.created_at);
               return (
                 <Card key={item.request_id} className="border border-border/70 bg-card/80">
                   <CardHeader className="gap-2 pb-4">
@@ -268,7 +304,7 @@ export default function ReviewQueue() {
                     <div className="text-xs text-muted-foreground">
                       Logged at{" "}
                       <span className="font-medium text-foreground">
-                        {new Date(item.created_at).toLocaleString()}
+                        {localizedCreatedAt}
                       </span>
                       . Reviewer overrides feed the next calibration pass.
                     </div>
@@ -306,6 +342,42 @@ export default function ReviewQueue() {
                 </Card>
               );
             })}
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
+              <span>
+                {totalPending
+                  ? `Showing ${startIndex}-${endIndex} of ${totalPending}`
+                  : "No queued cases"}
+              </span>
+              <div className="inline-flex items-center gap-2">
+                <span>
+                  Page {totalPending ? currentPage + 1 : 0} of {totalPending ? totalPages : 0}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={goPrev}
+                    disabled={isLoading || currentPage === 0 || totalPending === 0}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={goNext}
+                    disabled={
+                      isLoading ||
+                      totalPending === 0 ||
+                      currentPage >= totalPages - 1
+                    }
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

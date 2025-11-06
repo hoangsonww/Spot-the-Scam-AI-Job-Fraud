@@ -10,6 +10,7 @@ export default function TopNav() {
   const pathname = usePathname() || "/";
   const { data: reviewCount } = useSWR("review-count", fetchReviewCount, {
     refreshInterval: 60000,
+    dedupingInterval: 100,
   });
   const count = reviewCount ?? 0;
 
