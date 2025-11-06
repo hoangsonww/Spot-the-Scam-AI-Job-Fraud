@@ -21,6 +21,7 @@ from spot_scam.api.schemas import (
     TokenWeight,
     ThresholdMetricsResponse,
     LatencySummaryResponse,
+    SliceMetricsResponse,
 )
 from spot_scam.inference.predictor import FraudPredictor
 from spot_scam.utils.logging import configure_logging
@@ -103,6 +104,12 @@ def latency_summary() -> LatencySummaryResponse:
     predictor = get_predictor()
     summary = predictor.get_latency_summary()
     return LatencySummaryResponse(items=summary)
+
+@app.get("/insights/slice-metrics", response_model=SliceMetricsResponse)
+def slice_metrics(limit: int = Query(6, ge=1, le=50)) -> SliceMetricsResponse:
+    predictor = get_predictor()
+    metrics = predictor.get_slice_metrics(limit=limit)
+    return SliceMetricsResponse(items=metrics)
 
 
 @app.post("/predict", response_model=PredictionBatchResponse)

@@ -133,6 +133,17 @@ class LatencySummaryPoint(BaseModel):
 class LatencySummaryResponse(BaseModel):
     items: List[LatencySummaryPoint]
 
+class SliceMetric(BaseModel):
+    slice: str
+    category: str
+    count: int
+    f1: Optional[float] = None
+    precision: Optional[float] = None
+    recall: Optional[float] = None
+
+class SliceMetricsResponse(BaseModel):
+    items: List[SliceMetric]
+
 
 __all__ = [
     "JobPostingInput",
@@ -147,4 +158,6 @@ __all__ = [
     "LatencySummaryResponse",
     "PredictionExplanation",
     "FeatureContribution",
+    "SliceMetricsResponse",
+    "SliceMetric",
 ]
