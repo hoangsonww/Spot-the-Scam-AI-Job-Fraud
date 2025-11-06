@@ -2,13 +2,7 @@ name: Build & Publish Containers
 
 on:
   push:
-    branches:
-      - master
-      - main
   pull_request:
-    branches:
-      - master
-      - main
 
 permissions:
   contents: read
@@ -16,7 +10,7 @@ permissions:
 
 jobs:
   model:
-    name: Train classical model artifacts
+    name: "🤖 Train classical model artifacts"
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: src
