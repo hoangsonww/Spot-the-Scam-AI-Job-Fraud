@@ -9,6 +9,9 @@ EXPERIMENTS_DIR = PROJECT_ROOT / "experiments"
 FIGS_DIR = EXPERIMENTS_DIR / "figs"
 TABLES_DIR = EXPERIMENTS_DIR / "tables"
 TRACKING_DIR = PROJECT_ROOT / "tracking"
+TRACKING_FEEDBACK_DIR = TRACKING_DIR / "feedback"
+TRACKING_PREDICTIONS_DIR = TRACKING_DIR / "predictions"
+TRACKING_CASES_DIR = TRACKING_DIR / "cases"
 
 
 def ensure_directories() -> None:
@@ -22,5 +25,8 @@ def ensure_directories() -> None:
         FIGS_DIR,
         TABLES_DIR,
         TRACKING_DIR,
+        TRACKING_FEEDBACK_DIR,
+        TRACKING_PREDICTIONS_DIR,
+        TRACKING_CASES_DIR,
     ]:
         directory.mkdir(parents=True, exist_ok=True)

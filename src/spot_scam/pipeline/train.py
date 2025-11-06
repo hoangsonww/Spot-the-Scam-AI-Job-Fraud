@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import random
 import time
+import os
+import hashlib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -34,6 +36,7 @@ from spot_scam.features.builders import FeatureBundle, build_feature_bundle
 from spot_scam.models.classical import ModelRun, train_classical_models
 from spot_scam.models.transformer import TransformerRun, train_transformer_model
 from spot_scam.tracking.logger import append_run_record
+from spot_scam.tracking.feedback import load_feedback_dataframe
 from spot_scam.policy.gray_zone import classify_probability
 from spot_scam.utils.logging import configure_logging
 from spot_scam.utils.paths import ARTIFACTS_DIR, FIGS_DIR, TABLES_DIR, EXPERIMENTS_DIR, ensure_directories
@@ -43,6 +46,35 @@ from spot_scam.explainability.shapley import compute_tabular_shap
 from spot_scam.export import log_model_to_mlflow, MLFlowExportError
 
 app = typer.Typer(add_completion=False)
+
+
+def _hash_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _apply_feedback_labels(df: pd.DataFrame, target_column: str) -> int:
+    feedback_df = load_feedback_dataframe()
+    if feedback_df.empty:
+        return 0
+
+    valid = feedback_df[feedback_df["reviewer_label"].isin(["fraud", "legit"])]
+    if valid.empty:
+        return 0
+
+    valid = valid.sort_values("created_at").drop_duplicates(subset=["text_hash"], keep="last")
+    label_map = {"fraud": 1, "legit": 0}
+    overrides = 0
+    for _, row in valid.iterrows():
+        text_hash = str(row["text_hash"])
+        label = label_map[str(row["reviewer_label"])]
+        mask = df["text_hash"] == text_hash
+        if mask.any():
+            df.loc[mask, target_column] = label
+            df.loc[mask, "_feedback_applied"] = True
+            overrides += int(mask.sum())
+    return overrides
+
+
 logger = configure_logging(__name__)
 
 
@@ -72,18 +104,50 @@ def set_global_seed(seed: int) -> None:
 def run(
     config_path: Optional[Path] = typer.Option(None, "--config", "-c", help="Path to YAML config."),
     skip_transformer: bool = typer.Option(False, help="Skip transformer fine-tuning to save time."),
+    use_feedback: bool = typer.Option(
+        False,
+        "--use-feedback",
+        help="Incorporate reviewer feedback when available (overridden by USE_FEEDBACK env).",
+    ),
 ) -> None:
     """Execute the end-to-end training pipeline."""
     config = load_config(config_path=config_path)
+    use_feedback_env = os.getenv("USE_FEEDBACK", "").lower() in {"1", "true", "yes"}
+    use_feedback_enabled = use_feedback or use_feedback_env
+
     set_global_seed(config["project"]["random_seed"])
     ensure_directories()
 
     logger.info("Configuration hash: %s", config_hash(config))
+    if use_feedback_enabled:
+        logger.info("Feedback integration enabled (USE_FEEDBACK).")
 
     raw_df = load_raw_dataset(config)
     processed_df, _ = preprocess_dataframe(raw_df, config)
+    target_col = config["data"]["target_column"]
+    processed_df["text_hash"] = processed_df["text_all"].apply(_hash_text)
+    processed_df["_original_label"] = processed_df[target_col]
+    processed_df["_feedback_applied"] = False
+
+    feedback_override_count = 0
+    if use_feedback_enabled:
+        feedback_override_count = _apply_feedback_labels(processed_df, target_col)
+        if feedback_override_count:
+            logger.info("Applied reviewer feedback to %d samples.", feedback_override_count)
+        else:
+            logger.info("No matching reviewer feedback hashes found; proceeding with baseline labels.")
 
     splits = create_splits(processed_df, config, persist=True)
+    baseline_val_labels = splits.val["_original_label"].to_numpy()
+    baseline_test_labels = splits.test["_original_label"].to_numpy()
+    feedback_counts = {
+        "train": int(splits.train["_feedback_applied"].sum()),
+        "validation": int(splits.val["_feedback_applied"].sum()),
+        "test": int(splits.test["_feedback_applied"].sum()),
+    }
+    for split_df in (splits.train, splits.val, splits.test):
+        split_df.drop(columns=["_original_label", "_feedback_applied", "text_hash"], inplace=True, errors="ignore")
+
     processed_dir = Path(config["data"]["processed_dir"])
     processed_dir.mkdir(parents=True, exist_ok=True)
     splits.train.to_parquet(processed_dir / "train.parquet", index=False)
@@ -120,6 +184,16 @@ def run(
         y_test=y_test,
     )
 
+    if use_feedback_enabled:
+        best_model_artifacts.extra.setdefault("feedback", {})
+        best_model_artifacts.extra["feedback"].update(
+            {
+                "used": True,
+                "overrides": int(feedback_override_count),
+                "counts": feedback_counts,
+            }
+        )
+
     _persist_artifacts(best_model_artifacts, bundle, config, config_path)
     _generate_report_assets(
         best_model_artifacts,
@@ -127,6 +201,11 @@ def run(
         y_val=y_val,
         splits=splits,
         bundle=bundle,
+        baseline_val_labels=baseline_val_labels,
+        baseline_test_labels=baseline_test_labels,
+        feedback_counts=feedback_counts if use_feedback_enabled else None,
+        feedback_overrides=feedback_override_count if use_feedback_enabled else 0,
+        feedback_enabled=use_feedback_enabled,
     )
     append_run_record(best_model_artifacts, config)
     try:
@@ -439,6 +518,12 @@ def _generate_report_assets(
     y_val: np.ndarray,
     splits: SplitResult,
     bundle: FeatureBundle,
+    *,
+    baseline_val_labels: Optional[np.ndarray] = None,
+    baseline_test_labels: Optional[np.ndarray] = None,
+    feedback_counts: Optional[Dict[str, int]] = None,
+    feedback_overrides: int = 0,
+    feedback_enabled: bool = False,
 ) -> None:
     FIGS_DIR.mkdir(parents=True, exist_ok=True)
     TABLES_DIR.mkdir(parents=True, exist_ok=True)
@@ -564,6 +649,68 @@ def _generate_report_assets(
     slices_df = slices_to_dataframe(slice_metrics)
     if not slices_df.empty:
         slices_df.to_csv(TABLES_DIR / "slice_metrics.csv", index=False)
+
+    if feedback_enabled and baseline_test_labels is not None:
+        metrics_list = config["evaluation"]["metrics"]
+        delta_rows = []
+        split_specs = [
+            ("validation", baseline_val_labels, artifacts.val_probabilities, artifacts.val_metrics),
+            ("test", baseline_test_labels, artifacts.test_probabilities, artifacts.test_metrics),
+        ]
+        for split_name, baseline_labels, probs, metrics_obj in split_specs:
+            if baseline_labels is None:
+                continue
+            baseline_metrics = compute_metrics(baseline_labels, probs, metrics_list)
+            for metric_name, baseline_value in baseline_metrics.values.items():
+                feedback_value = metrics_obj.values.get(metric_name)
+                if baseline_value is None or feedback_value is None:
+                    continue
+                delta_rows.append(
+                    {
+                        "split": split_name,
+                        "metric": metric_name,
+                        "baseline": baseline_value,
+                        "with_feedback": feedback_value,
+                        "delta": feedback_value - baseline_value,
+                    }
+                )
+        if delta_rows:
+            pd.DataFrame(delta_rows).to_csv(TABLES_DIR / "metrics_with_feedback.csv", index=False)
+
+        baseline_test_df = splits.test.copy()
+        baseline_test_df[config["data"]["target_column"]] = baseline_test_labels
+        baseline_slice_metrics = compute_slice_metrics(
+            baseline_test_df,
+            artifacts.test_probabilities,
+            baseline_test_labels,
+            threshold=artifacts.threshold,
+            slice_columns=config["evaluation"]["slice_columns"],
+            metrics_list=metrics_list,
+            min_count=config["evaluation"].get("slice_min_count", 30),
+        )
+        baseline_slice_df = slices_to_dataframe(baseline_slice_metrics)
+        if not baseline_slice_df.empty:
+            baseline_slice_df.to_csv(TABLES_DIR / "slice_metrics_baseline.csv", index=False)
+        if not slices_df.empty and not baseline_slice_df.empty:
+            merged = baseline_slice_df.merge(
+                slices_df,
+                on=["slice", "category"],
+                suffixes=("_baseline", "_feedback"),
+            )
+            for metric_name in ["f1", "precision", "recall"]:
+                baseline_col = f"{metric_name}_baseline"
+                feedback_col = f"{metric_name}_feedback"
+                if baseline_col in merged.columns and feedback_col in merged.columns:
+                    merged[f"{metric_name}_delta"] = merged[feedback_col] - merged[baseline_col]
+            merged.to_csv(TABLES_DIR / "slice_metrics_feedback_delta.csv", index=False)
+
+        if feedback_counts:
+            pd.DataFrame(
+                [
+                    {"split": split_name, "overrides": count}
+                    for split_name, count in feedback_counts.items()
+                ]
+            ).to_csv(TABLES_DIR / "feedback_counts.csv", index=False)
 
     summary_df = pd.DataFrame(
         [

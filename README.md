@@ -25,6 +25,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
+- **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
 
 ## Outputs
@@ -49,6 +50,18 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 - To create an int8 dynamic-quantized transformer checkpoint: `make quantize-transformer`
 - Serve the quantized model by setting `SPOT_SCAM_USE_QUANTIZED=1` before starting the API.
 - Non-quantized models remain the default.
+
+### Human-in-the-Loop Review (HITL)
+
+- Run the API and review queue: `make serve-queue` (FastAPI on port 8000) and open `http://localhost:3000/review`.
+- Populate the queue with high-uncertainty cases via `make review-sample` (writes `experiments/tables/active_sample.csv`) or by using the live dashboard.
+- Reviewers submit confirmations/overrides; feedback is appended under `tracking/feedback/date=*/`.
+- Retrain with feedback applied by running `make retrain-with-feedback` (or `USE_FEEDBACK=1 PYTHONPATH=src python -m spot_scam.pipeline.train`). The pipeline produces comparative tables:
+  - `experiments/tables/metrics_with_feedback.csv`
+  - `experiments/tables/slice_metrics_baseline.csv`
+  - `experiments/tables/slice_metrics_feedback_delta.csv`
+- The review UI and nav badge automatically reflect queue size via `/cases` and `/feedback` endpoints.
+- API additions: `GET /cases` (queue), `POST /feedback` (append-only log), plus existing `/insights/*` endpoints for supporting analytics.
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams.
 

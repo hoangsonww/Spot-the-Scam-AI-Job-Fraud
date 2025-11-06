@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
+import TopNav from "@/components/top-nav"
 import {
   fetchMetadata,
   fetchTokenFrequency,
@@ -109,7 +110,7 @@ const samplePosting: FormFields = {
   has_questions: false,
 }
 
-const metricLabels: Record<MetricKey, string> = {
+export const metricLabels: Record<MetricKey, string> = {
   f1: "F1",
   precision: "Precision",
   recall: "Recall",
@@ -118,7 +119,7 @@ const metricLabels: Record<MetricKey, string> = {
   brier: "Brier",
 }
 
-function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
+export function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
   if (value === undefined || value === null) {
     return "-"
   }
@@ -131,7 +132,7 @@ function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions)
   return formatter.format(value)
 }
 
-function formatContribution(value?: number | null) {
+export function formatContribution(value?: number | null) {
   if (value === undefined || value === null || Number.isNaN(value)) {
     return "0.000"
   }
@@ -366,6 +367,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
+      <TopNav />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-8">
         <header className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -1146,7 +1148,7 @@ function TokenList({
   )
 }
 
-function ContributionColumn({
+export function ContributionColumn({
   title,
   items,
   direction = "positive",

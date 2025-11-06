@@ -223,10 +223,15 @@ class FraudPredictor:
         self.model.eval()
         self.transformer_max_length = self.config["models"]["transformer"]["max_length"]
 
-    def predict(self, payload: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def predict(
+        self,
+        payload: Iterable[Dict[str, Any]],
+        *,
+        return_context: bool = False,
+    ) -> Any:
         records = list(payload)
         if not records:
-            return []
+            return ([], []) if return_context else []
 
         df_raw = pd.DataFrame(records)
         processed_df, _ = preprocess_dataframe(df_raw, self.config)
@@ -235,10 +240,12 @@ class FraudPredictor:
             classical_output = self._predict_classical(processed_df)
             probabilities = classical_output["probabilities"]
             explanations = classical_output["explanations"]
+            tabular_snapshot = classical_output.get("tabular_df")
         elif self.model_type == "transformer":
             transformer_output = self._predict_transformer(processed_df)
             probabilities = transformer_output["probabilities"]
             explanations = transformer_output["explanations"]
+            tabular_snapshot = None
         else:
             raise ValueError(f"Unsupported model type: {self.model_type}")
 
@@ -247,7 +254,19 @@ class FraudPredictor:
         labels = (probabilities >= self.threshold).astype(int)
 
         outputs = []
+        contexts = []
         for idx, (record, prob, label, decision) in enumerate(zip(records, probabilities, labels, decisions)):
+            tabular_dict = (
+                {k: float(v) for k, v in tabular_snapshot.iloc[idx].to_dict().items()}
+                if tabular_snapshot is not None
+                else {}
+            )
+            contexts.append(
+                {
+                    "text_all": processed_df.iloc[idx]["text_all"],
+                    "tabular_features": tabular_dict,
+                }
+            )
             outputs.append(
                 {
                     "probability_fraud": float(prob),
@@ -259,6 +278,8 @@ class FraudPredictor:
                     "explanation": explanations[idx] if explanations else {},
                 }
             )
+        if return_context:
+            return outputs, contexts
         return outputs
 
     def _predict_classical(self, processed_df: pd.DataFrame) -> Dict[str, Any]:
@@ -296,6 +317,7 @@ class FraudPredictor:
             "probabilities": probabilities,
             "raw_scores": raw_scores,
             "explanations": explanations,
+            "tabular_df": tabular_df.reset_index(drop=True),
         }
 
     def _predict_transformer(self, processed_df: pd.DataFrame) -> Dict[str, Any]:
@@ -328,6 +350,7 @@ class FraudPredictor:
             "probabilities": probabilities,
             "raw_scores": raw_scores,
             "explanations": explanations,
+            "tabular_df": None,
         }
 
     def _build_classical_explanations(

@@ -25,3 +25,6 @@ artifacts/transformer/*/*.pt
 artifacts/transformer/*/*.bin
 mlruns/
 .docker-config/buildx
+/tracking/predictions/
+/tracking/feedback/
+/tracking/cases/

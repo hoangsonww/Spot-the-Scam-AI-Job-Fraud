@@ -88,6 +88,8 @@ This run:
 
 ### 5.2 Classical-Only Training (faster)
 
+This mode skips transformer training for quicker iterations:
+
 ```bash
 PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 ```
@@ -218,7 +220,43 @@ npm run lint
 
 ---
 
-## 8. Helpful Make Targets
+## 8. Human-in-the-Loop Review & Feedback
+
+1. **Serve the API for review workflows**
+   ```bash
+   make serve-queue
+   ```
+   This launches the FastAPI app with review endpoints (`/cases`, `/feedback`, `/insights/*`).
+
+2. **Populate the review queue**
+   - Execute real predictions via the dashboard (`/`) – each call logs sanitized payloads under `tracking/predictions/date=*/`.
+   - Optionally sample from historical predictions:
+     ```bash
+     make review-sample        # writes experiments/tables/active_sample.csv
+     ```
+
+3. **Process cases in the UI**
+   - Visit `http://localhost:3000/review` to open the triage drawer.
+   - Each card shows model rationale, token contributions, and sanitized text.
+   - Submit labels via `Confirm Fraud`, `Confirm Legit`, or `Unsure`. Notes and rationale fields are masked for PII before being persisted to `tracking/feedback/date__*/`.
+
+4. **Retrain with feedback**
+   ```bash
+   make retrain-with-feedback
+   ```
+   The pipeline merges reviewer labels (ignoring `unsure`), recalculates stratified splits, and emits comparison artifacts:
+   - `experiments/tables/metrics_with_feedback.csv`
+   - `experiments/tables/slice_metrics_baseline.csv`
+   - `experiments/tables/slice_metrics_feedback_delta.csv`
+   - `experiments/tables/feedback_counts.csv`
+
+5. **Schedule periodic sampling** (optional)
+   - The helper script `scripts/sample_uncertain.py` supports entropy or margin sampling (`python scripts/sample_uncertain.py --policy entropy --limit 200`).
+   - Integrate with cron to refresh `active_sample.csv` for reviewers.
+
+---
+
+## 9. Helpful Make Targets
 
 From project root:
 
@@ -228,14 +266,17 @@ From project root:
 | `make train`            | Run full training pipeline.                                    |
 | `make train-fast`       | Train classical models only.                                   |
 | `make serve`            | Launch FastAPI server on port 8000.                            |
+| `make serve-queue`      | Launch FastAPI server with review endpoints (same host/port).  |
 | `make test`             | Execute unit tests with coverage.                              |
 | `make lint`             | Run Ruff + Black checks.                                       |
 | `make frontend-install` | Install frontend dependencies (`npm install`).                 |
 | `make frontend`         | Start Next.js dev server (`npm run dev`).                      |
+| `make review-sample`    | Sample uncertain predictions into `experiments/tables/active_sample.csv`. |
+| `make retrain-with-feedback` | Run training with reviewer overrides applied (`USE_FEEDBACK=1`). |
 
 ---
 
-## 9. Testing & Quality Assurance
+## 10. Testing & Quality Assurance
 
 - **Python tests:** `source .venv/bin/activate && PYTHONPATH=src pytest`
 - **Frontend lint:** `cd frontend && npm run lint`
@@ -243,9 +284,9 @@ From project root:
 
 ---
 
-## 10. Docker & Devcontainer
+## 11. Docker & Devcontainer
 
-### 10.1 Docker Compose Runtime
+### 11.1 Docker Compose Runtime
 
 ```bash
 docker compose build
@@ -262,7 +303,7 @@ docker compose exec api bash
 PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 ```
 
-### 10.2 Devcontainer (VS Code)
+### 11.2 Devcontainer (VS Code)
 
 1. Install the Dev Containers extension.
 2. Open the repository and select **“Reopen in Container”**.
