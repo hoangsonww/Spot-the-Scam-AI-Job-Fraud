@@ -39,10 +39,12 @@ import {
   fetchThresholdMetrics,
   fetchLatencySummary,
   fetchSliceMetrics,
+  fetchModelSummaries,
   getApiBaseUrl,
   predictSingle,
   type JobPostingInput,
   type MetadataResponse,
+  type ModelsResponse,
   type PredictionResponse,
   type TokenFrequencyResponse,
   type TokenImportanceResponse,
@@ -159,6 +161,17 @@ function metricToPercent(value?: number | null) {
   return Math.min(100, Math.max(0, Math.round(value * 100)))
 }
 
+function formatTimestamp(value?: string | null) {
+  if (!value) {
+    return "-"
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return "-"
+  }
+  return parsed.toLocaleString()
+}
+
 export default function HomePage() {
   const [form, setForm] = useState<FormFields>(samplePosting)
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
@@ -173,6 +186,16 @@ export default function HomePage() {
   } = useSWR<MetadataResponse>("metadata", fetchMetadata, {
     revalidateOnFocus: false,
   })
+
+  const {
+    data: modelsResponse,
+    error: modelsError,
+    isLoading: isLoadingModels,
+  } = useSWR<ModelsResponse>(
+    "models",
+    () => fetchModelSummaries(50),
+    { revalidateOnFocus: false }
+  )
 
   const {
     data: tokenImportance,
@@ -308,6 +331,8 @@ export default function HomePage() {
 
     return entries
   }, [metadata])
+
+  const modelSummaries = useMemo(() => modelsResponse?.items ?? [], [modelsResponse])
 
   const thresholdSeries = useMemo(() => {
     if (!thresholdMetrics?.points?.length) {
@@ -914,6 +939,110 @@ export default function HomePage() {
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
+                  <AlignVerticalSpaceBetween className="size-5 text-chart-1" />
+                  Model leaderboard
+                </CardTitle>
+                <CardDescription>
+                  Recent training runs captured in the lightweight tracker. Sorted by test F1.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoadingModels ? (
+                  <div className="grid gap-2">
+                    <Skeleton className="h-5 w-full" />
+                    <Skeleton className="h-5 w-11/12" />
+                    <Skeleton className="h-5 w-10/12" />
+                  </div>
+                ) : modelsError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertTitle>Model leaderboard unavailable</AlertTitle>
+                    <AlertDescription>
+                      {modelsError instanceof Error
+                        ? modelsError.message
+                        : "Failed to load model records."}
+                    </AlertDescription>
+                  </Alert>
+                ) : modelSummaries.length ? (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Model</TableHead>
+                          <TableHead className="text-right">Val F1</TableHead>
+                          <TableHead className="text-right">Test F1</TableHead>
+                          <TableHead className="text-right">Test Precision</TableHead>
+                          <TableHead className="text-right">Test Recall</TableHead>
+                          <TableHead className="text-right">Threshold</TableHead>
+                          <TableHead>Updated</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {modelSummaries.map((summary, index) => (
+                          <TableRow
+                            key={`${summary.model_name}-${summary.timestamp ?? index}`}
+                            className={
+                              metadata?.model_name === summary.model_name
+                                ? "bg-muted/60"
+                                : undefined
+                            }
+                          >
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-foreground">
+                                    {summary.model_name}
+                                  </span>
+                                  {metadata?.model_name === summary.model_name ? (
+                                    <Badge variant="secondary" className="text-[10px] uppercase">
+                                      Serving
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {summary.model_type}
+                                  {summary.calibration_method
+                                    ? ` · ${summary.calibration_method}`
+                                    : ""}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatMetric(summary.validation?.f1)}
+                            </TableCell>
+                            <TableCell className="text-right text-sm font-medium">
+                              {formatMetric(summary.test?.f1)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {formatMetric(summary.test?.precision)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {formatMetric(summary.test?.recall)}
+                            </TableCell>
+                            <TableCell className="text-right text-xs text-muted-foreground">
+                              {summary.threshold !== undefined && summary.threshold !== null
+                                ? formatMetric(summary.threshold, { maximumFractionDigits: 3 })
+                                : "-"}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">
+                              {formatTimestamp(summary.timestamp)}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    No tracked model runs yet. Train a model to populate this leaderboard.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
                   <Brain className="size-5 text-chart-5" />
                   Feature signals
                 </CardTitle>
@@ -1118,7 +1247,7 @@ function TokenList({
   items: TokenWeightItem[]
 }) {
   return (
-    <div className="rounded-xl border border-border/60 bg-card/70 p-4">
+    <div className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 p-4">
       <div className="mb-3 flex items-center justify-between">
         <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {title}
@@ -1132,10 +1261,12 @@ function TokenList({
         {items.slice(0, 12).map((token) => (
           <li
             key={`${title}-${token.term}`}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
+            className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
           >
-            <span className="font-medium text-foreground">{token.term}</span>
-            <span className={`${tone} font-semibold`}>
+            <span className="flex-1 min-w-0 break-words font-medium leading-snug text-foreground">
+              {token.term}
+            </span>
+            <span className={`${tone} shrink-0 text-right font-semibold tabular-nums`}>
               {formatMetric(token.weight, { maximumFractionDigits: 3 })}
             </span>
           </li>
@@ -1169,21 +1300,25 @@ export function ContributionColumn({
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex min-w-0 flex-col gap-2">
       <div className="text-sm font-semibold text-foreground">{title}</div>
       <ul className="grid gap-1.5">
         {items.map((item) => (
           <li
             key={`${title}-${item.feature}-${item.source}`}
-            className="border-border/70 bg-card/60 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+            className="border-border/70 bg-card/60 flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm transition-colors hover:bg-card"
           >
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-foreground">{item.feature}</span>
+            <div className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium text-foreground break-words leading-snug">
+                {item.feature}
+              </span>
               <span className="text-xs text-muted-foreground capitalize">{item.source}</span>
             </div>
             <span
               className={
-                direction === "negative" ? "text-chart-2 text-sm font-semibold" : "text-destructive text-sm font-semibold"
+                direction === "negative"
+                  ? "text-chart-2 shrink-0 text-right text-sm font-semibold tabular-nums"
+                  : "text-destructive shrink-0 text-right text-sm font-semibold tabular-nums"
               }
             >
               {formatContribution(item.contribution)}

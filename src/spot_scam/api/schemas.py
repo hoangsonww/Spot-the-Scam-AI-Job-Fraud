@@ -61,6 +61,20 @@ class MetadataResponse(BaseModel):
     test_ece: Optional[float] = None
 
 
+class ModelSummary(BaseModel):
+    model_name: str
+    model_type: str
+    calibration_method: Optional[str] = None
+    threshold: Optional[float] = None
+    timestamp: Optional[datetime] = None
+    validation: MetricSet
+    test: MetricSet
+
+
+class ModelsResponse(BaseModel):
+    items: List[ModelSummary]
+
+
 class TokenWeight(BaseModel):
     term: str
     weight: float
@@ -198,6 +212,8 @@ __all__ = [
     "PredictionBatchResponse",
     "HealthResponse",
     "MetadataResponse",
+    "ModelSummary",
+    "ModelsResponse",
     "TokenImportanceResponse",
     "TokenFrequencyResponse",
     "ThresholdMetricsResponse",
