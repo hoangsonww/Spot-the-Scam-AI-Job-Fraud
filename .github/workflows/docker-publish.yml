@@ -111,25 +111,39 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build model image
-        id: model_build
+        if: github.event_name == 'push'
+        id: model_build_push
         uses: docker/build-push-action@v5
         with:
           context: docker/model
           file: docker/model/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          load: ${{ github.event_name != 'push' }}
+          push: true
+          load: false
           tags: ${{ steps.model_tags.outputs.tags }}
           cache-from: type=gha,scope=model
           cache-to: type=gha,mode=max,scope=model
+
+      - name: Build model image (cache only)
+        if: github.event_name != 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: docker/model
+          file: docker/model/Dockerfile
+          push: false
+          load: false
+          tags: ${{ steps.model_tags.outputs.tags }}
+          cache-from: type=gha,scope=model
+          cache-to: type=gha,mode=max,scope=model
+          outputs: type=cacheonly
 
       - name: List model image (PR checks)
         if: github.event_name != 'push'
         run: docker image ls
 
       - name: Log model image digest
-        if: steps.model_build.outputs.digest != ''
+        if: github.event_name == 'push' && steps.model_build_push.outputs.digest != ''
         run: |
-          echo "Model image digest: ${{ steps.model_build.outputs.digest }}"
+          echo "Model image digest: ${{ steps.model_build_push.outputs.digest }}"
 
       - name: Summarize model image stage
         run: |
@@ -141,8 +155,8 @@ jobs:
             while IFS= read -r tag; do
               [ -n "$tag" ] && echo "  - \`$tag\`"
             done <<< "${{ steps.model_tags.outputs.tags }}"
-            if [ -n "${{ steps.model_build.outputs.digest }}" ]; then
-              echo "- Digest: \`${{ steps.model_build.outputs.digest }}\`"
+            if [ "${{ github.event_name }}" == "push" ] && [ -n "${{ steps.model_build_push.outputs.digest }}" ]; then
+              echo "- Digest: \`${{ steps.model_build_push.outputs.digest }}\`"
             fi
             echo "- Contents: \`artifacts/\` (classical winner bundle)"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -191,26 +205,40 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build container
-        id: build
+      - name: Build and push container
+        if: github.event_name == 'push'
+        id: build_push
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.target.context }}
           file: ${{ matrix.target.file }}
-          push: ${{ github.event_name == 'push' }}
-          load: ${{ github.event_name != 'push' }}
+          push: true
+          load: false
           tags: ${{ steps.image_tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build container (cache only)
+        if: github.event_name != 'push'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.target.context }}
+          file: ${{ matrix.target.file }}
+          push: false
+          load: false
+          tags: ${{ steps.image_tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          outputs: type=cacheonly
 
       - name: List images (PR checks)
         if: github.event_name != 'push'
         run: docker image ls
 
       - name: Log build digest
-        if: steps.build.outputs.digest != ''
+        if: github.event_name == 'push' && steps.build_push.outputs.digest != ''
         run: |
-          echo "Built image digest: ${{ steps.build.outputs.digest }}"
+          echo "Built image digest: ${{ steps.build_push.outputs.digest }}"
 
       - name: Summarize ${{ matrix.target.name }} stage
         run: |
@@ -222,7 +250,7 @@ jobs:
             while IFS= read -r tag; do
               [ -n "$tag" ] && echo "  - \`$tag\`"
             done <<< "${{ steps.image_tags.outputs.tags }}"
-            if [ -n "${{ steps.build.outputs.digest }}" ]; then
-              echo "- Digest: \`${{ steps.build.outputs.digest }}\`"
+            if [ "${{ github.event_name }}" == "push" ] && [ -n "${{ steps.build_push.outputs.digest }}" ]; then
+              echo "- Digest: \`${{ steps.build_push.outputs.digest }}\`"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
