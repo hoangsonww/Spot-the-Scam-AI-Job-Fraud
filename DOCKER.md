@@ -79,7 +79,13 @@ PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 
 ## 4. GitHub Actions Automation
 
-The workflow at `.github/workflows/docker-publish.yml` automatically builds both containers:
+The workflow at `.github/workflows/docker-publish.yml` now performs three checks on every push/PR:
+
+- **Train classical model artifacts:** installs Python 3.12, runs `python -m spot_scam.pipeline.train --skip-transformer`, and uploads the resulting `artifacts/`, `experiments/`, and `mlruns/` directories so you can download them from the run summary.
+- **Build API container:** uses Docker Buildx to build/push `spot-the-scam-api`.
+- **Build frontend container:** uses Docker Buildx to build/push `spot-the-scam-frontend`.
+
+Additional workflow behaviour:
 
 - **Trigger:** all pushes and pull requests targeting `master`/`main`.
 - **Pull requests:** build the images (no push) with `docker buildx` to catch regressions.

@@ -62,6 +62,8 @@ import {
 
 type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>
 
+type BadgeTone = "default" | "destructive" | "secondary" | "outline"
+
 type FormFields = Pick<
   JobPostingInput,
   "title" | "company_profile" | "description" | "requirements" | "benefits"
@@ -281,17 +283,21 @@ export default function HomePage() {
     ]
   }, [metadata])
 
-  const predictionBadge = useMemo(() => {
+  const predictionBadge = useMemo((): { tone: BadgeTone; label: string } => {
     if (!prediction) {
-      return { tone: "outline" as const, label: "Awaiting submission" }
+      return { tone: "outline", label: "Awaiting submission" }
     }
 
-    const tone =
-      prediction.decision.toLowerCase() === "fraud"
-        ? "destructive"
-        : prediction.decision.toLowerCase() === "review"
-          ? "secondary"
-          : "default"
+    const normalizedDecision = prediction.decision.toLowerCase()
+    let tone: BadgeTone
+
+    if (normalizedDecision === "fraud") {
+      tone = "destructive"
+    } else if (normalizedDecision === "review") {
+      tone = "secondary"
+    } else {
+      tone = "default"
+    }
 
     return { tone, label: prediction.decision }
   }, [prediction])
