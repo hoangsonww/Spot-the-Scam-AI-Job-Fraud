@@ -86,6 +86,9 @@ This run:
 - Calibrates probabilities, writes artifacts to `artifacts/`.
 - Generates figures/metrics/tables in `experiments/`.
 
+> [!NOTE]
+> If you have limited resources on your machine, consider using the classical-only training mode below for faster iterations. The Transformer training can be time and memory intensive.
+
 ### 5.2 Classical-Only Training (faster)
 
 This mode skips transformer training for quicker iterations:
