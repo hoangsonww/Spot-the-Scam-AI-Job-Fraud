@@ -54,8 +54,9 @@ This document supplements `INSTRUCTIONS.md` and `ARCHITECTURE.md` with an end-to
 
 ## 6. Explainability
 - Classical: multiply vectorizer/scaler outputs by logistic coefficients to produce top positive/negative contributions. Summaries are natural-language sentence(s).
-- Transformer: stub summary until token-level attributions are implemented.
+- Transformer: gradient × input token attributions (attention-based fallback when gradients unavailable) feed the same “signals toward fraud/legit” UI as classical models.
 - Outputs attached to every `/predict` response under `explanation`.
+- Performance note: all training/latency numbers in this doc were collected on a local box with an NVIDIA RTX 3070 Ti (8 GB). Runs on CPU-only hardware or smaller GPUs will take proportionally longer, especially for transformer fine-tuning.
 
 ## 7. MLflow + ONNX (Optional)
 1. Convert winner to ONNX (captures vectorizer/scaler or transformer graph).
@@ -79,7 +80,7 @@ This document supplements `INSTRUCTIONS.md` and `ARCHITECTURE.md` with an end-to
 - Run notebook `notebooks/spot_the_scam_overview.ipynb` to recreate the pipeline.
 
 ## 10. Next Enhancements
-- Add token-level attributions for transformer.
+- Upgrade transformer attributions to Integrated Gradients / Captum once the current gradient × input approach bottlenecks or drifts.
 - Implement pipeline caching (TF-IDF reuse) to shorten train time.
 - Integrate automated alerts when MLflow metrics regress beyond threshold.
 

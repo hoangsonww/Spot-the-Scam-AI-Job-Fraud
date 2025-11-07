@@ -23,44 +23,43 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ## Features
 - **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
-- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
+- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
 - **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
 
-## Outputs
+## Outputs & File Structure
 - `artifacts/` - models, vectorizers, calibration metadata, final predictions.
 - `experiments/figs/` - PR & calibration curves, confusion matrices, score distributions, threshold vs metric sweeps, latency plots.
 - `experiments/tables/` - metrics summary, slice reports, token analyses, threshold metrics, latency benchmarks.
+- `src/` - source code for pipeline, model, API, and frontend.
+- `tests/` - unit and integration tests with PyTest.
+- `tracking/` - MLflow experiment runs and artifacts.
+- `experiments/report.md` - markdown report summarizing key results and insights.
+- `frontend/` - Next.js + shadcn UI + TailwindCSS source code.
+- `data/` - raw and processed datasets.
 - `INSTRUCTIONS.md` - step-by-step setup, training, serving, and frontend guidance.
 - `ARCHITECTURE.md` - detailed system architecture with flow diagrams.
 
 ## Explainability & Model Packaging
 
 - Every prediction includes a **local explanation**: the API surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept so reviewers can understand the decision instantly. The Next.js dashboard renders these insights in the “Decision rationale” card.
-- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners currently emit a high-level summary placeholder.
+- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners surface gradient-derived token contributions (falling back to attention scores when gradients are unavailable, e.g., quantized mode).
 
 ### ONNX + MLflow
 
 - The training pipeline automatically converts the selected model to ONNX and logs a ready-to-serve MLflow pyfunc package (vectorizer, scaler, ONNX graph, metadata, and decision policy).
-- Check `mlruns/` for runs and registered models. Use `mlflow models serve -m runs:/<RUN_ID>/model` to spin up a local pyfunc service with the same behavior as the FastAPI endpoint.
-- Running on GPU? Install `onnxruntime-gpu` inside your virtualenv (matching the CPU package version) so ONNX Runtime registers CUDA devices. Otherwise set `ORT_DISABLE_DEVICE_DISCOVERY=1` to silence the CPU-only warning.
 
 ### Quantization (optional)
-- To create an int8 dynamic-quantized transformer checkpoint: `make quantize-transformer`
-- Serve the quantized model by setting `SPOT_SCAM_USE_QUANTIZED=1` before starting the API.
-- Non-quantized models remain the default.
+- Quantization is supported for classical models via `ONNXRuntime` optimizations. Enable with `QUANTIZE_MODEL=1 make train` or `QUANTIZE_MODEL=1 PYTHONPATH=src python -m spot_scam.pipeline.train`.
+- Quantization helps reduce model size and inference latency with minimal accuracy loss, suitable for deployment scenarios with resource constraints.
+- All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch; expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
 
-### Human-in-the-Loop Review (HITL)
+## Human-in-the-Loop Review (HITL)
 
-- Run the API and review queue: `make serve-queue` (FastAPI on port 8000) and open `http://localhost:3000/review`.
-- Populate the queue with high-uncertainty cases via `make review-sample` (writes `experiments/tables/active_sample.csv`) or by using the live dashboard.
-- Reviewers submit confirmations/overrides; feedback is appended under `tracking/feedback/date=*/`.
-- Retrain with feedback applied by running `make retrain-with-feedback` (or `USE_FEEDBACK=1 PYTHONPATH=src python -m spot_scam.pipeline.train`). The pipeline produces comparative tables:
-  - `experiments/tables/metrics_with_feedback.csv`
-  - `experiments/tables/slice_metrics_baseline.csv`
-  - `experiments/tables/slice_metrics_feedback_delta.csv`
-- The review UI and nav badge automatically reflect queue size via `/cases` and `/feedback` endpoints.
+- Cases are automatically added to the review queue. User can submit feedback via the API or frontend.
+- Feedback is logged to `artifacts/hitl_feedback.csv` for retraining and calibration updates. 
+- Subsequent pipeline runs can incorporate this feedback to refine model performance and decision thresholds, ensuring continuous improvement based on real-world inputs.
 
 See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams.
 

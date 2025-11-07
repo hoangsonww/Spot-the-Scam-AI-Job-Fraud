@@ -125,6 +125,7 @@ def train_transformer_model(
         "gradient_accumulation_steps": gradient_accumulation,
         "report_to": "none",
         "save_strategy": "epoch",
+        "overwrite_output_dir": True,
     }
     # Hugging Face 4.57 renamed evaluation_strategy -> eval_strategy.
     if "eval_strategy" in TrainingArguments.__init__.__code__.co_varnames:
@@ -141,10 +142,15 @@ def train_transformer_model(
         precision, recall, f1, _ = _precision_recall_f1(labels, pred_labels)
         return {"precision": precision, "recall": recall, "f1": f1}
 
-    early_stop = EarlyStoppingCallback(
-        early_stopping_patience=transformer_conf.get("early_stopping_patience", 2),
-        early_stopping_threshold=0.0,
-    )
+    callbacks = []
+    early_stopping_patience = transformer_conf.get("early_stopping_patience")
+    if early_stopping_patience is not None and early_stopping_patience > 0:
+        callbacks.append(
+            EarlyStoppingCallback(
+                early_stopping_patience=int(early_stopping_patience),
+                early_stopping_threshold=0.0,
+            )
+        )
 
     trainer = Trainer(
         model=model,
@@ -152,7 +158,7 @@ def train_transformer_model(
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         compute_metrics=compute_eval_metrics,
-        callbacks=[early_stop],
+        callbacks=callbacks,
     )
 
     logger.info("Starting transformer fine-tuning for %d epochs (max).", transformer_conf["epochs"])

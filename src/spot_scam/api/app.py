@@ -39,6 +39,7 @@ from spot_scam.tracking.predictions import (
     log_predictions,
     get_review_queue,
     load_predictions_dataframe,
+    load_active_sample_dataframe,
 )
 from spot_scam.tracking.feedback import append_feedback
 from spot_scam.utils.paths import TRACKING_DIR, ensure_directories
@@ -204,6 +205,10 @@ def post_feedback(
     predictions_df = load_predictions_dataframe()
     known_ids = set(predictions_df["request_id"]) if not predictions_df.empty else set()
 
+    active_sample_df = load_active_sample_dataframe()
+    if not active_sample_df.empty and "request_id" in active_sample_df.columns:
+        known_ids.update(str(rid) for rid in active_sample_df["request_id"].dropna().astype(str))
+
     rows = []
     for entry in items:
         data = entry.model_dump()
@@ -220,6 +225,7 @@ def post_feedback(
 def review_cases(
     policy: str = Query("gray-zone", description="Sampling policy (gray-zone, entropy)."),
     limit: int = Query(25, ge=1, le=200),
+    offset: int = Query(0, ge=0, le=5000),
     predictor: FraudPredictor = Depends(get_predictor),
 ) -> CasesResponse:
     band = predictor.get_gray_zone_band()
@@ -228,6 +234,7 @@ def review_cases(
         limit=limit,
         threshold=float(predictor.threshold),
         gray_zone_width=float(band["width"]),
+        offset=offset,
     )
 
     items = []

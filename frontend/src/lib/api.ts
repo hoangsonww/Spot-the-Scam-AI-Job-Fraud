@@ -238,9 +238,10 @@ export async function fetchSliceMetrics(limit = 6): Promise<SliceMetricsResponse
 
 export async function fetchReviewCases(
   limit = 25,
-  policy = "gray-zone"
+  policy = "gray-zone",
+  offset = 0
 ): Promise<CasesResponse> {
-  return request<CasesResponse>(`/cases?policy=${policy}&limit=${limit}`);
+  return request<CasesResponse>(`/cases?policy=${policy}&limit=${limit}&offset=${offset}`);
 }
 
 export async function fetchReviewCount(): Promise<number> {

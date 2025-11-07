@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Tuple
 
@@ -51,15 +52,32 @@ def calibrate_prefit_model(
     results: List[CalibrationResult] = []
     for method in methods:
         if method in {"platt", "sigmoid"}:
-            calibrated = CalibratedClassifierCV(estimator, cv="prefit", method="sigmoid")
-            calibrated.fit(X_val, y_val)
-            probs = calibrated.predict_proba(X_val)[:, 1]
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="X does not have valid feature names, but LGBMClassifier was fitted with feature names",
+                    category=UserWarning,
+                )
+                warnings.filterwarnings(
+                    "ignore",
+                    message="The `cv='prefit'` option is deprecated in 1.6 and will be removed in 1.8.*",
+                    category=FutureWarning,
+                )
+                calibrated = CalibratedClassifierCV(estimator, cv="prefit", method="sigmoid")
+                calibrated.fit(X_val, y_val)
+                probs = calibrated.predict_proba(X_val)[:, 1]
         elif method == "isotonic":
-            scores = _get_raw_scores(estimator, X_val)
-            iso = IsotonicRegression(out_of_bounds="clip")
-            iso.fit(scores, y_val)
-            calibrated = IsotonicCalibratedModel(estimator, iso)
-            probs = calibrated.predict_proba(X_val)[:, 1]
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message="X does not have valid feature names, but LGBMClassifier was fitted with feature names",
+                    category=UserWarning,
+                )
+                scores = _get_raw_scores(estimator, X_val)
+                iso = IsotonicRegression(out_of_bounds="clip")
+                iso.fit(scores, y_val)
+                calibrated = IsotonicCalibratedModel(estimator, iso)
+                probs = calibrated.predict_proba(X_val)[:, 1]
         else:
             raise ValueError(f"Unsupported calibration method: {method}")
 

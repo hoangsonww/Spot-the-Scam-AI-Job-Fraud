@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+import warnings
 from typing import Dict, Iterable, List, Optional
 
 import numpy as np
@@ -15,6 +16,12 @@ from spot_scam.features.builders import FeatureBundle
 from spot_scam.utils.logging import configure_logging
 
 logger = configure_logging(__name__)
+
+warnings.filterwarnings(
+    "ignore",
+    message=r"X does not have valid feature names, but LGBMClassifier was fitted with feature names",
+    category=UserWarning,
+)
 
 
 @dataclass
@@ -159,11 +166,13 @@ def train_classical_models(
                 feature_type="tabular",
             )
         )
-        logger.info("LightGBM %s F1=%.3f Precision=%.3f Recall=%.3f",
-                    params,
-                    metric_results.values.get("f1", np.nan),
-                    metric_results.values.get("precision", np.nan),
-                    metric_results.values.get("recall", np.nan))
+        logger.info(
+            "LightGBM %s F1=%.3f Precision=%.3f Recall=%.3f",
+            params,
+            metric_results.values.get("f1", np.nan),
+            metric_results.values.get("precision", np.nan),
+            metric_results.values.get("recall", np.nan),
+        )
 
     return runs
 

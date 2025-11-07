@@ -160,11 +160,12 @@ def run(
     y_test = splits.test[config["data"]["target_column"]].values
 
     classical_runs = train_classical_models(bundle, y_train, y_val, config)
-    candidates = []
-    best_run = max(classical_runs, key=lambda run: run.val_metrics.values.get("f1", -np.inf))
-    candidates.append(("classical", best_run))
+    classical_artifacts = [
+        _evaluate_classical_on_test(run, bundle, splits, config, y_val, y_test)
+        for run in classical_runs
+    ]
 
-    transformer_run: Optional[TransformerRun] = None
+    transformer_artifact: Optional[BestModelArtifacts] = None
     if not skip_transformer:
         transformer_run = train_transformer_model(
             splits.train,
@@ -173,16 +174,13 @@ def run(
             config,
             output_dir=ARTIFACTS_DIR,
         )
-        candidates.append(("transformer", transformer_run))
+        transformer_artifact = _evaluate_transformer_on_test(transformer_run, config, y_test)
 
-    best_model_artifacts = _evaluate_and_select_best(
-        candidates,
-        bundle=bundle,
-        splits=splits,
-        config=config,
-        y_val=y_val,
-        y_test=y_test,
-    )
+    candidate_artifacts: List[BestModelArtifacts] = list(classical_artifacts)
+    if transformer_artifact is not None:
+        candidate_artifacts.append(transformer_artifact)
+
+    best_model_artifacts = _select_best_artifact(candidate_artifacts)
 
     if use_feedback_enabled:
         best_model_artifacts.extra.setdefault("feedback", {})
@@ -207,7 +205,8 @@ def run(
         feedback_overrides=feedback_override_count if use_feedback_enabled else 0,
         feedback_enabled=use_feedback_enabled,
     )
-    append_run_record(best_model_artifacts, config)
+    for artifact in candidate_artifacts:
+        append_run_record(artifact, config)
     try:
         log_model_to_mlflow(best_model_artifacts, bundle, config, splits)
     except MLFlowExportError as exc:
@@ -215,42 +214,21 @@ def run(
     typer.echo("Training complete. Best model: " + best_model_artifacts.name)
 
 
-def _evaluate_and_select_best(
-    candidates,
-    *,
-    bundle: FeatureBundle,
-    splits: SplitResult,
-    config: Dict,
-    y_val: np.ndarray,
-    y_test: np.ndarray,
-) -> BestModelArtifacts:
-    best_candidate = None
-    best_f1 = -np.inf
-
-    for model_type, run in candidates:
-        if isinstance(run, ModelRun):
-            f1 = run.val_metrics.values.get("f1", -np.inf)
-        elif isinstance(run, TransformerRun):
-            f1 = run.val_metrics.values.get("f1", -np.inf)
-        else:
-            continue
-        if f1 > best_f1:
-            best_f1 = f1
-            best_candidate = (model_type, run)
-
-    if best_candidate is None:
+def _select_best_artifact(artifacts: List[BestModelArtifacts]) -> BestModelArtifacts:
+    if not artifacts:
         raise RuntimeError("No candidate models were trained.")
 
-    model_type, run = best_candidate
-    logger.info("Selected best model (%s): %s (val F1=%.3f)", model_type, run.name, best_f1)
-
-    if isinstance(run, ModelRun):
-        test_artifacts = _evaluate_classical_on_test(run, bundle, splits, config, y_val, y_test)
-        return test_artifacts
-    if isinstance(run, TransformerRun):
-        test_artifacts = _evaluate_transformer_on_test(run, config, y_test)
-        return test_artifacts
-    raise AssertionError("Unexpected model run type.")
+    best_artifact = max(
+        artifacts,
+        key=lambda item: item.val_metrics.values.get("f1", -np.inf),
+    )
+    logger.info(
+        "Selected best model (%s): %s (val F1=%.3f)",
+        best_artifact.model_type,
+        best_artifact.name,
+        best_artifact.val_metrics.values.get("f1", np.nan),
+    )
+    return best_artifact
 
 
 def _evaluate_classical_on_test(

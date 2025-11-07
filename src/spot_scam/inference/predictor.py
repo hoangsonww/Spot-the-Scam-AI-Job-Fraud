@@ -322,29 +322,30 @@ class FraudPredictor:
 
     def _predict_transformer(self, processed_df: pd.DataFrame) -> Dict[str, Any]:
         texts = processed_df["text_all"].tolist()
-        encodings = self.tokenizer(
+        tokenized = self.tokenizer(
             texts,
             truncation=True,
             padding=True,
             max_length=self.transformer_max_length,
             return_tensors="pt",
         )
-        encodings = {k: v.to(self.device) for k, v in encodings.items()}
-        with torch.no_grad():
-            outputs = self.model(**encodings)
-            probabilities = torch.softmax(outputs.logits, dim=1)[:, 1].cpu().numpy()
+        cached_cpu = {k: v.clone() for k, v in tokenized.items()}
+        encodings = {k: v.to(self.device) for k, v in tokenized.items()}
 
-        raw_scores = outputs.logits[:, 1].cpu().numpy()
+        if not self.use_quantized:
+            try:
+                probabilities, raw_scores, token_scores = self._run_transformer_with_gradients(encodings)
+            except RuntimeError as exc:
+                logger.warning("Falling back to attention-based transformer explanations: %s", exc)
+                probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(encodings)
+        else:
+            probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(encodings)
 
-        explanations = [
-            {
-                "top_positive": [],
-                "top_negative": [],
-                "intercept": None,
-                "summary": f"Transformer probability {prob:.1%}; token-level attributions are not yet available.",
-            }
-            for prob in probabilities
-        ]
+        explanations = self._build_transformer_explanations(
+            cached_cpu,
+            token_scores,
+            probabilities,
+        )
 
         return {
             "probabilities": probabilities,
@@ -352,6 +353,135 @@ class FraudPredictor:
             "explanations": explanations,
             "tabular_df": None,
         }
+
+    def _run_transformer_with_gradients(self, encodings: Dict[str, torch.Tensor]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        embedding_layer = self.model.get_input_embeddings()
+        input_embeddings = embedding_layer(encodings["input_ids"]).detach()
+        input_embeddings.requires_grad_(True)
+        input_embeddings.retain_grad()
+        forward_kwargs = {
+            "inputs_embeds": input_embeddings,
+            "attention_mask": encodings["attention_mask"],
+            "return_dict": True,
+        }
+        if "token_type_ids" in encodings:
+            forward_kwargs["token_type_ids"] = encodings["token_type_ids"]
+
+        with torch.enable_grad():
+            self.model.zero_grad(set_to_none=True)
+            outputs = self.model(**forward_kwargs)
+            logits = outputs.logits
+            class_logit = logits[:, 1]
+            grad_outputs = torch.ones_like(class_logit)
+            class_logit.backward(gradient=grad_outputs)
+            token_scores = torch.sum(input_embeddings.grad * input_embeddings, dim=-1)
+            self.model.zero_grad(set_to_none=True)
+
+        probabilities = torch.softmax(logits, dim=1)[:, 1]
+        return (
+            probabilities.detach().cpu().numpy(),
+            class_logit.detach().cpu().numpy(),
+            token_scores.detach().cpu().numpy(),
+        )
+
+    def _run_transformer_with_attentions(
+        self, encodings: Dict[str, torch.Tensor]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        with torch.inference_mode():
+            outputs = self.model(**encodings, output_attentions=True, return_dict=True)
+        logits = outputs.logits
+        probabilities = torch.softmax(logits, dim=1)[:, 1]
+        attentions = outputs.attentions[-1].mean(dim=1)  # average heads on last layer
+        cls_attention = attentions[:, 0, :]
+        centered_scores = cls_attention - cls_attention.mean(dim=1, keepdim=True)
+        return (
+            probabilities.cpu().numpy(),
+            logits[:, 1].cpu().numpy(),
+            centered_scores.cpu().numpy(),
+        )
+
+    def _build_transformer_explanations(
+        self,
+        cpu_encodings: Dict[str, torch.Tensor],
+        token_scores: np.ndarray,
+        probabilities: np.ndarray,
+        top_k: int = 5,
+    ) -> List[Dict[str, Any]]:
+        input_ids = cpu_encodings["input_ids"].numpy()
+        attention_mask = cpu_encodings["attention_mask"].numpy()
+        special_tokens = set(self.tokenizer.all_special_tokens)
+
+        def clean_token(token: str) -> str:
+            if token.startswith("##"):
+                token = token[2:]
+            token = token.replace("▁", " ").strip()
+            return token
+
+        def merge_tokens(tokens: List[str], scores: np.ndarray) -> List[Dict[str, Any]]:
+            merged: List[Dict[str, Any]] = []
+            for token, score in zip(tokens, scores):
+                if token in special_tokens or not token:
+                    continue
+                cleaned = clean_token(token)
+                if not cleaned:
+                    continue
+                if token.startswith("##") and merged:
+                    merged[-1]["feature"] = f"{merged[-1]['feature']}{cleaned}"
+                    merged[-1]["contribution"] += float(score)
+                else:
+                    merged.append({"feature": cleaned, "contribution": float(score)})
+            return merged
+
+        def list_to_text(items: List[str]) -> str:
+            if not items:
+                return ""
+            if len(items) == 1:
+                return items[0]
+            if len(items) == 2:
+                return f"{items[0]} and {items[1]}"
+            return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+        explanations: List[Dict[str, Any]] = []
+        for idx in range(len(probabilities)):
+            mask_len = int(attention_mask[idx].sum())
+            tokens = self.tokenizer.convert_ids_to_tokens(input_ids[idx][:mask_len])
+            scores = token_scores[idx][:mask_len]
+            merged = merge_tokens(tokens, scores)
+            contributions = [
+                {**item, "source": "token"}
+                for item in merged
+                if abs(item["contribution"]) > 1e-6 and item["feature"]
+            ]
+            positives = [item for item in contributions if item["contribution"] > 0]
+            positives.sort(key=lambda item: item["contribution"], reverse=True)
+            negatives = [item for item in contributions if item["contribution"] < 0]
+            negatives.sort(key=lambda item: item["contribution"])
+
+            pos_names = [item["feature"] for item in positives[:3]]
+            neg_names = [item["feature"] for item in negatives[:3]]
+
+            summary_parts = [f"Transformer probability {probabilities[idx]:.1%}."]
+            if pos_names:
+                summary_parts.append(f"{list_to_text(pos_names).capitalize()} increased the fraud score")
+            if neg_names:
+                summary_parts.append(f"{list_to_text(neg_names).capitalize()} pushed the score toward legit")
+            if len(summary_parts) == 1:
+                summary_parts.append("No dominant tokens pulled the prediction in either direction.")
+            summary_text = " ".join(summary_parts)
+
+            if summary_text and not summary_text.endswith("."):
+                summary_text += "."
+
+            explanations.append(
+                {
+                    "top_positive": positives[:top_k],
+                    "top_negative": negatives[:top_k],
+                    "intercept": None,
+                    "summary": summary_text,
+                }
+            )
+
+        return explanations
 
     def _build_classical_explanations(
         self,
