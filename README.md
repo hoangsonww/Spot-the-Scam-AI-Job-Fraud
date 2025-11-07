@@ -23,7 +23,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ## Features
 - **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
-- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, token importances and frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
+- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
 - **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
@@ -44,7 +44,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ## Explainability & Model Packaging
 
 - Every prediction includes a **local explanation**: the API surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept so reviewers can understand the decision instantly. The Next.js dashboard renders these insights in the “Decision rationale” card.
-- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners currently emit a high-level summary placeholder.
+- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners surface gradient-derived token contributions (falling back to attention scores when gradients are unavailable, e.g., quantized mode).
 
 ### ONNX + MLflow
 
@@ -53,6 +53,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ### Quantization (optional)
 - Quantization is supported for classical models via `ONNXRuntime` optimizations. Enable with `QUANTIZE_MODEL=1 make train` or `QUANTIZE_MODEL=1 PYTHONPATH=src python -m spot_scam.pipeline.train`.
 - Quantization helps reduce model size and inference latency with minimal accuracy loss, suitable for deployment scenarios with resource constraints.
+- All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch; expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
 
 ## Human-in-the-Loop Review (HITL)
 

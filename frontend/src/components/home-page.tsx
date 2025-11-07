@@ -31,6 +31,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import TopNav from "@/components/top-nav"
 import {
   fetchMetadata,
@@ -70,6 +71,7 @@ import {
   LineChart as LineChartIcon,
   ShieldCheck,
   Target,
+  Info,
 } from "lucide-react"
 
 type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>
@@ -146,12 +148,17 @@ type LeaderboardSortKey =
 type TokenFrequencySortKey = "token" | "positive_count" | "negative_count" | "difference"
 
 const LEADERBOARD_PAGE_SIZE = 10
+const ISO_TZ_REGEX = /[zZ]|[+-]\d\d:\d\d$/
+
+function normalizeUtcTimestampString(value: string): string {
+  return ISO_TZ_REGEX.test(value) ? value : `${value}Z`
+}
 
 function parseLeaderboardTimestamp(value?: string | null): number | null {
   if (!value) {
     return null
   }
-  const parsed = new Date(value).getTime()
+  const parsed = new Date(normalizeUtcTimestampString(value)).getTime()
   return Number.isNaN(parsed) ? null : parsed
 }
 
@@ -306,7 +313,7 @@ function formatTimestamp(value?: string | null) {
   if (!value) {
     return "-"
   }
-  const parsed = new Date(value)
+  const parsed = new Date(normalizeUtcTimestampString(value))
   if (Number.isNaN(parsed.getTime())) {
     return "-"
   }
@@ -1273,9 +1280,30 @@ export default function HomePage() {
                   <AlignVerticalSpaceBetween className="size-5 text-chart-1" />
                   Model leaderboard
                 </CardTitle>
-                <CardDescription>
-                  Recent training runs captured in the lightweight tracker. Default order is Test F1
-                  (high to low).
+                <CardDescription className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>
+                    Recent training runs captured in the lightweight tracker. Default order is Test
+                    F1 (high to low).
+                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground"
+                        aria-label="Leaderboard details"
+                      >
+                        <Info className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="start" className="max-w-sm text-xs leading-relaxed">
+                      Each row is a fully trained model candidate that survived evaluation. Even if
+                      two rows share the same algorithm name (e.g., `linear_svm_C1.0`), they can
+                      differ by calibration choice, feature bundle, config hash, or training time.
+                      The tracker de-duplicates only when every parameter matches exactly, so you can
+                      compare how each distinct model variant performed before the winner is
+                      promoted to “Serving”.
+                    </TooltipContent>
+                  </Tooltip>
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1362,7 +1390,10 @@ export default function HomePage() {
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-foreground">
+                                  <span
+                                    className="font-medium text-foreground max-w-[220px] truncate whitespace-nowrap"
+                                    title={summary.model_name}
+                                  >
                                     {summary.model_name}
                                   </span>
                                   {metadata?.model_name === summary.model_name ? (

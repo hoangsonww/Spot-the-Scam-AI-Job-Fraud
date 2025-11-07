@@ -166,11 +166,13 @@ def train_classical_models(
                 feature_type="tabular",
             )
         )
-        logger.info("LightGBM %s F1=%.3f Precision=%.3f Recall=%.3f",
-                    params,
-                    metric_results.values.get("f1", np.nan),
-                    metric_results.values.get("precision", np.nan),
-                    metric_results.values.get("recall", np.nan))
+        logger.info(
+            "LightGBM %s F1=%.3f Precision=%.3f Recall=%.3f",
+            params,
+            metric_results.values.get("f1", np.nan),
+            metric_results.values.get("precision", np.nan),
+            metric_results.values.get("recall", np.nan),
+        )
 
     return runs
 

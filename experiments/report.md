@@ -3,21 +3,21 @@
 ## Configuration Snapshot
 - Model: **linear_svm_C1.0** (classical)
 - Calibration: isotonic
-- Decision threshold: 0.4680
+- Decision threshold: 0.5452
 - Gray-zone width: 0.1
 
 ## Metrics Overview
 | split      |       f1 |   precision |   recall |   roc_auc |   pr_auc |     brier |
 |:-----------|---------:|------------:|---------:|----------:|---------:|----------:|
-| validation | 0.813688 |    0.946903 | 0.713333 |  0.988126 | 0.875413 | 0.0114549 |
-| test       | 0.796935 |    0.928571 | 0.697987 |  0.981723 | 0.850056 | 0.0139119 |
+| validation | 0.810606 |    0.938596 | 0.713333 |  0.988162 | 0.871819 | 0.0117084 |
+| test       | 0.789272 |    0.919643 | 0.691275 |  0.981442 | 0.845352 | 0.0141198 |
 
 ## Token Signals (Top 20)
 | token      |   positive_count |   negative_count |   difference |
 |:-----------|-----------------:|-----------------:|-------------:|
 | solutions  |               89 |             1124 |        -1035 |
 | support    |               82 |             1195 |        -1113 |
-| -          |               85 |             1960 |        -1875 |
+| -          |               86 |             1959 |        -1873 |
 | &          |              105 |             1997 |        -1892 |
 | customer   |               85 |             2175 |        -2090 |
 | this       |               84 |             2420 |        -2336 |
@@ -39,20 +39,20 @@
 ## Slice Analysis
 | slice    | category               |   count |       f1 |   precision |   recall |    roc_auc |   pr_auc |       brier |
 |:---------|:-----------------------|--------:|---------:|------------:|---------:|-----------:|---------:|------------:|
-| function | <missing>              |     780 | 0.918033 |    1        | 0.848485 |   0.997059 | 0.95135  | 0.00660287  |
-| function | Administrative         |     111 | 0.882353 |    0.9375   | 0.833333 |   0.995221 | 0.969059 | 0.0232007   |
-| function | Business Development   |      34 | 1        |    1        | 1        |   1        | 1        | 6.92839e-05 |
-| function | Customer Service       |     153 | 0.8      |    1        | 0.666667 |   0.983747 | 0.865238 | 0.0261522   |
-| function | Design                 |      62 | 0        |    0        | 0        |   1        | 1        | 0.00969083  |
-| function | Engineering            |     226 | 0.869565 |    1        | 0.769231 |   0.997308 | 0.975917 | 0.0163895   |
-| function | Health Care Provider   |      53 | 0        |    0        | 0        | nan        | 0        | 0.0229567   |
-| function | Human Resources        |      40 | 1        |    1        | 1        |   1        | 1        | 4.26555e-05 |
-| function | Information Technology |     294 | 0.4      |    1        | 0.25     |   0.843534 | 0.547519 | 0.00871674  |
-| function | Management             |      52 | 0        |    0        | 0        |   1        | 1        | 0.0116369   |
-| function | Marketing              |     146 | 1        |    1        | 1        |   1        | 1        | 0.000124784 |
-| function | Not Mentioned          |     717 | 0.666667 |    0.826087 | 0.558824 |   0.947313 | 0.688025 | 0.0230377   |
-| function | Other                  |      56 | 0.666667 |    1        | 0.5      |   0.990741 | 0.75     | 0.0165515   |
-| function | Sales                  |     254 | 0.8      |    0.8      | 0.8      |   0.98996  | 0.85     | 0.0113518   |
+| function | <missing>              |     780 | 0.918033 |    1        | 0.848485 |   0.997079 | 0.948441 | 0.00647124  |
+| function | Administrative         |     111 | 0.882353 |    0.9375   | 0.833333 |   0.994922 | 0.967392 | 0.0254864   |
+| function | Business Development   |      34 | 1        |    1        | 1        |   1        | 1        | 6.59215e-05 |
+| function | Customer Service       |     153 | 0.7      |    0.875    | 0.583333 |   0.981678 | 0.829523 | 0.0292127   |
+| function | Design                 |      62 | 0        |    0        | 0        |   1        | 1        | 0.00956506  |
+| function | Engineering            |     226 | 0.869565 |    1        | 0.769231 |   0.997404 | 0.977337 | 0.0166987   |
+| function | Health Care Provider   |      53 | 0        |    0        | 0        | nan        | 0        | 0.0221094   |
+| function | Human Resources        |      40 | 1        |    1        | 1        |   1        | 1        | 3.77718e-05 |
+| function | Information Technology |     294 | 0.4      |    1        | 0.25     |   0.846552 | 0.553401 | 0.00816128  |
+| function | Management             |      52 | 0        |    0        | 0        |   1        | 1        | 0.0114809   |
+| function | Marketing              |     146 | 1        |    1        | 1        |   1        | 1        | 0.000179829 |
+| function | Not Mentioned          |     717 | 0.666667 |    0.826087 | 0.558824 |   0.944901 | 0.672779 | 0.0238961   |
+| function | Other                  |      56 | 0.666667 |    1        | 0.5      |   0.990741 | 0.75     | 0.016602    |
+| function | Sales                  |     254 | 0.8      |    0.8      | 0.8      |   0.991165 | 0.858824 | 0.0112652   |
 
 ## Additional Visuals
 - `experiments/figs/score_distribution_test.png`: probability density by class.

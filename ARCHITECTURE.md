@@ -110,7 +110,7 @@ graph LR
   - `features.builders`: orchestrates vectorizer + tabular scaler combo.
 
 - **Models**  
-  - `models.classical`: logistic regression, linear SVM, LightGBM with grid search.  
+  - `models.classical`: logistic regression, linear SVM, LightGBM with config-driven grids.  
   - `models.transformer`: DistilBERT fine-tune with HF Trainer (AMP + early stopping).
 
 - **Evaluation**  

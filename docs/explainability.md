@@ -2,7 +2,7 @@
 
 This brief dives into how we generate and surface explanations for each prediction.
 
-## 1. Classical models (Logistic Regression / Linear SVM)
+## 1. Classical models (Logistic Regression / Linear SVM - Support Vector Machine)
 - **Core idea:** multiply the standardized feature vector by the learned coefficients to get per-feature contributions.
 - **Implementation:** `spot_scam.inference.predictor.FraudPredictor._build_classical_explanations`.
   - Extract TF-IDF activations for the posting.
@@ -16,11 +16,8 @@ This brief dives into how we generate and surface explanations for each predicti
 - **Output schema:** returned with every `/predict` response under `explanation`.
 
 ## 2. Transformer models (distilbert-base-uncased)
-- **Current behavior:** emit a placeholder summary reporting the probability because token-level attributions are not yet implemented.
-- **Next steps (backlog):**
-  1. Hook into Hugging Face’s `pipeline` with `return_all_scores`.
-  2. Use gradient-based methods (Integrated Gradients) to compute word importances.
-  3. Serialize top tokens alongside classical tabular features (if any) for hybrid runs.
+- **Current behavior:** compute per-token contributions with a gradient × input attribution on the classification head. We build `inputs_embeds` manually, backprop the positive-class logit, and sum `(grad * embed)` across the hidden dimension to capture directional influence (positive ⇒ fraud leaning, negative ⇒ legit leaning). The UI now receives `top_positive` and `top_negative` tokens exactly like the classical stack.
+- **Fallback:** when gradients are unavailable (e.g., quantized INT8 mode) we fall back to centered CLS-attention scores so we can still highlight salient tokens, albeit without the signed magnitude guarantees of gradients.
 
 ## 3. Frontend display
 - `frontend/src/components/home-page.tsx` renders:
