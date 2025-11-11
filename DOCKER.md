@@ -100,7 +100,7 @@ Additional workflow behaviour:
   - `pr-<number>` (PR context)
 - Cache is managed via `type=gha` to speed up rebuilds.
 
-No additional secrets are required—GitHub automatically grants the workflow a scoped token with `packages: write`.
+No additional secrets are required-GitHub automatically grants the workflow a scoped token with `packages: write`.
 
 To inspect runs or re-trigger builds, visit the **Actions → “Build & Publish Containers”** page in the GitHub UI.
 
@@ -141,7 +141,7 @@ docker run -d --name scam-ui --network spot-the-scam -p 3000:3000 \
 
 ## 6. Storage & Troubleshooting Tips
 
-- Docker Desktop (especially on WSL2) stores layers on the system drive—keep several GB free before building.
+- Docker Desktop (especially on WSL2) stores layers on the system drive-keep several GB free before building.
 - Remove old layers with `docker system prune` when you no longer need cached images.
 - Double-check that `docker compose` uses the project root as context to include all dependencies.
 - If builds fail on CI, inspect the cached artifacts in the workflow run logs for clues.
