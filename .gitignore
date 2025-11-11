@@ -7,7 +7,6 @@ venv/
 .idea/
 .pytest_cache/
 .coverage
-data/processed/*
 !data/processed/.gitkeep
 !tracking/.gitkeep
 artifacts/*.joblib
