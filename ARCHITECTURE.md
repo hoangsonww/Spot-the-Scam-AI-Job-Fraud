@@ -217,7 +217,22 @@ flowchart LR
     HomePage --> UI
 ```
 
-![UI Screenshot](experiments/figs/ui.png)
+### UI Screenshots & Demo
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing" target="_blank">
+    <img src="experiments/figs/ui.png" alt="UI Screenshot" width="100%"/>
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing" target="_blank">
+    <img src="experiments/figs/ui1.png" alt="UI Screenshot" width="100%"/>
+  </a>
+</p>
+
+> [!NOTE]
+> Demo video available at [https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing](https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing).
 
 ### Frontend Highlights
 - App directory with `page.tsx` wrapper around `HomePage`.
