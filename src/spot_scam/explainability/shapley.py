@@ -37,7 +37,11 @@ def compute_tabular_shap(
         explainer = shap.KernelExplainer(estimator.predict_proba, background)  # type: ignore[attr-defined]
 
     shap_values = explainer(background)
-    values = shap_values.values if isinstance(shap_values, shap._explanation.Explanation) else shap_values
+    values = (
+        shap_values.values
+        if isinstance(shap_values, shap._explanation.Explanation)
+        else shap_values
+    )
     if isinstance(values, list):
         values = values[1]
     mean_abs_shap = np.mean(np.abs(values), axis=0)
@@ -53,4 +57,3 @@ def compute_tabular_shap(
 
 
 __all__ = ["compute_tabular_shap"]
-

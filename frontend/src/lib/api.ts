@@ -278,3 +278,90 @@ export async function fetchHealth() {
 export function getApiBaseUrl(): string {
   return API_BASE_URL;
 }
+
+// Chat API types
+export type ChatContext = {
+  request_id?: string | null;
+  job_posting?: JobPostingInput | null;
+  prediction?: PredictionResponse | null;
+};
+
+export type ChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: string;
+};
+
+export type ChatRequest = {
+  message: string;
+  context?: ChatContext | null;
+  session_id?: string | null;
+  history?: ChatMessage[] | null;
+};
+
+export type ChatStreamChunk = {
+  chunk: string;
+  done: boolean;
+};
+
+// Chat streaming function
+export async function streamChat(
+  request: ChatRequest,
+  onChunk: (chunk: string) => void,
+  onComplete: () => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Chat API error: ${response.status} - ${errorText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body reader available");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const jsonStr = line.slice(6);
+            const data: ChatStreamChunk = JSON.parse(jsonStr);
+            if (data.chunk) {
+              onChunk(data.chunk);
+            }
+            if (data.done) {
+              onComplete();
+              return;
+            }
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
+          }
+        }
+      }
+    }
+
+    onComplete();
+  } catch (error) {
+    onError(error as Error);
+  }
+}

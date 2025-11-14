@@ -29,4 +29,3 @@ def build_tfidf_vectorizer(config: Dict) -> Tuple[TfidfVectorizer, Dict]:
 
 
 __all__ = ["build_tfidf_vectorizer"]
-

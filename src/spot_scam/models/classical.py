@@ -66,7 +66,9 @@ def train_classical_models(
         clf.fit(X_train_linear, y_train)
         train_time = time.time() - start
         val_scores = clf.predict_proba(X_val_linear)[:, 1]
-        threshold = optimal_threshold(y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+        threshold = optimal_threshold(
+            y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"]
+        )
         metric_results = compute_metrics(
             y_val,
             val_scores,
@@ -86,11 +88,13 @@ def train_classical_models(
                 feature_type="tfidf+tabular",
             )
         )
-        logger.info("Logistic Regression (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
-                    C,
-                    metric_results.values.get("f1", np.nan),
-                    metric_results.values.get("precision", np.nan),
-                    metric_results.values.get("recall", np.nan))
+        logger.info(
+            "Logistic Regression (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
+            C,
+            metric_results.values.get("f1", np.nan),
+            metric_results.values.get("precision", np.nan),
+            metric_results.values.get("recall", np.nan),
+        )
 
     # Linear SVM
     for C in classical_conf["linear_svm"]["Cs"]:
@@ -106,7 +110,9 @@ def train_classical_models(
         train_time = time.time() - start
         decision_scores = svm.decision_function(X_val_linear)
         val_scores = _sigmoid(decision_scores)
-        threshold = optimal_threshold(y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+        threshold = optimal_threshold(
+            y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"]
+        )
         metric_results = compute_metrics(
             y_val,
             val_scores,
@@ -126,11 +132,13 @@ def train_classical_models(
                 feature_type="tfidf+tabular",
             )
         )
-        logger.info("Linear SVM (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
-                    C,
-                    metric_results.values.get("f1", np.nan),
-                    metric_results.values.get("precision", np.nan),
-                    metric_results.values.get("recall", np.nan))
+        logger.info(
+            "Linear SVM (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
+            C,
+            metric_results.values.get("f1", np.nan),
+            metric_results.values.get("precision", np.nan),
+            metric_results.values.get("recall", np.nan),
+        )
 
     # LightGBM (tabular only)
     tab_train = bundle.tabular_train
@@ -146,7 +154,9 @@ def train_classical_models(
         clf.fit(tab_train.toarray(), y_train)
         train_time = time.time() - start
         val_scores = clf.predict_proba(tab_val.toarray())[:, 1]
-        threshold = optimal_threshold(y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+        threshold = optimal_threshold(
+            y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"]
+        )
         metric_results = compute_metrics(
             y_val,
             val_scores,
@@ -181,7 +191,9 @@ def _expand_grid(param_grid: Dict[str, Iterable]) -> List[Dict]:
     from itertools import product
 
     keys = [key for key, value in param_grid.items() if isinstance(value, (list, tuple))]
-    constant_params = {key: value for key, value in param_grid.items() if not isinstance(value, (list, tuple))}
+    constant_params = {
+        key: value for key, value in param_grid.items() if not isinstance(value, (list, tuple))
+    }
     grid = []
     if not keys:
         grid.append(constant_params)

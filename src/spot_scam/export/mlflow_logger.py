@@ -190,7 +190,9 @@ if pyfunc is not None:  # pragma: no branch
                 if artifact_key and artifact_key in context.artifacts:
                     self._calibration_model = joblib.load(context.artifacts[artifact_key])
 
-            prefer_quantized = self.prefer_quantized or os.getenv("SPOT_SCAM_USE_QUANTIZED", "").lower() in {
+            prefer_quantized = self.prefer_quantized or os.getenv(
+                "SPOT_SCAM_USE_QUANTIZED", ""
+            ).lower() in {
                 "1",
                 "true",
                 "yes",
@@ -209,7 +211,9 @@ if pyfunc is not None:  # pragma: no branch
                 else:
                     self._session = _create_session(base_model_path)
                     if "onnx_quantized" in context.artifacts:
-                        self._quantized_session = _create_session(context.artifacts["onnx_quantized"])
+                        self._quantized_session = _create_session(
+                            context.artifacts["onnx_quantized"]
+                        )
                     else:
                         self._quantized_session = None
                         self._use_quantized = False
@@ -217,13 +221,13 @@ if pyfunc is not None:  # pragma: no branch
                 self._output_names = [out.name for out in self._session.get_outputs()]
             elif self.variant == "transformer":
                 if AutoTokenizer is None:
-                    raise MLFlowExportError("transformers dependency is required for transformer pyfunc model.")
+                    raise MLFlowExportError(
+                        "transformers dependency is required for transformer pyfunc model."
+                    )
                 tokenizer_dir = context.artifacts["tokenizer"]
                 self._tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
                 self._max_length = (
-                    self._config.get("models", {})
-                    .get("transformer", {})
-                    .get("max_length", 128)
+                    self._config.get("models", {}).get("transformer", {}).get("max_length", 128)
                 )
                 use_quant_path = prefer_quantized and "onnx_quantized" in context.artifacts
                 base_model_path = context.artifacts["onnx_model"]
@@ -233,7 +237,9 @@ if pyfunc is not None:  # pragma: no branch
                 else:
                     self._session = _create_session(base_model_path)
                     if "onnx_quantized" in context.artifacts:
-                        self._quantized_session = _create_session(context.artifacts["onnx_quantized"])
+                        self._quantized_session = _create_session(
+                            context.artifacts["onnx_quantized"]
+                        )
                     else:
                         self._quantized_session = None
                         self._use_quantized = False
@@ -260,7 +266,11 @@ if pyfunc is not None:  # pragma: no branch
                 records = model_input.to_dict(orient="records")
             elif isinstance(model_input, dict):
                 records = [model_input]
-            elif isinstance(model_input, list) and model_input and isinstance(model_input[0], pd.DataFrame):
+            elif (
+                isinstance(model_input, list)
+                and model_input
+                and isinstance(model_input[0], pd.DataFrame)
+            ):
                 records = pd.concat(model_input, ignore_index=True).to_dict(orient="records")
             else:
                 records = list(model_input)
@@ -380,7 +390,9 @@ if pyfunc is not None:  # pragma: no branch
             return probabilities
 
         # ------------------------------------------------------------------ #
-        def _apply_calibration(self, probabilities: np.ndarray, raw_scores: np.ndarray) -> np.ndarray:
+        def _apply_calibration(
+            self, probabilities: np.ndarray, raw_scores: np.ndarray
+        ) -> np.ndarray:
             method = (self._calibration or {}).get("method", "none")
             if method == "none":
                 return probabilities
@@ -394,7 +406,9 @@ if pyfunc is not None:  # pragma: no branch
                 if self._calibration_model is None:
                     raise MLFlowExportError("Isotonic calibration artefact missing.")
                 return np.asarray(self._calibration_model.predict(raw_scores))  # type: ignore[call-arg, no-any-return]
-            logger.warning("Unknown calibration method '%s'; defaulting to uncalibrated probabilities.", method)
+            logger.warning(
+                "Unknown calibration method '%s'; defaulting to uncalibrated probabilities.", method
+            )
             return probabilities
 
         # ------------------------------------------------------------------ #
@@ -410,6 +424,8 @@ else:  # pragma: no cover - mlflow optional dependency
     class SpotScamPyfuncModel:  # type: ignore[override]
         def __init__(self, *args: Any, **kwargs: Any) -> None:
             raise MLFlowExportError("MLflow pyfunc dependencies are not installed.")
+
+
 def log_model_to_mlflow(
     best_model: "BestModelArtifacts",
     bundle: FeatureBundle,
@@ -523,7 +539,9 @@ def _prepare_export_bundle(
     Prepare ONNX artifacts and pyfunc model depending on the chosen pipeline.
     """
     if best_model.model_type == "classical":
-        return _prepare_classical_export(best_model, bundle, config, export_root, mlflow_conf, splits)
+        return _prepare_classical_export(
+            best_model, bundle, config, export_root, mlflow_conf, splits
+        )
     if best_model.model_type == "transformer":
         return _prepare_transformer_export(best_model, config, export_root, mlflow_conf, splits)
     raise MLFlowExportError(f"Unsupported model type for MLflow export: {best_model.model_type}")
@@ -580,7 +598,9 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     return exp / exp.sum(axis=1, keepdims=True)
 
 
-def _serialize_calibration(best_model: "BestModelArtifacts", export_root: Path) -> Tuple[Dict[str, Any], Optional[Path]]:
+def _serialize_calibration(
+    best_model: "BestModelArtifacts", export_root: Path
+) -> Tuple[Dict[str, Any], Optional[Path]]:
     calibration = {"method": best_model.calibration_method or "none"}
     calibrator_path: Optional[Path] = None
     estimator = best_model.estimator
@@ -591,7 +611,9 @@ def _serialize_calibration(best_model: "BestModelArtifacts", export_root: Path) 
     if isinstance(estimator, IsotonicCalibratedModel):
         calibrator_path = export_root / "calibrator_model.joblib"
         joblib.dump(estimator.iso_model, calibrator_path)
-        calibration.update({"method": "isotonic", "artifact_key": "calibrator_model", "score_source": "logit"})
+        calibration.update(
+            {"method": "isotonic", "artifact_key": "calibrator_model", "score_source": "logit"}
+        )
     elif isinstance(estimator, CalibratedClassifierCV):
         calibrated = estimator.calibrated_classifiers_[0]
         cal = calibrated.calibrator
@@ -609,7 +631,9 @@ def _serialize_calibration(best_model: "BestModelArtifacts", export_root: Path) 
         else:  # isotonic via CalibratedClassifierCV
             calibrator_path = export_root / "calibrator_model.joblib"
             joblib.dump(cal, calibrator_path)
-            calibration.update({"method": "isotonic", "artifact_key": "calibrator_model", "score_source": "raw"})
+            calibration.update(
+                {"method": "isotonic", "artifact_key": "calibrator_model", "score_source": "raw"}
+            )
     else:
         calibration["method"] = "none"
 
@@ -633,8 +657,10 @@ def _build_signature() -> ModelSignature:
 
 def _empty_input_example(config: Dict[str, Any]) -> pd.DataFrame:
     fill_value = config.get("preprocessing", {}).get("fill_missing", "")
-    record: Dict[str, Any] = {name: fill_value if dtype == "string" else DEFAULT_NUMERIC_VALUES.get(name, 0)
-                              for name, dtype in API_INPUT_COLUMNS}
+    record: Dict[str, Any] = {
+        name: fill_value if dtype == "string" else DEFAULT_NUMERIC_VALUES.get(name, 0)
+        for name, dtype in API_INPUT_COLUMNS
+    }
     for col, default in DEFAULT_NUMERIC_VALUES.items():
         record[col] = default
     return pd.DataFrame([record])
@@ -642,7 +668,10 @@ def _empty_input_example(config: Dict[str, Any]) -> pd.DataFrame:
 
 def _collect_metrics(best_model: "BestModelArtifacts") -> Dict[str, float]:
     metrics: Dict[str, float] = {}
-    for split, metric in ("val", best_model.val_metrics.values), ("test", best_model.test_metrics.values):
+    for split, metric in ("val", best_model.val_metrics.values), (
+        "test",
+        best_model.test_metrics.values,
+    ):
         for key, value in metric.items():
             if value is None:
                 continue
@@ -782,7 +811,9 @@ def _prepare_classical_export(
 
     signature = None
     metrics = _collect_metrics(best_model)
-    params = _collect_params(best_model, config, opset, quantized_path is not None, prefer_quantized)
+    params = _collect_params(
+        best_model, config, opset, quantized_path is not None, prefer_quantized
+    )
     tags = _collect_tags(best_model)
 
     python_model = SpotScamPyfuncModel("classical", prefer_quantized=prefer_quantized)
@@ -807,7 +838,9 @@ def _prepare_transformer_export(
 ) -> ExportedModelArtifacts:
     _ = splits
     if ORTModelForSequenceClassification is None or AutoTokenizer is None:
-        raise MLFlowExportError("optimum[onnxruntime] and transformers are required for transformer export.")
+        raise MLFlowExportError(
+            "optimum[onnxruntime] and transformers are required for transformer export."
+        )
 
     export_conf = mlflow_conf.get("export", {})
     opset = int(export_conf.get("opset", 17))
@@ -815,7 +848,9 @@ def _prepare_transformer_export(
     prefer_quantized = bool(export_conf.get("prefer_quantized", True))
 
     model_dir = Path(best_model.extra.get("model_dir", ARTIFACTS_DIR / "transformer" / "best"))
-    tokenizer_dir = Path(best_model.extra.get("tokenizer_dir", ARTIFACTS_DIR / "transformer" / "tokenizer"))
+    tokenizer_dir = Path(
+        best_model.extra.get("tokenizer_dir", ARTIFACTS_DIR / "transformer" / "tokenizer")
+    )
     if not model_dir.exists():
         raise MLFlowExportError(f"Expected transformer directory does not exist: {model_dir}")
 
@@ -883,7 +918,9 @@ def _prepare_transformer_export(
 
     signature = None
     metrics = _collect_metrics(best_model)
-    params = _collect_params(best_model, config, opset, quantized_path is not None, prefer_quantized)
+    params = _collect_params(
+        best_model, config, opset, quantized_path is not None, prefer_quantized
+    )
     tags = _collect_tags(best_model)
 
     python_model = SpotScamPyfuncModel("transformer", prefer_quantized=prefer_quantized)

@@ -28,6 +28,7 @@ export default function TopNav() {
         </Badge>
       ),
     },
+    { href: "/chat", label: "Chat" },
   ];
 
   return (
@@ -44,9 +45,7 @@ export default function TopNav() {
                 key={link.href}
                 href={link.href}
                 className={`inline-flex items-center gap-2 rounded-full px-3 py-1 transition-colors ${
-                  active
-                    ? "bg-slate-800 text-slate-100"
-                    : "hover:bg-slate-800/70 text-slate-300"
+                  active ? "bg-slate-800 text-slate-100" : "hover:bg-slate-800/70 text-slate-300"
                 }`}
               >
                 <span>{link.label}</span>

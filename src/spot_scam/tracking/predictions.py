@@ -171,7 +171,9 @@ def get_review_queue(
     if policy == "gray-zone" and preds.empty and not predictions_df.empty:
         probs = predictions_df["probability"].astype(float)
         entropy = -(probs * np.log2(probs + 1e-9) + (1 - probs) * np.log2(1 - probs + 1e-9))
-        preds = predictions_df.assign(_entropy=entropy)[~predictions_df["request_id"].isin(reviewed_ids)]
+        preds = predictions_df.assign(_entropy=entropy)[
+            ~predictions_df["request_id"].isin(reviewed_ids)
+        ]
         preds = preds.sort_values("_entropy", ascending=False)
 
     preds = preds.drop_duplicates(subset=["request_id"], keep="first")

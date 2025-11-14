@@ -32,18 +32,26 @@ def compute_metrics(
 
     for metric_name in metrics_list:
         if metric_name == "f1":
-            results["f1"] = metrics.f1_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
+            results["f1"] = metrics.f1_score(
+                y_true, y_pred, pos_label=positive_label, zero_division=0
+            )
         elif metric_name == "precision":
-            results["precision"] = metrics.precision_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
+            results["precision"] = metrics.precision_score(
+                y_true, y_pred, pos_label=positive_label, zero_division=0
+            )
         elif metric_name == "recall":
-            results["recall"] = metrics.recall_score(y_true, y_pred, pos_label=positive_label, zero_division=0)
+            results["recall"] = metrics.recall_score(
+                y_true, y_pred, pos_label=positive_label, zero_division=0
+            )
         elif metric_name == "roc_auc":
             if len(unique_labels) > 1:
                 results["roc_auc"] = metrics.roc_auc_score(y_true, y_scores)
             else:
                 results["roc_auc"] = float("nan")
         elif metric_name == "average_precision":
-            results["pr_auc"] = metrics.average_precision_score(y_true, y_scores) if len(unique_labels) > 1 else 0.0
+            results["pr_auc"] = (
+                metrics.average_precision_score(y_true, y_scores) if len(unique_labels) > 1 else 0.0
+            )
         elif metric_name == "brier":
             results["brier"] = metrics.brier_score_loss(y_true, y_scores, pos_label=positive_label)
         else:

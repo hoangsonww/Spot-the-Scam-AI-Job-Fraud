@@ -111,13 +111,17 @@ class PredictionExplanation(BaseModel):
 
 class PredictionResponse(BaseModel):
     request_id: str = Field(..., description="Identifier for this prediction request.")
-    probability_fraud: float = Field(..., description="Calibrated probability of the posting being fraudulent.")
+    probability_fraud: float = Field(
+        ..., description="Calibrated probability of the posting being fraudulent."
+    )
     binary_label: int = Field(..., description="Thresholded label (1 = fraud).")
     decision: str = Field(..., description="Final decision after applying the gray-zone policy.")
     threshold: float = Field(..., description="Threshold used to assign binary_label.")
     gray_zone: Dict[str, Any] = Field(..., description="Gray-zone policy summary.")
     meta: Dict[str, Optional[str]] = Field(..., description="Metadata about the serving model.")
-    explanation: PredictionExplanation = Field(..., description="Local explanation for the prediction.")
+    explanation: PredictionExplanation = Field(
+        ..., description="Local explanation for the prediction."
+    )
 
 
 class PredictionBatchRequest(BaseModel):
@@ -149,6 +153,7 @@ class LatencySummaryPoint(BaseModel):
 class LatencySummaryResponse(BaseModel):
     items: List[LatencySummaryPoint]
 
+
 class SliceMetric(BaseModel):
     slice: str
     category: str
@@ -156,6 +161,7 @@ class SliceMetric(BaseModel):
     f1: Optional[float] = None
     precision: Optional[float] = None
     recall: Optional[float] = None
+
 
 class SliceMetricsResponse(BaseModel):
     items: List[SliceMetric]
@@ -205,6 +211,36 @@ class FeedbackIn(BaseModel):
     notes: Optional[str] = None
 
 
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant", "system"]
+    content: str
+    timestamp: Optional[datetime] = None
+
+
+class ChatContext(BaseModel):
+    request_id: Optional[str] = None
+    job_posting: Optional[JobPostingInput] = None
+    prediction: Optional[PredictionResponse] = None
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User message to send to the chatbot.")
+    context: Optional[ChatContext] = Field(
+        default=None, description="Optional context from fraud detection results."
+    )
+    session_id: Optional[str] = Field(
+        default=None, description="Optional session ID for conversation continuity."
+    )
+    history: Optional[List[ChatMessage]] = Field(
+        default=None, description="Previous conversation messages for context."
+    )
+
+
+class ChatStreamChunk(BaseModel):
+    chunk: str = Field(..., description="Partial response chunk from the LLM.")
+    done: bool = Field(default=False, description="Whether this is the final chunk.")
+
+
 __all__ = [
     "JobPostingInput",
     "PredictionBatchRequest",
@@ -225,4 +261,8 @@ __all__ = [
     "CasesResponse",
     "ReviewCase",
     "FeedbackIn",
+    "ChatMessage",
+    "ChatContext",
+    "ChatRequest",
+    "ChatStreamChunk",
 ]

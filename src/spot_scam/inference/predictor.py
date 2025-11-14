@@ -41,7 +41,11 @@ class FraudPredictor:
         }
         self.model_type = self.metadata["model_type"]
         self.feature_type = self.metadata.get("feature_type", "tfidf+tabular")
-        self.use_quantized = os.getenv("SPOT_SCAM_USE_QUANTIZED", "").lower() in {"1", "true", "yes"}
+        self.use_quantized = os.getenv("SPOT_SCAM_USE_QUANTIZED", "").lower() in {
+            "1",
+            "true",
+            "yes",
+        }
 
         if self.model_type == "classical":
             self._load_classical_artifacts()
@@ -166,7 +170,9 @@ class FraudPredictor:
                     "category": str(row.get("category", "")),
                     "count": int(row.get("count", 0) or 0),
                     "f1": float(row["f1"]) if pd.notna(row.get("f1")) else None,
-                    "precision": float(row["precision"]) if pd.notna(row.get("precision")) else None,
+                    "precision": (
+                        float(row["precision"]) if pd.notna(row.get("precision")) else None
+                    ),
                     "recall": float(row["recall"]) if pd.notna(row.get("recall")) else None,
                 }
             )
@@ -186,7 +192,9 @@ class FraudPredictor:
         self.model = joblib.load(self.artifacts_dir / "model.joblib")
         self.vectorizer = joblib.load(self.artifacts_dir / "features" / "tfidf_vectorizer.joblib")
         self.scaler = joblib.load(self.artifacts_dir / "features" / "tabular_scaler.joblib")
-        self.feature_names: List[str] = list(joblib.load(self.artifacts_dir / "features" / "tabular_feature_names.joblib"))
+        self.feature_names: List[str] = list(
+            joblib.load(self.artifacts_dir / "features" / "tabular_feature_names.joblib")
+        )
         base_path = self.artifacts_dir / "base_model.joblib"
         self.base_model = joblib.load(base_path) if base_path.exists() else None
         self.tfidf_feature_names = self.vectorizer.get_feature_names_out()
@@ -194,7 +202,9 @@ class FraudPredictor:
     def _load_transformer_artifacts(self) -> None:
         extra = self.metadata.get("extra", {})
         model_dir = Path(extra.get("model_dir", self.artifacts_dir / "transformer" / "best"))
-        tokenizer_dir = Path(extra.get("tokenizer_dir", self.artifacts_dir / "transformer" / "tokenizer"))
+        tokenizer_dir = Path(
+            extra.get("tokenizer_dir", self.artifacts_dir / "transformer" / "tokenizer")
+        )
         if not model_dir.is_absolute():
             model_dir = self.artifacts_dir / model_dir
         if not tokenizer_dir.is_absolute():
@@ -255,7 +265,9 @@ class FraudPredictor:
 
         outputs = []
         contexts = []
-        for idx, (record, prob, label, decision) in enumerate(zip(records, probabilities, labels, decisions)):
+        for idx, (record, prob, label, decision) in enumerate(
+            zip(records, probabilities, labels, decisions)
+        ):
             tabular_dict = (
                 {k: float(v) for k, v in tabular_snapshot.iloc[idx].to_dict().items()}
                 if tabular_snapshot is not None
@@ -274,7 +286,10 @@ class FraudPredictor:
                     "decision": decision,
                     "threshold": self.threshold,
                     "gray_zone": band,
-                    "meta": {"model_type": self.model_type, "model_name": self.metadata.get("model_name")},
+                    "meta": {
+                        "model_type": self.model_type,
+                        "model_name": self.metadata.get("model_name"),
+                    },
                     "explanation": explanations[idx] if explanations else {},
                 }
             )
@@ -334,12 +349,18 @@ class FraudPredictor:
 
         if not self.use_quantized:
             try:
-                probabilities, raw_scores, token_scores = self._run_transformer_with_gradients(encodings)
+                probabilities, raw_scores, token_scores = self._run_transformer_with_gradients(
+                    encodings
+                )
             except RuntimeError as exc:
                 logger.warning("Falling back to attention-based transformer explanations: %s", exc)
-                probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(encodings)
+                probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(
+                    encodings
+                )
         else:
-            probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(encodings)
+            probabilities, raw_scores, token_scores = self._run_transformer_with_attentions(
+                encodings
+            )
 
         explanations = self._build_transformer_explanations(
             cached_cpu,
@@ -354,7 +375,9 @@ class FraudPredictor:
             "tabular_df": None,
         }
 
-    def _run_transformer_with_gradients(self, encodings: Dict[str, torch.Tensor]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def _run_transformer_with_gradients(
+        self, encodings: Dict[str, torch.Tensor]
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         embedding_layer = self.model.get_input_embeddings()
         input_embeddings = embedding_layer(encodings["input_ids"]).detach()
         input_embeddings.requires_grad_(True)
@@ -462,11 +485,17 @@ class FraudPredictor:
 
             summary_parts = [f"Transformer probability {probabilities[idx]:.1%}."]
             if pos_names:
-                summary_parts.append(f"{list_to_text(pos_names).capitalize()} increased the fraud score")
+                summary_parts.append(
+                    f"{list_to_text(pos_names).capitalize()} increased the fraud score"
+                )
             if neg_names:
-                summary_parts.append(f"{list_to_text(neg_names).capitalize()} pushed the score toward legit")
+                summary_parts.append(
+                    f"{list_to_text(neg_names).capitalize()} pushed the score toward legit"
+                )
             if len(summary_parts) == 1:
-                summary_parts.append("No dominant tokens pulled the prediction in either direction.")
+                summary_parts.append(
+                    "No dominant tokens pulled the prediction in either direction."
+                )
             summary_text = " ".join(summary_parts)
 
             if summary_text and not summary_text.endswith("."):
@@ -504,12 +533,7 @@ class FraudPredictor:
         explanations: List[Dict[str, Any]] = []
 
         def humanize(name: str) -> str:
-            return (
-                name.replace("scam_term_", "")
-                .replace("_", " ")
-                .replace("  ", " ")
-                .strip()
-            )
+            return name.replace("scam_term_", "").replace("_", " ").replace("  ", " ").strip()
 
         def list_to_text(items: List[str]) -> str:
             if not items:
@@ -526,7 +550,7 @@ class FraudPredictor:
             tabular_dim = max(0, aligned - tfidf_dim)
 
         tfidf_coef = coef[:tfidf_dim]
-        tabular_coef = coef[tfidf_dim:tfidf_dim + tabular_dim]
+        tabular_coef = coef[tfidf_dim : tfidf_dim + tabular_dim]
 
         for i in range(tfidf_matrix.shape[0]):
             contributions: List[Dict[str, Any]] = []
@@ -577,13 +601,21 @@ class FraudPredictor:
 
             summary_parts: List[str] = []
             if pos_names:
-                summary_parts.append(f"{list_to_text(pos_names).capitalize()} pushed the score toward fraud")
+                summary_parts.append(
+                    f"{list_to_text(pos_names).capitalize()} pushed the score toward fraud"
+                )
             if neg_names:
-                summary_parts.append(f"{list_to_text(neg_names).capitalize()} reinforced the legit decision")
+                summary_parts.append(
+                    f"{list_to_text(neg_names).capitalize()} reinforced the legit decision"
+                )
             if len(summary_parts) > 1:
                 summary_text = "; ".join(summary_parts)
             else:
-                summary_text = summary_parts[0] if summary_parts else "No strong drivers were found for this decision."
+                summary_text = (
+                    summary_parts[0]
+                    if summary_parts
+                    else "No strong drivers were found for this decision."
+                )
 
             if summary_text and not summary_text.endswith("."):
                 summary_text = summary_text + "."
