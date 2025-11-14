@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { getApiBaseUrl } from "./api";
+import { getApiBaseUrl } from "./config";
 import type { ReviewCase, PredictionResponse, JobPostingInput } from "./api";
 
 export type BackendStatus = {

@@ -289,15 +289,18 @@ flowchart LR
   </a>
 </p>
 
-> [!NOTE]
-> Demo video available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
-
 ### Frontend Highlights
 - App directory with `page.tsx` wrapper around `HomePage`.
 - `lib/api.ts` centralizes REST calls (metadata, predictions, insights).
 - `home-page.tsx` uses SWR for metadata + insights, handles prediction form, and renders natural-language rationales for each decision alongside contribution lists.
 - shadcn components (Card, Tabs, Table, Badge, etc.) for cohesive styling.
-- `.env.local` controls `NEXT_PUBLIC_API_BASE_URL`.
+- `.env.local` controls `NEXT_PUBLIC_API_BASE_URL`
+
+> [!IMPORTANT]
+> **DEMO FRONTEND: Hosted at [https://spot-the-scam-job-fraud.vercel.app/](https://spot-the-scam-job-fraud.vercel.app/).**
+
+> [!NOTE]
+> Quick demo video available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
 
 ---
 

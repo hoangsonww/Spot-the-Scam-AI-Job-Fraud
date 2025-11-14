@@ -1,7 +1,6 @@
 import * as MockData from "./mock-data";
 import { useBackendStatus, useDemoReviewQueue } from "./backend-status";
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import { API_BASE_URL, getApiBaseUrl } from "./config";
 
 // Function to check if we should use mock data
 function shouldUseMockData(): boolean {
@@ -354,9 +353,8 @@ export async function fetchHealth() {
   return request<{ status: string; model_type: string; threshold: number }>("/health");
 }
 
-export function getApiBaseUrl(): string {
-  return API_BASE_URL;
-}
+// Re-export getApiBaseUrl for backward compatibility
+export { getApiBaseUrl };
 
 // Chat API types
 export type ChatContext = {
