@@ -29,6 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import TopNav from "@/components/top-nav";
+import { DemoModeBanner } from "@/components/demo-mode-banner";
 import {
   fetchMetadata,
   fetchTokenFrequency,
@@ -666,6 +667,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
       <TopNav />
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-8">
+        <DemoModeBanner />
         <header className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Badge variant="secondary" className="w-fit">

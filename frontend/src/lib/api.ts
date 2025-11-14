@@ -1,4 +1,20 @@
+import * as MockData from "./mock-data";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+// Function to check if we should use mock data
+function shouldUseMockData(): boolean {
+  if (typeof window === "undefined") return false; // Server-side, try real API
+
+  // Check if backend status store indicates disconnection
+  try {
+    const backendStatusModule = require("./backend-status");
+    const status = backendStatusModule.useBackendStatus.getState();
+    return !status.isConnected;
+  } catch {
+    return false;
+  }
+}
 
 export type JobPostingInput = {
   title: string;
@@ -209,30 +225,51 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchMetadata(): Promise<MetadataResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchMetadata();
+  }
   return request<MetadataResponse>("/metadata");
 }
 
 export async function fetchModelSummaries(limit = 20): Promise<ModelsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchModelSummaries(limit);
+  }
   return request<ModelsResponse>(`/models?limit=${limit}`);
 }
 
 export async function fetchTokenImportance(limit = 20): Promise<TokenImportanceResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchTokenImportance(limit);
+  }
   return request<TokenImportanceResponse>(`/insights/token-importance?limit=${limit}`);
 }
 
 export async function fetchTokenFrequency(limit = 20): Promise<TokenFrequencyResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchTokenFrequency(limit);
+  }
   return request<TokenFrequencyResponse>(`/insights/token-frequency?limit=${limit}`);
 }
 
 export async function fetchThresholdMetrics(limit = 50): Promise<ThresholdMetricsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchThresholdMetrics(limit);
+  }
   return request<ThresholdMetricsResponse>(`/insights/threshold-metrics?limit=${limit}`);
 }
 
 export async function fetchLatencySummary(): Promise<LatencySummaryResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchLatencySummary();
+  }
   return request<LatencySummaryResponse>("/insights/latency");
 }
 
 export async function fetchSliceMetrics(limit = 6): Promise<SliceMetricsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchSliceMetrics(limit);
+  }
   return request<SliceMetricsResponse>(`/insights/slice-metrics?limit=${limit}`);
 }
 
@@ -241,6 +278,9 @@ export async function fetchReviewCases(
   policy = "gray-zone",
   offset = 0
 ): Promise<CasesResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchReviewCases(limit, policy, offset);
+  }
   return request<CasesResponse>(`/cases?policy=${policy}&limit=${limit}&offset=${offset}`);
 }
 
@@ -250,6 +290,25 @@ export async function fetchReviewCount(): Promise<number> {
 }
 
 export async function submitFeedback(records: FeedbackPayload[]): Promise<void> {
+  if (shouldUseMockData()) {
+    // Simulate successful feedback submission in demo mode
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // Remove cases from demo queue
+    if (typeof window !== "undefined") {
+      try {
+        const backendStatusModule = require("./backend-status");
+        const demoQueue = backendStatusModule.useDemoReviewQueue.getState();
+        records.forEach((record) => {
+          demoQueue.removeCase(record.request_id);
+        });
+      } catch (e) {
+        console.error("Failed to remove cases from demo queue:", e);
+      }
+    }
+
+    return;
+  }
   await request<{ inserted: number }>("/feedback", {
     method: "POST",
     body: JSON.stringify(records),
@@ -257,6 +316,9 @@ export async function submitFeedback(records: FeedbackPayload[]): Promise<void> 
 }
 
 export async function predictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockPredictBatch(instances);
+  }
   return request<PredictionBatchResponse>("/predict", {
     method: "POST",
     body: JSON.stringify({ instances }),
@@ -268,10 +330,29 @@ export async function predictSingle(instance: JobPostingInput): Promise<Predicti
   if (!predictions.length) {
     throw new Error("No predictions returned by API");
   }
-  return predictions[0];
+
+  const prediction = predictions[0];
+
+  // In demo mode, add gray-zone cases to the review queue
+  if (shouldUseMockData() && prediction.decision === "review") {
+    if (typeof window !== "undefined") {
+      try {
+        const backendStatusModule = require("./backend-status");
+        const demoQueue = backendStatusModule.useDemoReviewQueue.getState();
+        demoQueue.addCase(prediction, instance);
+      } catch (e) {
+        console.error("Failed to add case to demo queue:", e);
+      }
+    }
+  }
+
+  return prediction;
 }
 
 export async function fetchHealth() {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchHealth();
+  }
   return request<{ status: string; model_type: string; threshold: number }>("/health");
 }
 
@@ -311,6 +392,11 @@ export async function streamChat(
   onComplete: () => void,
   onError: (error: Error) => void
 ): Promise<void> {
+  // Use mock chat in demo mode
+  if (shouldUseMockData()) {
+    return MockData.mockStreamChat(request.message, onChunk, onComplete, onError);
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/chat`, {
       method: "POST",

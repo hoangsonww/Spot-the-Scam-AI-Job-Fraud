@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import useSWR, { mutate as mutateGlobal } from "swr";
 import { fetchReviewCases, submitFeedback, type ReviewCase } from "@/lib/api";
 import TopNav from "@/components/top-nav";
+import { DemoModeBanner } from "@/components/demo-mode-banner";
 import { formatContribution, formatMetric, ContributionColumn } from "@/components/home-page";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -128,6 +129,7 @@ export default function ReviewQueue() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
       <TopNav />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-8">
+        <DemoModeBanner />
         <header className="flex flex-col gap-3">
           <Badge variant="secondary" className="w-fit">
             Human-in-the-loop Queue
