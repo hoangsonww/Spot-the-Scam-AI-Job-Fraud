@@ -1,4 +1,5 @@
 import * as MockData from "./mock-data";
+import { useBackendStatus, useDemoReviewQueue } from "./backend-status";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 
@@ -8,8 +9,7 @@ function shouldUseMockData(): boolean {
 
   // Check if backend status store indicates disconnection
   try {
-    const backendStatusModule = require("./backend-status");
-    const status = backendStatusModule.useBackendStatus.getState();
+    const status = useBackendStatus.getState();
     return !status.isConnected;
   } catch {
     return false;
@@ -297,8 +297,7 @@ export async function submitFeedback(records: FeedbackPayload[]): Promise<void> 
     // Remove cases from demo queue
     if (typeof window !== "undefined") {
       try {
-        const backendStatusModule = require("./backend-status");
-        const demoQueue = backendStatusModule.useDemoReviewQueue.getState();
+        const demoQueue = useDemoReviewQueue.getState();
         records.forEach((record) => {
           demoQueue.removeCase(record.request_id);
         });
@@ -337,8 +336,7 @@ export async function predictSingle(instance: JobPostingInput): Promise<Predicti
   if (shouldUseMockData() && prediction.decision === "review") {
     if (typeof window !== "undefined") {
       try {
-        const backendStatusModule = require("./backend-status");
-        const demoQueue = backendStatusModule.useDemoReviewQueue.getState();
+        const demoQueue = useDemoReviewQueue.getState();
         demoQueue.addCase(prediction, instance);
       } catch (e) {
         console.error("Failed to add case to demo queue:", e);
