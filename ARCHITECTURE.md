@@ -283,6 +283,12 @@ flowchart LR
   </a>
 </p>
 
+<p align="center">
+  <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
+    <img src="experiments/figs/ui2.png" alt="UI Screenshot" width="100%"/>
+  </a>
+</p>
+
 > [!NOTE]
 > Demo video available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
 

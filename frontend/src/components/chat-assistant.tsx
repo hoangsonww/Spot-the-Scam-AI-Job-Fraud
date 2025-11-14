@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Trash2, Send, Loader2, Bot, User } from "lucide-react";
 import TopNav from "@/components/top-nav";
+import { DemoModeBanner } from "@/components/demo-mode-banner";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github.css";
 
@@ -27,6 +28,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const originalHtmlOverflow = document.documentElement.style.overflow;
@@ -45,6 +47,10 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
       try {
         const parsed = JSON.parse(saved);
         setMessages(parsed);
+        // Scroll to bottom after loading messages
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+        }, 100);
       } catch (e) {
         console.error("Failed to parse chat history:", e);
       }
@@ -58,18 +64,14 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
   }, [messages]);
 
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
-
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    const shouldStickToBottom = distanceFromBottom < 120 || distanceFromBottom === 0;
-
-    if (shouldStickToBottom || streamingMessage || messages.length === 0) {
-      container.scrollTo({
-        top: container.scrollHeight,
-        behavior: "smooth",
+    // Always scroll to bottom when messages change or streaming
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: streamingMessage ? "auto" : "smooth", // Instant scroll while streaming
+        block: "end"
       });
-    }
+    });
   }, [messages, streamingMessage]);
 
   const handleSend = async () => {
@@ -85,6 +87,11 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
     setInput("");
     setIsLoading(true);
     setStreamingMessage("");
+
+    // Scroll to bottom after sending message
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
 
     const context = messages.length === 0 ? initialContext : null;
     let accumulatedResponse = "";
@@ -143,6 +150,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
       <TopNav />
 
       <main className="flex-1 mx-auto w-full max-w-6xl px-4 sm:px-8 py-6 flex flex-col overflow-hidden min-h-0">
+        <DemoModeBanner />
         <div className="mb-4 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-slate-100 p-2.5 border border-slate-200">
@@ -501,6 +509,9 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
                   </div>
                 </div>
               )}
+
+              {/* Scroll anchor - always at the bottom */}
+              <div ref={messagesEndRef} />
             </div>
 
             {/* Input Area */}
