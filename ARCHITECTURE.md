@@ -300,7 +300,7 @@ flowchart LR
 > **DEMO FRONTEND: Hosted at [https://spot-the-scam-job-fraud.vercel.app/](https://spot-the-scam-job-fraud.vercel.app/).**
 
 > [!NOTE]
-> Quick demo video available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
+> Quick demo video also available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
 
 ---
 
