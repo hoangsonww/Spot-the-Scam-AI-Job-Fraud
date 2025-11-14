@@ -49,7 +49,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
         setMessages(parsed);
         // Scroll to bottom after loading messages
         setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
+          messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" });
         }, 100);
       } catch (e) {
         console.error("Failed to parse chat history:", e);
@@ -69,7 +69,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({
         behavior: streamingMessage ? "auto" : "smooth", // Instant scroll while streaming
-        block: "end"
+        block: "nearest"
       });
     });
   }, [messages, streamingMessage]);
@@ -90,7 +90,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
 
     // Scroll to bottom after sending message
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 100);
 
     const context = messages.length === 0 ? initialContext : null;
