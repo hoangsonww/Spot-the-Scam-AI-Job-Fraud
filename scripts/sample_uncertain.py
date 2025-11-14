@@ -40,7 +40,9 @@ def main(
     ensure_directories()
     predictions = load_predictions_dataframe()
     if predictions.empty:
-        typer.secho("No prediction logs available. Run inference before sampling.", fg=typer.colors.YELLOW)
+        typer.secho(
+            "No prediction logs available. Run inference before sampling.", fg=typer.colors.YELLOW
+        )
         raise typer.Exit(code=0)
 
     feedback = load_feedback_dataframe()
@@ -62,7 +64,11 @@ def main(
         raise typer.Exit(code=1)
 
     sample = frame.head(limit).copy()
-    sample.drop(columns=[col for col in sample.columns if col.startswith("_")], inplace=True, errors="ignore")
+    sample.drop(
+        columns=[col for col in sample.columns if col.startswith("_")],
+        inplace=True,
+        errors="ignore",
+    )
 
     output.parent.mkdir(parents=True, exist_ok=True)
     sample.to_csv(output, index=False)

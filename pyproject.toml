@@ -52,7 +52,9 @@ dependencies = [
   "onnxruntime>=1.17.0",
   "onnxmltools>=1.11.0",
   "skl2onnx>=1.15.0",
-  "optimum[onnxruntime]>=1.17.0"
+  "optimum[onnxruntime]>=1.17.0",
+  "google-generativeai>=0.3.0",
+  "python-dotenv>=1.0.0"
 ]
 
 [project.optional-dependencies]

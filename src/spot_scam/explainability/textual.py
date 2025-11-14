@@ -60,6 +60,7 @@ def token_frequency_analysis(
     Compute frequency differences of tokens between predicted frauds and legits.
     """
     import collections
+
     prob_series = pd.Series(probabilities, index=df.index)
 
     predicted_positive = df.loc[prob_series >= threshold, "text_all"]
@@ -73,7 +74,10 @@ def token_frequency_analysis(
     for text in predicted_negative:
         negative_counter.update(text.split())
 
-    tokens = set(list(dict(positive_counter.most_common(top_k)).keys()) + list(dict(negative_counter.most_common(top_k)).keys()))
+    tokens = set(
+        list(dict(positive_counter.most_common(top_k)).keys())
+        + list(dict(negative_counter.most_common(top_k)).keys())
+    )
     records = []
     for token in tokens:
         pos_freq = positive_counter[token]

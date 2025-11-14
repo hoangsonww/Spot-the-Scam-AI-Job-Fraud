@@ -39,7 +39,13 @@ from spot_scam.tracking.logger import append_run_record
 from spot_scam.tracking.feedback import load_feedback_dataframe
 from spot_scam.policy.gray_zone import classify_probability
 from spot_scam.utils.logging import configure_logging
-from spot_scam.utils.paths import ARTIFACTS_DIR, FIGS_DIR, TABLES_DIR, EXPERIMENTS_DIR, ensure_directories
+from spot_scam.utils.paths import (
+    ARTIFACTS_DIR,
+    FIGS_DIR,
+    TABLES_DIR,
+    EXPERIMENTS_DIR,
+    ensure_directories,
+)
 from spot_scam.evaluation.reporting import render_markdown_report
 from spot_scam.explainability.textual import top_tfidf_terms, token_frequency_analysis
 from spot_scam.explainability.shapley import compute_tabular_shap
@@ -135,7 +141,9 @@ def run(
         if feedback_override_count:
             logger.info("Applied reviewer feedback to %d samples.", feedback_override_count)
         else:
-            logger.info("No matching reviewer feedback hashes found; proceeding with baseline labels.")
+            logger.info(
+                "No matching reviewer feedback hashes found; proceeding with baseline labels."
+            )
 
     splits = create_splits(processed_df, config, persist=True)
     baseline_val_labels = splits.val["_original_label"].to_numpy()
@@ -146,7 +154,11 @@ def run(
         "test": int(splits.test["_feedback_applied"].sum()),
     }
     for split_df in (splits.train, splits.val, splits.test):
-        split_df.drop(columns=["_original_label", "_feedback_applied", "text_hash"], inplace=True, errors="ignore")
+        split_df.drop(
+            columns=["_original_label", "_feedback_applied", "text_hash"],
+            inplace=True,
+            errors="ignore",
+        )
 
     processed_dir = Path(config["data"]["processed_dir"])
     processed_dir.mkdir(parents=True, exist_ok=True)
@@ -307,7 +319,9 @@ def _prepare_features_for_run(run: ModelRun, bundle: FeatureBundle, splits: Spli
     return X_val, X_test
 
 
-def _evaluate_transformer_on_test(run: TransformerRun, config: Dict, y_test: np.ndarray) -> BestModelArtifacts:
+def _evaluate_transformer_on_test(
+    run: TransformerRun, config: Dict, y_test: np.ndarray
+) -> BestModelArtifacts:
     test_metrics = compute_metrics(
         run.test_labels,
         run.test_scores,

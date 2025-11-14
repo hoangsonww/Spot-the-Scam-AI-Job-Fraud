@@ -1,14 +1,10 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react"
-import useSWR, { mutate as mutateGlobal } from "swr"
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import useSWR, { mutate as mutateGlobal } from "swr";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,10 +12,10 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -27,12 +23,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Textarea } from "@/components/ui/textarea"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
-import TopNav from "@/components/top-nav"
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import TopNav from "@/components/top-nav";
 import {
   fetchMetadata,
   fetchTokenFrequency,
@@ -54,7 +50,7 @@ import {
   type LatencySummaryResponse,
   type FeatureContribution,
   type SliceMetricsResponse,
-} from "@/lib/api"
+} from "@/lib/api";
 import {
   Activity,
   AlertTriangle,
@@ -72,13 +68,15 @@ import {
   ShieldCheck,
   Target,
   Info,
-} from "lucide-react"
+  MessageCircle,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
-type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>
+type MetricKey = keyof NonNullable<MetadataResponse["val_metrics"]>;
 
-type BadgeTone = "default" | "destructive" | "secondary" | "outline"
+type BadgeTone = "default" | "destructive" | "secondary" | "outline";
 
-type ToggleField = "telecommuting" | "has_company_logo" | "has_questions"
+type ToggleField = "telecommuting" | "has_company_logo" | "has_questions";
 
 type FormFields = Pick<
   JobPostingInput,
@@ -94,10 +92,10 @@ type FormFields = Pick<
   | "industry"
   | "function"
 > & {
-  telecommuting: boolean
-  has_company_logo: boolean
-  has_questions: boolean
-}
+  telecommuting: boolean;
+  has_company_logo: boolean;
+  has_questions: boolean;
+};
 
 const samplePosting: FormFields = {
   title: "Remote Accounts Payable Specialist (Immediate Start)",
@@ -118,7 +116,7 @@ const samplePosting: FormFields = {
   telecommuting: true,
   has_company_logo: true,
   has_questions: false,
-}
+};
 
 export const metricLabels: Record<MetricKey, string> = {
   f1: "F1",
@@ -127,14 +125,14 @@ export const metricLabels: Record<MetricKey, string> = {
   roc_auc: "ROC AUC",
   pr_auc: "PR AUC",
   brier: "Brier",
-}
+};
 
-type SortDirection = "asc" | "desc"
+type SortDirection = "asc" | "desc";
 
 type SortConfig<K extends string> = {
-  key: K
-  direction: SortDirection
-}
+  key: K;
+  direction: SortDirection;
+};
 
 type LeaderboardSortKey =
   | "model"
@@ -143,23 +141,23 @@ type LeaderboardSortKey =
   | "test_precision"
   | "test_recall"
   | "threshold"
-  | "timestamp"
+  | "timestamp";
 
-type TokenFrequencySortKey = "token" | "positive_count" | "negative_count" | "difference"
+type TokenFrequencySortKey = "token" | "positive_count" | "negative_count" | "difference";
 
-const LEADERBOARD_PAGE_SIZE = 10
-const ISO_TZ_REGEX = /[zZ]|[+-]\d\d:\d\d$/
+const LEADERBOARD_PAGE_SIZE = 10;
+const ISO_TZ_REGEX = /[zZ]|[+-]\d\d:\d\d$/;
 
 function normalizeUtcTimestampString(value: string): string {
-  return ISO_TZ_REGEX.test(value) ? value : `${value}Z`
+  return ISO_TZ_REGEX.test(value) ? value : `${value}Z`;
 }
 
 function parseLeaderboardTimestamp(value?: string | null): number | null {
   if (!value) {
-    return null
+    return null;
   }
-  const parsed = new Date(normalizeUtcTimestampString(value)).getTime()
-  return Number.isNaN(parsed) ? null : parsed
+  const parsed = new Date(normalizeUtcTimestampString(value)).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function extractLeaderboardSortValue(
@@ -168,21 +166,21 @@ function extractLeaderboardSortValue(
 ): string | number | null {
   switch (key) {
     case "model":
-      return summary.model_name?.toLowerCase() ?? null
+      return summary.model_name?.toLowerCase() ?? null;
     case "val_f1":
-      return summary.validation?.f1 ?? null
+      return summary.validation?.f1 ?? null;
     case "test_f1":
-      return summary.test?.f1 ?? null
+      return summary.test?.f1 ?? null;
     case "test_precision":
-      return summary.test?.precision ?? null
+      return summary.test?.precision ?? null;
     case "test_recall":
-      return summary.test?.recall ?? null
+      return summary.test?.recall ?? null;
     case "threshold":
-      return summary.threshold ?? null
+      return summary.threshold ?? null;
     case "timestamp":
-      return parseLeaderboardTimestamp(summary.timestamp)
+      return parseLeaderboardTimestamp(summary.timestamp);
     default:
-      return null
+      return null;
   }
 }
 
@@ -192,48 +190,46 @@ function extractTokenFrequencySortValue(
 ): string | number | null {
   switch (key) {
     case "token":
-      return item.token?.toLowerCase() ?? null
+      return item.token?.toLowerCase() ?? null;
     case "positive_count":
-      return item.positive_count ?? null
+      return item.positive_count ?? null;
     case "negative_count":
-      return item.negative_count ?? null
+      return item.negative_count ?? null;
     case "difference":
-      return item.difference ?? null
+      return item.difference ?? null;
     default:
-      return null
+      return null;
   }
 }
 
 function compareSortValues(a: string | number | null, b: string | number | null): number {
   const isMissing = (value: string | number | null) =>
-    value === null ||
-    value === undefined ||
-    (typeof value === "number" && Number.isNaN(value))
+    value === null || value === undefined || (typeof value === "number" && Number.isNaN(value));
 
-  const aMissing = isMissing(a)
-  const bMissing = isMissing(b)
+  const aMissing = isMissing(a);
+  const bMissing = isMissing(b);
 
   if (aMissing && bMissing) {
-    return 0
+    return 0;
   }
   if (aMissing) {
-    return 1
+    return 1;
   }
   if (bMissing) {
-    return -1
+    return -1;
   }
   if (typeof a === "number" && typeof b === "number") {
-    return a - b
+    return a - b;
   }
-  return String(a).localeCompare(String(b))
+  return String(a).localeCompare(String(b));
 }
 
 interface SortableHeadProps<K extends string> {
-  label: string
-  sortKey: K
-  currentSort: SortConfig<K> | null
-  onToggle: (key: K) => void
-  align?: "left" | "right"
+  label: string;
+  sortKey: K;
+  currentSort: SortConfig<K> | null;
+  onToggle: (key: K) => void;
+  align?: "left" | "right";
 }
 
 function SortableTableHead<K extends string>({
@@ -243,11 +239,10 @@ function SortableTableHead<K extends string>({
   onToggle,
   align = "left",
 }: SortableHeadProps<K>) {
-  const direction = currentSort?.key === sortKey ? currentSort.direction : null
+  const direction = currentSort?.key === sortKey ? currentSort.direction : null;
   const ariaSort =
-    direction === "asc" ? "ascending" : direction === "desc" ? "descending" : undefined
-  const alignmentClasses =
-    align === "right" ? "justify-end text-right" : "justify-start text-left"
+    direction === "asc" ? "ascending" : direction === "desc" ? "descending" : undefined;
+  const alignmentClasses = align === "right" ? "justify-end text-right" : "justify-start text-left";
 
   return (
     <TableHead className={align === "right" ? "text-right" : undefined} aria-sort={ariaSort}>
@@ -266,66 +261,67 @@ function SortableTableHead<K extends string>({
         )}
       </button>
     </TableHead>
-  )
+  );
 }
 
 export function formatMetric(value?: number | null, options?: Intl.NumberFormatOptions) {
   if (value === undefined || value === null) {
-    return "-"
+    return "-";
   }
 
   const formatter = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 3,
     minimumFractionDigits: options?.style === "percent" ? 1 : 2,
     ...options,
-  })
-  return formatter.format(value)
+  });
+  return formatter.format(value);
 }
 
 export function formatContribution(value?: number | null) {
   if (value === undefined || value === null || Number.isNaN(value)) {
-    return "0.000"
+    return "0.000";
   }
   const formatter = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
-  })
-  const formatted = formatter.format(value)
-  return value >= 0 ? `+${formatted}` : formatted
+  });
+  const formatted = formatter.format(value);
+  return value >= 0 ? `+${formatted}` : formatted;
 }
 
 function normalizeTextField(value?: string | null): string | null {
   if (value === undefined || value === null) {
-    return null
+    return null;
   }
-  const trimmed = value.trim()
-  return trimmed.length ? trimmed : null
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
 }
 
 function metricToPercent(value?: number | null) {
   if (value === undefined || value === null) {
-    return 0
+    return 0;
   }
-  return Math.min(100, Math.max(0, Math.round(value * 100)))
+  return Math.min(100, Math.max(0, Math.round(value * 100)));
 }
 
 function formatTimestamp(value?: string | null) {
   if (!value) {
-    return "-"
+    return "-";
   }
-  const parsed = new Date(normalizeUtcTimestampString(value))
+  const parsed = new Date(normalizeUtcTimestampString(value));
   if (Number.isNaN(parsed.getTime())) {
-    return "-"
+    return "-";
   }
-  return parsed.toLocaleString()
+  return parsed.toLocaleString();
 }
 
 export default function HomePage() {
-  const [form, setForm] = useState<FormFields>(samplePosting)
-  const [prediction, setPrediction] = useState<PredictionResponse | null>(null)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), [])
+  const router = useRouter();
+  const [form, setForm] = useState<FormFields>(samplePosting);
+  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
 
   const {
     data: metadata,
@@ -333,91 +329,105 @@ export default function HomePage() {
     isLoading: isLoadingMetadata,
   } = useSWR<MetadataResponse>("metadata", fetchMetadata, {
     revalidateOnFocus: false,
-  })
+  });
 
   const {
     data: modelsResponse,
     error: modelsError,
     isLoading: isLoadingModels,
-  } = useSWR<ModelsResponse>(
-    "models",
-    () => fetchModelSummaries(50),
-    { revalidateOnFocus: false }
-  )
+  } = useSWR<ModelsResponse>("models", () => fetchModelSummaries(50), { revalidateOnFocus: false });
 
-  const {
-    data: tokenImportance,
-    isLoading: isLoadingImportance,
-  } = useSWR<TokenImportanceResponse>(
+  const { data: tokenImportance, isLoading: isLoadingImportance } = useSWR<TokenImportanceResponse>(
     "token-importance",
     () => fetchTokenImportance(12),
     { revalidateOnFocus: false }
-  )
+  );
 
-  const {
-    data: tokenFrequency,
-    isLoading: isLoadingFrequency,
-  } = useSWR<TokenFrequencyResponse>(
+  const { data: tokenFrequency, isLoading: isLoadingFrequency } = useSWR<TokenFrequencyResponse>(
     "token-frequency",
     () => fetchTokenFrequency(12),
     { revalidateOnFocus: false }
-  )
+  );
 
-  const {
-    data: thresholdMetrics,
-    isLoading: isLoadingThresholds,
-  } = useSWR<ThresholdMetricsResponse>(
-    "threshold-metrics",
-    () => fetchThresholdMetrics(40),
-    { revalidateOnFocus: false }
-  )
+  const { data: thresholdMetrics, isLoading: isLoadingThresholds } =
+    useSWR<ThresholdMetricsResponse>("threshold-metrics", () => fetchThresholdMetrics(40), {
+      revalidateOnFocus: false,
+    });
 
-  const {
-    data: latencySummary,
-    isLoading: isLoadingLatency,
-  } = useSWR<LatencySummaryResponse>(
+  const { data: latencySummary, isLoading: isLoadingLatency } = useSWR<LatencySummaryResponse>(
     "latency-summary",
     () => fetchLatencySummary(),
     { revalidateOnFocus: false }
-  )
+  );
 
   const {
     data: sliceMetrics,
     error: sliceMetricsError,
     isLoading: isLoadingSliceMetrics,
-  } = useSWR<SliceMetricsResponse>(
-    "slice-metrics",
-    () => fetchSliceMetrics(6),
-    { revalidateOnFocus: false }
-  )
+  } = useSWR<SliceMetricsResponse>("slice-metrics", () => fetchSliceMetrics(6), {
+    revalidateOnFocus: false,
+  });
 
   const handleChange = useCallback(
     (field: keyof FormFields) =>
       (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const value = event.target.value
-        setForm((prev) => ({ ...prev, [field]: value }))
+        const value = event.target.value;
+        setForm((prev) => ({ ...prev, [field]: value }));
       },
     []
-  )
+  );
 
   const handleToggleChange = useCallback(
     (field: ToggleField) => (event: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prev) => ({ ...prev, [field]: event.target.checked }))
+      setForm((prev) => ({ ...prev, [field]: event.target.checked }));
     },
     []
-  )
+  );
 
   const resetToSample = useCallback(() => {
-    setForm(() => ({ ...samplePosting }))
-    setPrediction(null)
-    setError(null)
-  }, [])
+    setForm(() => ({ ...samplePosting }));
+    setPrediction(null);
+    setError(null);
+  }, []);
+
+  const handleAskAI = useCallback(() => {
+    if (!prediction) return;
+
+    // Build job posting from form
+    const jobPosting: JobPostingInput = {
+      title: form.title.trim(),
+      location: normalizeTextField(form.location),
+      company_profile: normalizeTextField(form.company_profile),
+      description: normalizeTextField(form.description),
+      requirements: normalizeTextField(form.requirements),
+      benefits: normalizeTextField(form.benefits),
+      employment_type: normalizeTextField(form.employment_type),
+      required_experience: normalizeTextField(form.required_experience),
+      required_education: normalizeTextField(form.required_education),
+      industry: normalizeTextField(form.industry),
+      function: normalizeTextField(form.function),
+      telecommuting: form.telecommuting ? 1 : 0,
+      has_company_logo: form.has_company_logo ? 1 : 0,
+      has_questions: form.has_questions ? 1 : 0,
+    };
+
+    // Save context to localStorage for chat page
+    const context = {
+      request_id: prediction.request_id,
+      job_posting: jobPosting,
+      prediction: prediction,
+    };
+    localStorage.setItem("spot-scam-chat-context", JSON.stringify(context));
+
+    // Navigate to chat
+    router.push("/chat");
+  }, [prediction, form, router]);
 
   const handlePredict = useCallback(
     async (event: React.FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      setIsSubmitting(true)
-      setError(null)
+      event.preventDefault();
+      setIsSubmitting(true);
+      setError(null);
 
       const payload: JobPostingInput = {
         title: form.title.trim(),
@@ -434,76 +444,74 @@ export default function HomePage() {
         telecommuting: form.telecommuting ? 1 : 0,
         has_company_logo: form.has_company_logo ? 1 : 0,
         has_questions: form.has_questions ? 1 : 0,
-      }
+      };
 
       try {
-        const result = await predictSingle(payload)
-        setPrediction(result)
-        mutateGlobal("review-count", undefined, { revalidate: true })
+        const result = await predictSingle(payload);
+        setPrediction(result);
+        mutateGlobal("review-count", undefined, { revalidate: true });
       } catch (predictError) {
         const message =
-          predictError instanceof Error
-            ? predictError.message
-            : "Unable to score the job posting."
-        setError(message)
-        setPrediction(null)
+          predictError instanceof Error ? predictError.message : "Unable to score the job posting.";
+        setError(message);
+        setPrediction(null);
       } finally {
-        setIsSubmitting(false)
+        setIsSubmitting(false);
       }
     },
     [form]
-  )
+  );
 
   const metrics = useMemo(() => {
     if (!metadata) {
-      return []
+      return [];
     }
     const entries: {
-      label: string
-      key: MetricKey
-      validation?: number | null
-      testing?: number | null
-    }[] = []
+      label: string;
+      key: MetricKey;
+      validation?: number | null;
+      testing?: number | null;
+    }[] = [];
 
-    ;(Object.keys(metricLabels) as MetricKey[]).forEach((metric) => {
-      const validation = metadata.val_metrics?.[metric]
-      const testing = metadata.test_metrics?.[metric]
+    (Object.keys(metricLabels) as MetricKey[]).forEach((metric) => {
+      const validation = metadata.val_metrics?.[metric];
+      const testing = metadata.test_metrics?.[metric];
       if (validation !== undefined || testing !== undefined) {
         entries.push({
           label: metricLabels[metric],
           key: metric,
           validation,
           testing,
-        })
+        });
       }
-    })
+    });
 
-    return entries
-  }, [metadata])
+    return entries;
+  }, [metadata]);
 
-  const modelSummaries = useMemo(() => modelsResponse?.items ?? [], [modelsResponse])
+  const modelSummaries = useMemo(() => modelsResponse?.items ?? [], [modelsResponse]);
 
   const [leaderboardSort, setLeaderboardSort] = useState<SortConfig<LeaderboardSortKey> | null>(
     null
-  )
+  );
 
   const toggleLeaderboardSort = useCallback((key: LeaderboardSortKey) => {
     setLeaderboardSort((current) => {
       if (!current || current.key !== key) {
-        return { key, direction: "desc" }
+        return { key, direction: "desc" };
       }
       if (current.direction === "desc") {
-        return { key, direction: "asc" }
+        return { key, direction: "asc" };
       }
-      return null
-    })
-  }, [])
+      return null;
+    });
+  }, []);
 
   const sortedModelSummaries = useMemo(() => {
     if (!leaderboardSort) {
-      return modelSummaries
+      return modelSummaries;
     }
-    const { key, direction } = leaderboardSort
+    const { key, direction } = leaderboardSort;
     return modelSummaries
       .map((item, index) => ({ item, index }))
       .sort((a, b) => {
@@ -516,64 +524,64 @@ export default function HomePage() {
             : compareSortValues(
                 extractLeaderboardSortValue(b.item, key),
                 extractLeaderboardSortValue(a.item, key)
-              )
+              );
         if (comparison !== 0) {
-          return comparison
+          return comparison;
         }
-        return a.index - b.index
+        return a.index - b.index;
       })
-      .map(({ item }) => item)
-  }, [leaderboardSort, modelSummaries])
+      .map(({ item }) => item);
+  }, [leaderboardSort, modelSummaries]);
 
-  const [leaderboardPage, setLeaderboardPage] = useState(0)
-
-  useEffect(() => {
-    setLeaderboardPage(0)
-  }, [leaderboardSort, modelSummaries.length])
-
-  const leaderboardTotal = sortedModelSummaries.length
-  const totalPages = Math.max(1, Math.ceil(Math.max(leaderboardTotal, 1) / LEADERBOARD_PAGE_SIZE))
+  const [leaderboardPage, setLeaderboardPage] = useState(0);
 
   useEffect(() => {
-    setLeaderboardPage((prev) => Math.min(prev, totalPages - 1))
-  }, [totalPages])
+    setLeaderboardPage(0);
+  }, [leaderboardSort, modelSummaries.length]);
 
-  const pageStartIndex = leaderboardPage * LEADERBOARD_PAGE_SIZE
-  const pageEndIndex = Math.min(pageStartIndex + LEADERBOARD_PAGE_SIZE, leaderboardTotal)
-  const paginatedModelSummaries = sortedModelSummaries.slice(pageStartIndex, pageEndIndex)
+  const leaderboardTotal = sortedModelSummaries.length;
+  const totalPages = Math.max(1, Math.ceil(Math.max(leaderboardTotal, 1) / LEADERBOARD_PAGE_SIZE));
+
+  useEffect(() => {
+    setLeaderboardPage((prev) => Math.min(prev, totalPages - 1));
+  }, [totalPages]);
+
+  const pageStartIndex = leaderboardPage * LEADERBOARD_PAGE_SIZE;
+  const pageEndIndex = Math.min(pageStartIndex + LEADERBOARD_PAGE_SIZE, leaderboardTotal);
+  const paginatedModelSummaries = sortedModelSummaries.slice(pageStartIndex, pageEndIndex);
 
   const goToPrevLeaderboardPage = useCallback(() => {
-    setLeaderboardPage((prev) => Math.max(prev - 1, 0))
-  }, [])
+    setLeaderboardPage((prev) => Math.max(prev - 1, 0));
+  }, []);
 
   const goToNextLeaderboardPage = useCallback(() => {
-    setLeaderboardPage((prev) => Math.min(prev + 1, totalPages - 1))
-  }, [totalPages])
+    setLeaderboardPage((prev) => Math.min(prev + 1, totalPages - 1));
+  }, [totalPages]);
 
-  const canGoPrev = leaderboardPage > 0
-  const canGoNext = leaderboardPage < totalPages - 1
+  const canGoPrev = leaderboardPage > 0;
+  const canGoNext = leaderboardPage < totalPages - 1;
 
   const [tokenFrequencySort, setTokenFrequencySort] =
-    useState<SortConfig<TokenFrequencySortKey> | null>(null)
+    useState<SortConfig<TokenFrequencySortKey> | null>(null);
 
   const toggleTokenFrequencySort = useCallback((key: TokenFrequencySortKey) => {
     setTokenFrequencySort((current) => {
       if (!current || current.key !== key) {
-        return { key, direction: "desc" }
+        return { key, direction: "desc" };
       }
       if (current.direction === "desc") {
-        return { key, direction: "asc" }
+        return { key, direction: "asc" };
       }
-      return null
-    })
-  }, [])
+      return null;
+    });
+  }, []);
 
   const sortedTokenFrequency = useMemo(() => {
-    const items = tokenFrequency?.items ?? []
+    const items = tokenFrequency?.items ?? [];
     if (!tokenFrequencySort) {
-      return items
+      return items;
     }
-    const { key, direction } = tokenFrequencySort
+    const { key, direction } = tokenFrequencySort;
     return items
       .map((item, index) => ({ item, index }))
       .sort((a, b) => {
@@ -586,28 +594,28 @@ export default function HomePage() {
             : compareSortValues(
                 extractTokenFrequencySortValue(b.item, key),
                 extractTokenFrequencySortValue(a.item, key)
-              )
+              );
         if (comparison !== 0) {
-          return comparison
+          return comparison;
         }
-        return a.index - b.index
+        return a.index - b.index;
       })
-      .map(({ item }) => item)
-  }, [tokenFrequency?.items, tokenFrequencySort])
+      .map(({ item }) => item);
+  }, [tokenFrequency?.items, tokenFrequencySort]);
 
   const thresholdSeries = useMemo(() => {
     if (!thresholdMetrics?.points?.length) {
-      return []
+      return [];
     }
     return thresholdMetrics.points.map((point) => ({
       x: point.threshold,
       y: point.f1,
-    }))
-  }, [thresholdMetrics])
+    }));
+  }, [thresholdMetrics]);
 
   const latencyBars = useMemo(() => {
     if (!latencySummary?.items?.length) {
-      return []
+      return [];
     }
 
     return latencySummary.items.map((item) => ({
@@ -615,41 +623,44 @@ export default function HomePage() {
       p50: item.latency_p50_ms,
       p95: item.latency_p95_ms,
       throughput: item.throughput_rps,
-    }))
-  }, [latencySummary])
+    }));
+  }, [latencySummary]);
 
   const grayZoneDetails = useMemo(() => {
     if (!metadata) {
-      return null
+      return null;
     }
 
-    const policy = metadata.gray_zone
+    const policy = metadata.gray_zone;
     return [
       { label: "Width", value: formatMetric(policy.width, { maximumFractionDigits: 2 }) },
       { label: "Lower bound", value: formatMetric(policy.lower, { maximumFractionDigits: 2 }) },
       { label: "Upper bound", value: formatMetric(policy.upper, { maximumFractionDigits: 2 }) },
-      { label: "Labels", value: `${policy.negative_label} → ${policy.review_label} → ${policy.positive_label}` },
-    ]
-  }, [metadata])
+      {
+        label: "Labels",
+        value: `${policy.negative_label} → ${policy.review_label} → ${policy.positive_label}`,
+      },
+    ];
+  }, [metadata]);
 
   const predictionBadge = useMemo((): { tone: BadgeTone; label: string } => {
     if (!prediction) {
-      return { tone: "outline", label: "Awaiting submission" }
+      return { tone: "outline", label: "Awaiting submission" };
     }
 
-    const normalizedDecision = prediction.decision.toLowerCase()
-    let tone: BadgeTone
+    const normalizedDecision = prediction.decision.toLowerCase();
+    let tone: BadgeTone;
 
     if (normalizedDecision === "fraud") {
-      tone = "destructive"
+      tone = "destructive";
     } else if (normalizedDecision === "review") {
-      tone = "secondary"
+      tone = "secondary";
     } else {
-      tone = "default"
+      tone = "default";
     }
 
-    return { tone, label: prediction.decision }
-  }, [prediction])
+    return { tone, label: prediction.decision };
+  }, [prediction]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
@@ -825,7 +836,8 @@ export default function HomePage() {
                     <div className="mb-3 flex flex-col gap-1">
                       <span className="text-sm font-medium text-foreground">Metadata flags</span>
                       <span className="text-xs text-muted-foreground">
-                        These booleans align with the training data and directly influence the model&apos;s tabular features.
+                        These booleans align with the training data and directly influence the
+                        model&apos;s tabular features.
                       </span>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-3">
@@ -851,7 +863,9 @@ export default function HomePage() {
                           onChange={handleToggleChange("telecommuting")}
                         />
                         <span className="flex flex-col gap-0.5">
-                          <span className="font-medium text-foreground">Telecommuting / remote</span>
+                          <span className="font-medium text-foreground">
+                            Telecommuting / remote
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             Set when the job can be performed remotely.
                           </span>
@@ -865,7 +879,9 @@ export default function HomePage() {
                           onChange={handleToggleChange("has_questions")}
                         />
                         <span className="flex flex-col gap-0.5">
-                          <span className="font-medium text-foreground">Screening questions included</span>
+                          <span className="font-medium text-foreground">
+                            Screening questions included
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             Enable when applicants must answer custom questions.
                           </span>
@@ -918,11 +934,7 @@ export default function HomePage() {
                   <MetricCallout
                     label="Binary label"
                     value={
-                      prediction
-                        ? prediction.binary_label === 1
-                          ? "Fraud"
-                          : "Legit"
-                        : "Pending"
+                      prediction ? (prediction.binary_label === 1 ? "Fraud" : "Legit") : "Pending"
                     }
                     accent={
                       prediction
@@ -965,18 +977,22 @@ export default function HomePage() {
                       </span>
                     </div>
                     <ul className="grid gap-1 pl-4 marker:text-primary list-disc">
-                      <li>Text goes through the same TF-IDF + tabular pipeline used during training.</li>
                       <li>
-                        Calibrated probabilities are compared to the current threshold and gray-zone policy.
+                        Text goes through the same TF-IDF + tabular pipeline used during training.
                       </li>
                       <li>
-                        Predictions return decision labels along with metadata so you can log or review them.
+                        Calibrated probabilities are compared to the current threshold and gray-zone
+                        policy.
+                      </li>
+                      <li>
+                        Predictions return decision labels along with metadata so you can log or
+                        review them.
                       </li>
                     </ul>
                   </div>
                 )}
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
 
             {prediction ? (
               <Card>
@@ -1013,6 +1029,15 @@ export default function HomePage() {
                     </div>
                   ) : null}
                 </CardContent>
+                <CardFooter>
+                  <Button
+                    onClick={handleAskAI}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Ask AI about this result
+                  </Button>
+                </CardFooter>
               </Card>
             ) : null}
 
@@ -1029,9 +1054,7 @@ export default function HomePage() {
               <CardContent className="flex flex-col gap-8">
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      F1 vs. threshold
-                    </span>
+                    <span className="text-sm font-semibold text-foreground">F1 vs. threshold</span>
                     <span className="text-xs text-muted-foreground">
                       Latest F1:{" "}
                       <strong className="text-foreground">
@@ -1051,9 +1074,7 @@ export default function HomePage() {
                       color="var(--chart-1)"
                       minY={0}
                       maxY={1}
-                      formatX={(value) =>
-                        formatMetric(value, { maximumFractionDigits: 2 })
-                      }
+                      formatX={(value) => formatMetric(value, { maximumFractionDigits: 2 })}
                       formatY={(value) => formatMetric(value, { maximumFractionDigits: 2 })}
                     />
                   ) : (
@@ -1070,9 +1091,7 @@ export default function HomePage() {
 
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      Latency envelopes
-                    </span>
+                    <span className="text-sm font-semibold text-foreground">Latency envelopes</span>
                     <span className="text-xs text-muted-foreground">
                       Throughput @ batch 32:{" "}
                       <strong className="text-foreground">
@@ -1099,88 +1118,90 @@ export default function HomePage() {
                     </Alert>
                   )}
                 </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2">
-                <Target className="size-5 text-chart-4" />
-                Slices to review
-              </CardTitle>
-              <CardDescription>
-                Lowest F1 slices from the latest evaluation so you can focus manual audits where the
-                model struggles most.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {isLoadingSliceMetrics ? (
-                <div className="grid gap-3">
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                  <Skeleton className="h-20 w-full" />
-                </div>
-              ) : sliceMetricsError ? (
-                <Alert variant="destructive">
-                  <AlertTriangle className="size-4" />
-                  <AlertTitle>Slice metrics unavailable</AlertTitle>
-                  <AlertDescription>
-                    {sliceMetricsError instanceof Error
-                      ? sliceMetricsError.message
-                      : "Failed to load slice-level performance."}
-                  </AlertDescription>
-                </Alert>
-              ) : sliceMetrics && sliceMetrics.items.length ? (
-                <ul className="grid gap-3">
-                  {sliceMetrics.items.map((item) => (
-                    <li
-                      key={`${item.slice}-${item.category}`}
-                      className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex flex-col">
-                          <span className="text-sm font-semibold text-foreground">
-                            {item.category && item.category !== "<missing>" ? item.category : "Missing value"}
-                          </span>
-                          <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {item.slice}
-                          </span>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="size-5 text-chart-4" />
+                  Slices to review
+                </CardTitle>
+                <CardDescription>
+                  Lowest F1 slices from the latest evaluation so you can focus manual audits where
+                  the model struggles most.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {isLoadingSliceMetrics ? (
+                  <div className="grid gap-3">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                ) : sliceMetricsError ? (
+                  <Alert variant="destructive">
+                    <AlertTriangle className="size-4" />
+                    <AlertTitle>Slice metrics unavailable</AlertTitle>
+                    <AlertDescription>
+                      {sliceMetricsError instanceof Error
+                        ? sliceMetricsError.message
+                        : "Failed to load slice-level performance."}
+                    </AlertDescription>
+                  </Alert>
+                ) : sliceMetrics && sliceMetrics.items.length ? (
+                  <ul className="grid gap-3">
+                    {sliceMetrics.items.map((item) => (
+                      <li
+                        key={`${item.slice}-${item.category}`}
+                        className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-foreground">
+                              {item.category && item.category !== "<missing>"
+                                ? item.category
+                                : "Missing value"}
+                            </span>
+                            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                              {item.slice}
+                            </span>
+                          </div>
+                          <Badge variant="outline">n={item.count}</Badge>
                         </div>
-                        <Badge variant="outline">n={item.count}</Badge>
-                      </div>
-                      <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <span>F1</span>
-                          <span className="font-medium text-foreground">
-                            {formatMetric(item.f1, { maximumFractionDigits: 3 })}
-                          </span>
+                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>F1</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.f1, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Precision</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.precision, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>Recall</span>
+                            <span className="font-medium text-foreground">
+                              {formatMetric(item.recall, { maximumFractionDigits: 3 })}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span>Precision</span>
-                          <span className="font-medium text-foreground">
-                            {formatMetric(item.precision, { maximumFractionDigits: 3 })}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span>Recall</span>
-                          <span className="font-medium text-foreground">
-                            {formatMetric(item.recall, { maximumFractionDigits: 3 })}
-                          </span>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Slice metrics are not available yet. Re-run the evaluation suite to surface
-                  segment-level performance.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Slice metrics are not available yet. Re-run the evaluation suite to surface
+                    segment-level performance.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
             <Card>
               <CardHeader className="pb-4">
                 <CardTitle className="flex items-center gap-2">
@@ -1295,12 +1316,16 @@ export default function HomePage() {
                         <Info className="size-3.5" />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" align="start" className="max-w-sm text-xs leading-relaxed">
+                    <TooltipContent
+                      side="top"
+                      align="start"
+                      className="max-w-sm text-xs leading-relaxed"
+                    >
                       Each row is a fully trained model candidate that survived evaluation. Even if
                       two rows share the same algorithm name (e.g., `linear_svm_C1.0`), they can
                       differ by calibration choice, feature bundle, config hash, or training time.
-                      The tracker de-duplicates only when every parameter matches exactly, so you can
-                      compare how each distinct model variant performed before the winner is
+                      The tracker de-duplicates only when every parameter matches exactly, so you
+                      can compare how each distinct model variant performed before the winner is
                       promoted to “Serving”.
                     </TooltipContent>
                   </Tooltip>
@@ -1524,8 +1549,8 @@ export default function HomePage() {
                     ) : tokenFrequency ? (
                       <div className="rounded-xl border">
                         <div className="border-b px-4 py-2 text-xs text-muted-foreground">
-                          Default order is Δ (fraud minus legit) high to low. Click any column header
-                          to change the sort.
+                          Default order is Δ (fraud minus legit) high to low. Click any column
+                          header to change the sort.
                         </div>
                         <Table>
                           <TableHeader>
@@ -1563,12 +1588,8 @@ export default function HomePage() {
                             {sortedTokenFrequency.map((item) => (
                               <TableRow key={item.token}>
                                 <TableCell className="font-medium">{item.token}</TableCell>
-                                <TableCell className="text-right">
-                                  {item.positive_count}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {item.negative_count}
-                                </TableCell>
+                                <TableCell className="text-right">{item.positive_count}</TableCell>
+                                <TableCell className="text-right">{item.negative_count}</TableCell>
                                 <TableCell
                                   className={`text-right font-semibold ${
                                     item.difference >= 0 ? "text-chart-1" : "text-chart-2"
@@ -1595,12 +1616,11 @@ export default function HomePage() {
                 </Tabs>
               </CardContent>
             </Card>
-
           </div>
         </section>
       </main>
     </div>
-  )
+  );
 }
 
 function MetricCallout({
@@ -1608,28 +1628,28 @@ function MetricCallout({
   value,
   accent,
 }: {
-  label: string
-  value: string
-  accent?: string
+  label: string;
+  value: string;
+  accent?: string;
 }) {
   return (
     <div className="rounded-lg border border-border/60 bg-card px-4 py-3 text-sm">
       <div className="text-muted-foreground text-xs uppercase tracking-wide">{label}</div>
       <div className={`text-lg font-semibold ${accent ?? "text-foreground"}`}>{value}</div>
     </div>
-  )
+  );
 }
 
-type TokenWeightItem = TokenImportanceResponse["positive"][number]
+type TokenWeightItem = TokenImportanceResponse["positive"][number];
 
 function TokenList({
   title,
   tone,
   items,
 }: {
-  title: string
-  tone: string
-  items: TokenWeightItem[]
+  title: string;
+  tone: string;
+  items: TokenWeightItem[];
 }) {
   return (
     <div className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 p-4">
@@ -1661,7 +1681,7 @@ function TokenList({
         ) : null}
       </ul>
     </div>
-  )
+  );
 }
 
 export function ContributionColumn({
@@ -1670,10 +1690,10 @@ export function ContributionColumn({
   direction = "positive",
   emptyLabel,
 }: {
-  title: string
-  items: FeatureContribution[]
-  direction?: "positive" | "negative"
-  emptyLabel: string
+  title: string;
+  items: FeatureContribution[];
+  direction?: "positive" | "negative";
+  emptyLabel: string;
 }) {
   if (!items.length) {
     return (
@@ -1681,7 +1701,7 @@ export function ContributionColumn({
         <div className="text-sm font-semibold text-foreground">{title}</div>
         <p className="text-xs text-muted-foreground">{emptyLabel}</p>
       </div>
-    )
+    );
   }
 
   return (
@@ -1712,10 +1732,10 @@ export function ContributionColumn({
         ))}
       </ul>
     </div>
-  )
+  );
 }
 
-type ChartPoint = { x: number; y: number }
+type ChartPoint = { x: number; y: number };
 
 function LineChart({
   points,
@@ -1725,68 +1745,63 @@ function LineChart({
   formatX,
   formatY,
 }: {
-  points: ChartPoint[]
-  color: string
-  minY?: number
-  maxY?: number
-  formatX?: (value: number) => string
-  formatY?: (value: number) => string
+  points: ChartPoint[];
+  color: string;
+  minY?: number;
+  maxY?: number;
+  formatX?: (value: number) => string;
+  formatY?: (value: number) => string;
 }) {
-  const gradientId = useId()
+  const gradientId = useId();
   if (!points.length) {
-    return null
+    return null;
   }
 
-  const width = 420
-  const height = 160
-  const padding = 16
+  const width = 420;
+  const height = 160;
+  const padding = 16;
 
-  const xs = points.map((point) => point.x)
-  const ys = points.map((point) => point.y)
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
 
-  const minX = Math.min(...xs)
-  let maxX = Math.max(...xs)
-  let minDataY = Math.min(...ys)
-  let maxDataY = Math.max(...ys)
+  const minX = Math.min(...xs);
+  let maxX = Math.max(...xs);
+  let minDataY = Math.min(...ys);
+  let maxDataY = Math.max(...ys);
 
   if (typeof minY === "number") {
-    minDataY = Math.min(minDataY, minY)
+    minDataY = Math.min(minDataY, minY);
   }
   if (typeof maxY === "number") {
-    maxDataY = Math.max(maxDataY, maxY)
+    maxDataY = Math.max(maxDataY, maxY);
   }
 
   if (Math.abs(maxX - minX) < 1e-9) {
-    maxX = minX + 1
+    maxX = minX + 1;
   }
   if (Math.abs(maxDataY - minDataY) < 1e-9) {
-    maxDataY = minDataY + 1
+    maxDataY = minDataY + 1;
   }
 
   const scaleX = (value: number) =>
-    padding + ((value - minX) / (maxX - minX)) * (width - padding * 2)
+    padding + ((value - minX) / (maxX - minX)) * (width - padding * 2);
   const scaleY = (value: number) =>
-    height - padding - ((value - minDataY) / (maxDataY - minDataY)) * (height - padding * 2)
+    height - padding - ((value - minDataY) / (maxDataY - minDataY)) * (height - padding * 2);
 
   const pathData = points
     .map((point, index) => {
-      const x = scaleX(point.x)
-      const y = scaleY(point.y)
-      return `${index === 0 ? "M" : "L"} ${x} ${y}`
+      const x = scaleX(point.x);
+      const y = scaleY(point.y);
+      return `${index === 0 ? "M" : "L"} ${x} ${y}`;
     })
-    .join(" ")
+    .join(" ");
 
-  const xFormatter = formatX ?? ((value: number) => value.toFixed(2))
-  const yFormatter = formatY ?? ((value: number) => value.toFixed(2))
+  const xFormatter = formatX ?? ((value: number) => value.toFixed(2));
+  const yFormatter = formatY ?? ((value: number) => value.toFixed(2));
 
   return (
     <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4">
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        className="h-40 w-full"
-        aria-hidden="true"
-        role="img"
-      >
+      <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full" aria-hidden="true" role="img">
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.45" />
@@ -1820,22 +1835,22 @@ function LineChart({
         </span>
       </div>
     </div>
-  )
+  );
 }
 
 type LatencyBar = {
-  batchSize: number
-  p50: number
-  p95: number
-  throughput: number
-}
+  batchSize: number;
+  p50: number;
+  p95: number;
+  throughput: number;
+};
 
 function LatencyChart({ bars }: { bars: LatencyBar[] }) {
   if (!bars.length) {
-    return null
+    return null;
   }
 
-  const maxLatency = bars.reduce((max, bar) => Math.max(max, bar.p95), 0) || 1
+  const maxLatency = bars.reduce((max, bar) => Math.max(max, bar.p95), 0) || 1;
 
   return (
     <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-6">
@@ -1851,8 +1866,8 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
       </div>
       <div className="flex h-48 items-end justify-between gap-4">
         {bars.map((bar) => {
-          const p95Height = Math.max(6, (bar.p95 / maxLatency) * 100)
-          const p50Height = Math.max(4, (bar.p50 / maxLatency) * 100)
+          const p95Height = Math.max(6, (bar.p95 / maxLatency) * 100);
+          const p50Height = Math.max(4, (bar.p50 / maxLatency) * 100);
           return (
             <div
               key={bar.batchSize}
@@ -1877,13 +1892,15 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
                 rps
               </div>
             </div>
-          )
+          );
         })}
       </div>
       <div className="mt-3 flex w-full justify-between text-xs text-muted-foreground">
         <span>0 ms</span>
-        <span>{formatMetric(maxLatency, { maximumFractionDigits: 0, minimumFractionDigits: 0 })} ms</span>
+        <span>
+          {formatMetric(maxLatency, { maximumFractionDigits: 0, minimumFractionDigits: 0 })} ms
+        </span>
       </div>
     </div>
-  )
+  );
 }

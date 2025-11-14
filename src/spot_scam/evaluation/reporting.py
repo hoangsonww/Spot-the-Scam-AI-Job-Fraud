@@ -41,9 +41,7 @@ def render_markdown_report(
         lines.append(slice_metrics.to_markdown(index=False))
         lines.append("")
     lines.append("## Additional Visuals")
-    lines.append(
-        "- `experiments/figs/score_distribution_test.png`: probability density by class."
-    )
+    lines.append("- `experiments/figs/score_distribution_test.png`: probability density by class.")
     lines.append(
         "- `experiments/figs/threshold_sweep_val.png`: precision/recall/F1 trade-offs across thresholds."
     )

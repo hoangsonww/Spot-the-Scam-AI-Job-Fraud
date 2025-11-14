@@ -40,29 +40,29 @@ def compute_slice_metrics(
             continue
 
     for category, group in df.groupby(column, dropna=False, observed=False):
-            mask = group.index
-            subset_labels = labels[df.index.isin(mask)]
-            subset_probs = probabilities[df.index.isin(mask)]
-            count = subset_labels.size
-            if count < min_count:
-                continue
+        mask = group.index
+        subset_labels = labels[df.index.isin(mask)]
+        subset_probs = probabilities[df.index.isin(mask)]
+        count = subset_labels.size
+        if count < min_count:
+            continue
 
-            metric_result = compute_metrics(
-                subset_labels,
-                subset_probs,
-                metrics_list=metrics_list,
-                threshold=threshold,
-                positive_label=1,
-            )
+        metric_result = compute_metrics(
+            subset_labels,
+            subset_probs,
+            metrics_list=metrics_list,
+            threshold=threshold,
+            positive_label=1,
+        )
 
-            slices.append(
-                SliceMetric(
-                    slice_name=column,
-                    category=str(category),
-                    count=count,
-                    metrics=metric_result.values,
-                )
+        slices.append(
+            SliceMetric(
+                slice_name=column,
+                category=str(category),
+                count=count,
+                metrics=metric_result.values,
             )
+        )
     return slices
 
 

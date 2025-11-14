@@ -19,18 +19,23 @@ flowchart TD
     end
 
     subgraph Online Serving
-        B1[FastAPI Service]
+        B1[FastAPI Service\n /predict, /chat, insights]
         B2[FraudPredictor]
         B3[Artifacts - Model, Feature Pipelines]
+        B4[Gemini API]
+        B5[Chat Routing Layer]
     end
     A7 -->|Load| B3
     B3 --> B2 --> B1
+    B1 -->|Invoke| B5
+    B5 -->|Auto-detect job posts| B2
+    B5 -->|LLM responses| B4
 
     subgraph Frontend & Registry
-        C1[Next.js Dashboard]
+        C1[Next.js Dashboard\n& Chat Assistant]
         C2[MLflow Model Registry]
     end
-    B1 <-->|REST| C1
+    B1 <-->|REST + SSE| C1
     A6 -->|Register| C2
     C2 -->|pyfunc / ONNX| B1
 ```
@@ -194,12 +199,59 @@ flowchart TD
 
 1. **FastAPI** loads a singleton `FraudPredictor` (cached via `functools.lru_cache`).
 2. `FraudPredictor` restores model weights, vectorizer, scaler, and metadata.
-3. `/predict` route accepts Pydantic models, runs preprocessing → features → scoring → calibration → gray-zone assignment.
+3. REST + SSE routes:
+   - `/predict/single` & `/predict/batch`: preprocess → features → scoring → calibration → gray-zone policy.
+   - `/insights/*`, `/metadata`, `/tracking/*`: dashboard data (token importance, latency, slices, review queue).
+   - `/chat`: streaming chatbot endpoint that orchestrates LLM classification + model scoring.
 4. Additional routes expose metadata, token importance, and frequency analysis for the frontend.
 
 ---
 
-## 7. Frontend Architecture (Next.js)
+## 7. AI Chatbot & Routing
+
+### 7.1 Frontend Experience
+- `ChatAssistant` component (App Router page) renders the conversation with `ReactMarkdown`, KaTeX, syntax highlighting, and custom inline/block code styling.
+- Uses `streamChat` helper to open an SSE connection to `/chat`, so Gemini responses appear token-by-token.
+- Persists the last conversation in `localStorage` and sends a bounded history back to the server for context.
+- Supports optional `initialContext` when the user jumps in from a scored posting (Score page → Chat).
+
+### 7.2 `/chat` Pipeline
+
+```mermaid
+sequenceDiagram
+    participant UI as Next.js Chat UI
+    participant API as FastAPI /chat
+    participant Cls as Gemini Classifier
+    participant Pred as FraudPredictor
+    participant LLM as Gemini Assistant
+
+    UI->>API: POST /chat (message, context, history)
+    API->>Cls: classify message (JSON verdict)
+    Cls-->>API: {is_job_posting, confidence, reason}
+    API->>Pred: predict() if job posting/context absent
+    Pred-->>API: proba + decision + explanations
+    API->>LLM: stream response with context block
+    LLM-->>API: text chunks
+    API-->>UI: SSE chunks (ChatStreamChunk)
+```
+
+### 7.3 Routing Logic
+1. **LLM Classifier:** A lightweight Gemini prompt (JSON-only response) determines if the message is a job posting and provides confidence + rationale.
+2. **Heuristic Fallback:** Keyword/length heuristics trigger the fraud model when the classifier is unavailable or below confidence thresholds.
+3. **Fraud Prediction:** When needed, the backend builds a `JobPostingInput` from the raw message and runs the trained classical stack (e.g., linear SVM) via `FraudPredictor`, yielding probabilities, labels, and SHAP-style explanations.
+4. **Context Assembly:** The assistant prompt combines:
+   - System instructions focused on scam detection.
+   - Classification summary (only when the message is treated as a job post).
+   - Prediction results (auto-run or provided via `request.context`).
+   - Job metadata from the frontend (title, description, etc.).
+   - The verbatim user message.
+5. **Streaming Response:** FastAPI wraps Gemini’s streaming iterator in `StreamingResponse` (SSE), relaying `ChatStreamChunk` payloads back to the browser.
+
+This agentic layer ensures normal chats go straight to Gemini, while suspected job postings are scored by our trained models before Gemini explains the outcome.
+
+---
+
+## 8. Frontend Architecture (Next.js)
 
 ```mermaid
 flowchart LR
@@ -220,19 +272,19 @@ flowchart LR
 ### UI Screenshots & Demo
 
 <p align="center">
-  <a href="https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing" target="_blank">
+  <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
     <img src="experiments/figs/ui.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 <p align="center">
-  <a href="https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing" target="_blank">
+  <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
     <img src="experiments/figs/ui1.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 > [!NOTE]
-> Demo video available at [https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing](https://drive.google.com/file/d/1Ut3x84JgtOX1UD3mQfL-tzRzqAERfEV1/view?usp=sharing).
+> Demo video available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
 
 ### Frontend Highlights
 - App directory with `page.tsx` wrapper around `HomePage`.
@@ -243,7 +295,7 @@ flowchart LR
 
 ---
 
-## 8. Environment & Configuration
+## 9. Environment & Configuration
 
 - **Configuration loader (`config/loader.py`)** merges `configs/defaults.yaml` with optional overrides. Dot-notation overrides supported.
 - **Paths utility (`utils/paths.py`)** centralizes directories relative to project root (artifacts, experiments, tracking, etc.).
@@ -251,7 +303,7 @@ flowchart LR
 
 ---
 
-## 9. Quality & Testing
+## 10. Quality & Testing
 
 - Python unit tests validate configuration, ingest, and policy utilities (`pytest`).
 - Linting via `ruff` and `black`.
