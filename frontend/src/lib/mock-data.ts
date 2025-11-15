@@ -14,7 +14,7 @@ import type {
 } from "./api";
 
 // Simulated delay for realistic API behavior
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Generate realistic prediction based on job posting content
 function generateRealisticPrediction(input: JobPostingInput): PredictionResponse {
@@ -22,24 +22,25 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
   const fraudIndicators: string[] = [];
   const legitIndicators: string[] = [];
 
-  const text = [
-    input.title,
-    input.description,
-    input.requirements,
-    input.company_profile,
-  ].join(" ").toLowerCase();
+  const text = [input.title, input.description, input.requirements, input.company_profile]
+    .join(" ")
+    .toLowerCase();
 
   // Check for fraud signals
   if (text.includes("earn") && text.includes("from home")) fraudIndicators.push("work from home");
   if (text.includes("no experience")) fraudIndicators.push("no experience required");
   if (text.includes("urgent") || text.includes("immediate")) fraudIndicators.push("urgency");
   if (text.includes("$$$") || text.includes("money")) fraudIndicators.push("money focus");
-  if (!input.company_profile || input.company_profile.length < 20) fraudIndicators.push("minimal company info");
-  if (!input.requirements || input.requirements.length < 30) fraudIndicators.push("vague requirements");
+  if (!input.company_profile || input.company_profile.length < 20)
+    fraudIndicators.push("minimal company info");
+  if (!input.requirements || input.requirements.length < 30)
+    fraudIndicators.push("vague requirements");
 
   // Check for legit signals
-  if (input.company_profile && input.company_profile.length > 100) legitIndicators.push("detailed company info");
-  if (input.requirements && input.requirements.length > 100) legitIndicators.push("specific requirements");
+  if (input.company_profile && input.company_profile.length > 100)
+    legitIndicators.push("detailed company info");
+  if (input.requirements && input.requirements.length > 100)
+    legitIndicators.push("specific requirements");
   if (input.benefits && input.benefits.length > 50) legitIndicators.push("clear benefits");
   if (input.required_education) legitIndicators.push("education requirements");
   if (input.required_experience) legitIndicators.push("experience requirements");
@@ -112,7 +113,9 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
   };
 }
 
-export async function mockPredictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {
+export async function mockPredictBatch(
+  instances: JobPostingInput[]
+): Promise<PredictionBatchResponse> {
   await delay(300 + Math.random() * 200); // Simulate network delay
 
   return {
@@ -221,7 +224,7 @@ export async function mockFetchModelSummaries(limit = 20): Promise<ModelsRespons
         precision: 0.845,
         recall: 0.861,
         roc_auc: 0.933,
-        pr_auc: 0.920,
+        pr_auc: 0.92,
       },
     },
   ];
@@ -337,12 +340,54 @@ export async function mockFetchSliceMetrics(limit = 6): Promise<SliceMetricsResp
   await delay(180);
 
   const items = [
-    { slice: "Telecommuting", category: "telecommuting", count: 3245, f1: 0.823, precision: 0.815, recall: 0.831 },
-    { slice: "Entry Level", category: "required_experience", count: 2876, f1: 0.891, precision: 0.883, recall: 0.899 },
-    { slice: "Mid-Senior", category: "required_experience", count: 4532, f1: 0.856, precision: 0.848, recall: 0.864 },
-    { slice: "IT/Tech", category: "industry", count: 5123, f1: 0.902, precision: 0.895, recall: 0.909 },
-    { slice: "Healthcare", category: "industry", count: 3891, f1: 0.867, precision: 0.859, recall: 0.875 },
-    { slice: "Finance", category: "industry", count: 2765, f1: 0.878, precision: 0.871, recall: 0.885 },
+    {
+      slice: "Telecommuting",
+      category: "telecommuting",
+      count: 3245,
+      f1: 0.823,
+      precision: 0.815,
+      recall: 0.831,
+    },
+    {
+      slice: "Entry Level",
+      category: "required_experience",
+      count: 2876,
+      f1: 0.891,
+      precision: 0.883,
+      recall: 0.899,
+    },
+    {
+      slice: "Mid-Senior",
+      category: "required_experience",
+      count: 4532,
+      f1: 0.856,
+      precision: 0.848,
+      recall: 0.864,
+    },
+    {
+      slice: "IT/Tech",
+      category: "industry",
+      count: 5123,
+      f1: 0.902,
+      precision: 0.895,
+      recall: 0.909,
+    },
+    {
+      slice: "Healthcare",
+      category: "industry",
+      count: 3891,
+      f1: 0.867,
+      precision: 0.859,
+      recall: 0.875,
+    },
+    {
+      slice: "Finance",
+      category: "industry",
+      count: 2765,
+      f1: 0.878,
+      precision: 0.871,
+      recall: 0.885,
+    },
   ];
 
   return {
@@ -428,9 +473,7 @@ export async function mockFetchReviewCases(
         function: "Marketing",
       },
       explanation: {
-        top_positive: [
-          { feature: "immediate start", source: "title", contribution: 0.14 },
-        ],
+        top_positive: [{ feature: "immediate start", source: "title", contribution: 0.14 }],
         top_negative: [
           { feature: "health insurance", source: "benefits", contribution: -0.18 },
           { feature: "bachelor's degree", source: "required_education", contribution: -0.11 },

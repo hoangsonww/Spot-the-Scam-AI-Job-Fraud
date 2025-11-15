@@ -89,9 +89,12 @@ if (typeof window !== "undefined") {
   useBackendStatus.getState().checkConnection();
 
   // Optional: Periodic health checks (every 5 minutes)
-  setInterval(() => {
-    useBackendStatus.getState().checkConnection();
-  }, 5 * 60 * 1000);
+  setInterval(
+    () => {
+      useBackendStatus.getState().checkConnection();
+    },
+    5 * 60 * 1000
+  );
 }
 
 // Global store for demo review queue (persisted in localStorage)

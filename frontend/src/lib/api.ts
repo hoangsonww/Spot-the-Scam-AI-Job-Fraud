@@ -291,7 +291,7 @@ export async function fetchReviewCount(): Promise<number> {
 export async function submitFeedback(records: FeedbackPayload[]): Promise<void> {
   if (shouldUseMockData()) {
     // Simulate successful feedback submission in demo mode
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Remove cases from demo queue
     if (typeof window !== "undefined") {

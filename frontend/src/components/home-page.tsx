@@ -664,203 +664,259 @@ export default function HomePage() {
   }, [prediction]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
+    <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background overflow-x-hidden">
       <TopNav />
-      <main className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 py-12 sm:px-8">
+      <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 sm:gap-8 lg:gap-10 px-3 sm:px-4 lg:px-6 xl:px-8 py-6 sm:py-10 lg:py-12">
         <DemoModeBanner />
-        <header className="flex flex-col gap-4">
+        <header className="flex flex-col gap-3 sm:gap-4">
           <div className="flex flex-col gap-2">
-            <Badge variant="secondary" className="w-fit">
-              <AlignVerticalSpaceBetween className="size-4" />
+            <Badge variant="secondary" className="w-fit text-xs">
+              <AlignVerticalSpaceBetween className="size-3.5 sm:size-4" />
               Model Risk Dashboard
             </Badge>
-            <h1 className="text-foreground text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="text-foreground text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight">
               Spot questionable job postings before they hit applicants.
             </h1>
-            <p className="text-muted-foreground max-w-3xl text-base">
+            <p className="text-muted-foreground max-w-3xl text-sm sm:text-base">
               Score listings using the calibrated pipeline, inspect the features that drive
               decisions, and keep an eye on model health metrics - all in one vertical flow.
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
-              <ShieldCheck className="size-4 text-primary" />
-              Serving threshold:{" "}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-border/60 bg-card px-2.5 sm:px-3 py-1">
+              <ShieldCheck className="size-3.5 sm:size-4 text-primary" />
+              <span className="hidden xs:inline">Serving threshold:</span>
+              <span className="xs:hidden">Threshold:</span>
               <strong className="text-foreground">
                 {metadata ? formatMetric(metadata.threshold, { maximumFractionDigits: 3 }) : "…"}
               </strong>
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
-              <Activity className="size-4 text-chart-2" />
-              API: <code className="font-mono text-xs">{apiBaseUrl}</code>
+            <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-border/60 bg-card px-2.5 sm:px-3 py-1 max-w-full overflow-hidden">
+              <Activity className="size-3.5 sm:size-4 text-chart-2 shrink-0" />
+              <span className="hidden sm:inline">API:</span>
+              <code className="font-mono text-[10px] sm:text-xs truncate min-w-0">
+                {apiBaseUrl}
+              </code>
             </span>
             {metadata?.calibration_method ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card px-3 py-1">
-                <Brain className="size-4 text-chart-3" />
+              <span className="inline-flex items-center gap-1 sm:gap-1.5 rounded-full border border-border/60 bg-card px-2.5 sm:px-3 py-1">
+                <Brain className="size-3.5 sm:size-4 text-chart-3" />
                 Calibration: {metadata.calibration_method}
               </span>
             ) : null}
           </div>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-          <div className="flex flex-col gap-6">
-            <Card className="backdrop-blur">
-              <CardHeader>
-                <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <section className="grid gap-4 sm:gap-5 lg:gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] w-full min-w-0">
+          <div className="flex flex-col gap-4 sm:gap-5 lg:gap-6 min-w-0">
+            <Card className="backdrop-blur overflow-hidden">
+              <CardHeader className="px-4 sm:px-6 py-4 sm:py-6">
+                <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between text-lg sm:text-xl">
                   <span>Score a job posting</span>
-                  <Badge variant={predictionBadge.tone} className="uppercase tracking-wide">
+                  <Badge
+                    variant={predictionBadge.tone}
+                    className="uppercase tracking-wide text-xs w-fit"
+                  >
                     {predictionBadge.label}
                   </Badge>
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Paste details from a listing. We keep the text local until you submit for scoring.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <form className="flex flex-col gap-4" onSubmit={handlePredict}>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="title">Job title *</Label>
+              <CardContent className="px-4 sm:px-6">
+                <form className="flex flex-col gap-3 sm:gap-4" onSubmit={handlePredict}>
+                  <div className="flex flex-col gap-1.5 sm:gap-2">
+                    <Label htmlFor="title" className="text-sm">
+                      Job title *
+                    </Label>
                     <Input
                       id="title"
                       required
                       value={form.title}
                       onChange={handleChange("title")}
                       placeholder="Fraud Prevention Specialist"
+                      className="text-sm"
                     />
                   </div>
                   <Tabs defaultValue="description" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="description">Description</TabsTrigger>
-                      <TabsTrigger value="requirements">Requirements</TabsTrigger>
-                      <TabsTrigger value="company">Company profile</TabsTrigger>
-                      <TabsTrigger value="benefits">Benefits</TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+                      <TabsTrigger value="description" className="text-xs sm:text-sm px-2 py-2">
+                        Description
+                      </TabsTrigger>
+                      <TabsTrigger value="requirements" className="text-xs sm:text-sm px-2 py-2">
+                        Requirements
+                      </TabsTrigger>
+                      <TabsTrigger value="company" className="text-xs sm:text-sm px-2 py-2">
+                        Company
+                      </TabsTrigger>
+                      <TabsTrigger value="benefits" className="text-xs sm:text-sm px-2 py-2">
+                        Benefits
+                      </TabsTrigger>
                     </TabsList>
-                    <TabsContent value="description" className="mt-2 flex flex-col gap-2">
-                      <Label htmlFor="description">Role overview</Label>
+                    <TabsContent
+                      value="description"
+                      className="mt-2 flex flex-col gap-1.5 sm:gap-2"
+                    >
+                      <Label htmlFor="description" className="text-sm">
+                        Role overview
+                      </Label>
                       <Textarea
                         id="description"
-                        rows={8}
+                        rows={6}
                         value={form.description ?? ""}
                         onChange={handleChange("description")}
                         placeholder="Enter the main body of the job posting..."
+                        className="text-sm resize-none"
                       />
                     </TabsContent>
-                    <TabsContent value="requirements" className="mt-2 flex flex-col gap-2">
-                      <Label htmlFor="requirements">Requirements</Label>
+                    <TabsContent
+                      value="requirements"
+                      className="mt-2 flex flex-col gap-1.5 sm:gap-2"
+                    >
+                      <Label htmlFor="requirements" className="text-sm">
+                        Requirements
+                      </Label>
                       <Textarea
                         id="requirements"
-                        rows={6}
+                        rows={5}
                         value={form.requirements ?? ""}
                         onChange={handleChange("requirements")}
                         placeholder="Experience expectations, background checks, etc."
+                        className="text-sm resize-none"
                       />
                     </TabsContent>
-                    <TabsContent value="company" className="mt-2 flex flex-col gap-2">
-                      <Label htmlFor="company_profile">Company profile</Label>
+                    <TabsContent value="company" className="mt-2 flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="company_profile" className="text-sm">
+                        Company profile
+                      </Label>
                       <Textarea
                         id="company_profile"
-                        rows={5}
+                        rows={4}
                         value={form.company_profile ?? ""}
                         onChange={handleChange("company_profile")}
                         placeholder="How the company presents itself in the listing."
+                        className="text-sm resize-none"
                       />
                     </TabsContent>
-                    <TabsContent value="benefits" className="mt-2 flex flex-col gap-2">
-                      <Label htmlFor="benefits">Benefits</Label>
+                    <TabsContent value="benefits" className="mt-2 flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="benefits" className="text-sm">
+                        Benefits
+                      </Label>
                       <Textarea
                         id="benefits"
                         rows={4}
                         value={form.benefits ?? ""}
                         onChange={handleChange("benefits")}
                         placeholder="Perks, compensation, or promises made in the posting."
+                        className="text-sm resize-none"
                       />
                     </TabsContent>
                   </Tabs>
                   <Separator className="my-1" />
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="location">Location</Label>
+                  <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="location" className="text-sm">
+                        Location
+                      </Label>
                       <Input
                         id="location"
                         value={form.location ?? ""}
                         onChange={handleChange("location")}
                         placeholder="Remote · Austin, TX · Hybrid"
+                        className="text-sm"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="employment_type">Employment type</Label>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="employment_type" className="text-sm">
+                        Employment type
+                      </Label>
                       <Input
                         id="employment_type"
                         value={form.employment_type ?? ""}
                         onChange={handleChange("employment_type")}
                         placeholder="Full-time, Contract, Internship…"
+                        className="text-sm"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="required_experience">Required experience</Label>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="required_experience" className="text-sm">
+                        Required experience
+                      </Label>
                       <Input
                         id="required_experience"
                         value={form.required_experience ?? ""}
                         onChange={handleChange("required_experience")}
                         placeholder="e.g., 2+ years, Entry level"
+                        className="text-sm"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="required_education">Required education</Label>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="required_education" className="text-sm">
+                        Required education
+                      </Label>
                       <Input
                         id="required_education"
                         value={form.required_education ?? ""}
                         onChange={handleChange("required_education")}
                         placeholder="e.g., Bachelor's, High School Diploma"
+                        className="text-sm"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="industry">Industry</Label>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="industry" className="text-sm">
+                        Industry
+                      </Label>
                       <Input
                         id="industry"
                         value={form.industry ?? ""}
                         onChange={handleChange("industry")}
                         placeholder="Industry context (Finance, Healthcare…)"
+                        className="text-sm"
                       />
                     </div>
-                    <div className="flex flex-col gap-2">
-                      <Label htmlFor="function">Function</Label>
+                    <div className="flex flex-col gap-1.5 sm:gap-2">
+                      <Label htmlFor="function" className="text-sm">
+                        Function
+                      </Label>
                       <Input
                         id="function"
                         value={form.function ?? ""}
                         onChange={handleChange("function")}
                         placeholder="Functional area (Sales, Engineering…)"
+                        className="text-sm"
                       />
                     </div>
                   </div>
-                  <div className="rounded-lg border border-border/60 bg-muted/10 p-4">
-                    <div className="mb-3 flex flex-col gap-1">
-                      <span className="text-sm font-medium text-foreground">Metadata flags</span>
-                      <span className="text-xs text-muted-foreground">
+                  <div className="rounded-lg border border-border/60 bg-muted/10 p-3 sm:p-4">
+                    <div className="mb-2 sm:mb-3 flex flex-col gap-0.5 sm:gap-1">
+                      <span className="text-xs sm:text-sm font-medium text-foreground">
+                        Metadata flags
+                      </span>
+                      <span className="text-[11px] sm:text-xs text-muted-foreground">
                         These booleans align with the training data and directly influence the
                         model&apos;s tabular features.
                       </span>
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                    <div className="grid gap-2 sm:gap-3 sm:grid-cols-3">
+                      <label className="flex items-start gap-2 sm:gap-3 rounded-md border border-border/60 bg-background px-2.5 sm:px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-muted/20 transition-colors">
                         <input
                           type="checkbox"
-                          className="mt-1 size-4 accent-primary"
+                          className="mt-0.5 sm:mt-1 size-4 accent-primary"
                           checked={form.has_company_logo}
                           onChange={handleToggleChange("has_company_logo")}
                         />
                         <span className="flex flex-col gap-0.5">
                           <span className="font-medium text-foreground">Displays company logo</span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[11px] sm:text-xs text-muted-foreground">
                             Mark when the listing shows an authentic employer logo.
                           </span>
                         </span>
                       </label>
-                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                      <label className="flex items-start gap-2 sm:gap-3 rounded-md border border-border/60 bg-background px-2.5 sm:px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-muted/20 transition-colors">
                         <input
                           type="checkbox"
-                          className="mt-1 size-4 accent-primary"
+                          className="mt-0.5 sm:mt-1 size-4 accent-primary"
                           checked={form.telecommuting}
                           onChange={handleToggleChange("telecommuting")}
                         />
@@ -868,15 +924,15 @@ export default function HomePage() {
                           <span className="font-medium text-foreground">
                             Telecommuting / remote
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[11px] sm:text-xs text-muted-foreground">
                             Set when the job can be performed remotely.
                           </span>
                         </span>
                       </label>
-                      <label className="flex items-start gap-3 rounded-md border border-border/60 bg-background px-3 py-2 text-sm">
+                      <label className="flex items-start gap-2 sm:gap-3 rounded-md border border-border/60 bg-background px-2.5 sm:px-3 py-2 text-xs sm:text-sm cursor-pointer hover:bg-muted/20 transition-colors">
                         <input
                           type="checkbox"
-                          className="mt-1 size-4 accent-primary"
+                          className="mt-0.5 sm:mt-1 size-4 accent-primary"
                           checked={form.has_questions}
                           onChange={handleToggleChange("has_questions")}
                         />
@@ -884,7 +940,7 @@ export default function HomePage() {
                           <span className="font-medium text-foreground">
                             Screening questions included
                           </span>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[11px] sm:text-xs text-muted-foreground">
                             Enable when applicants must answer custom questions.
                           </span>
                         </span>
@@ -894,33 +950,38 @@ export default function HomePage() {
                   {error ? (
                     <Alert variant="destructive" className="mt-2">
                       <AlertTriangle className="size-4" />
-                      <AlertTitle>Scoring failed</AlertTitle>
-                      <AlertDescription>{error}</AlertDescription>
+                      <AlertTitle className="text-sm">Scoring failed</AlertTitle>
+                      <AlertDescription className="text-xs">{error}</AlertDescription>
                     </Alert>
                   ) : null}
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                    <div className="text-muted-foreground text-xs">
+                  <div className="flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-muted-foreground text-[11px] sm:text-xs order-2 sm:order-1">
                       Fields marked * are required. We automatically apply your gray-zone policy.
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 order-1 sm:order-2">
                       <Button
                         type="button"
                         variant="ghost"
                         onClick={resetToSample}
                         disabled={isSubmitting}
+                        className="text-xs sm:text-sm px-3 h-9"
                       >
                         Load sample
                       </Button>
-                      <Button type="submit" disabled={isSubmitting}>
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting}
+                        className="text-xs sm:text-sm px-3 h-9 flex-1 sm:flex-initial"
+                      >
                         Score posting
-                        <ArrowRight className="size-4" />
+                        <ArrowRight className="size-3.5 sm:size-4" />
                       </Button>
                     </div>
                   </div>
                 </form>
               </CardContent>
-              <CardFooter className="flex flex-col gap-4 border-t border-border/60 pt-6">
-                <div className="grid gap-3 sm:grid-cols-3">
+              <CardFooter className="flex flex-col gap-3 sm:gap-4 border-t border-border/60 pt-4 sm:pt-6 px-4 sm:px-6">
+                <div className="grid gap-2 sm:gap-3 sm:grid-cols-3">
                   <MetricCallout
                     label="Fraud probability"
                     value={
@@ -959,7 +1020,7 @@ export default function HomePage() {
                   />
                 </div>
                 {prediction ? (
-                  <div className="text-muted-foreground text-xs">
+                  <div className="text-muted-foreground text-[11px] sm:text-xs">
                     Gray-zone band:{" "}
                     <span className="font-medium text-foreground">
                       {formatMetric(prediction.gray_zone.lower, { maximumFractionDigits: 3 })} -{" "}
@@ -969,7 +1030,7 @@ export default function HomePage() {
                     {prediction.gray_zone.positive_label})
                   </div>
                 ) : (
-                  <div className="grid gap-2 text-xs text-muted-foreground">
+                  <div className="grid gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground">
                     <div>
                       Gray-zone band:{" "}
                       <span className="font-medium text-foreground">
@@ -978,7 +1039,7 @@ export default function HomePage() {
                           : "-"}
                       </span>
                     </div>
-                    <ul className="grid gap-1 pl-4 marker:text-primary list-disc">
+                    <ul className="grid gap-0.5 sm:gap-1 pl-4 marker:text-primary list-disc">
                       <li>
                         Text goes through the same TF-IDF + tabular pipeline used during training.
                       </li>
@@ -997,22 +1058,22 @@ export default function HomePage() {
             </Card>
 
             {prediction ? (
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <AlignVerticalSpaceBetween className="size-5 text-chart-3" />
+              <Card className="overflow-hidden">
+                <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                    <AlignVerticalSpaceBetween className="size-4 sm:size-5 text-chart-3" />
                     Decision rationale
                   </CardTitle>
-                  <CardDescription>
+                  <CardDescription className="text-xs sm:text-sm">
                     Highlights of what pushed this posting toward or away from fraud.
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <p className="text-sm text-muted-foreground">
+                <CardContent className="flex flex-col gap-3 sm:gap-4 px-4 sm:px-6">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     {prediction.explanation.summary ??
                       "Positive contributions increase the fraud score, while negative ones back the legit decision."}
                   </p>
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
                     <ContributionColumn
                       title="Signals toward fraud"
                       emptyLabel="No strong fraud drivers detected."
@@ -1026,38 +1087,40 @@ export default function HomePage() {
                     />
                   </div>
                   {typeof prediction.explanation.intercept === "number" ? (
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[11px] sm:text-xs text-muted-foreground">
                       Model intercept: {formatContribution(prediction.explanation.intercept)}
                     </div>
                   ) : null}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="px-4 sm:px-6">
                   <Button
                     onClick={handleAskAI}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm h-9 sm:h-10"
                   >
-                    <MessageCircle className="mr-2 h-4 w-4" />
+                    <MessageCircle className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     Ask AI about this result
                   </Button>
                 </CardFooter>
               </Card>
             ) : null}
 
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <LineChartIcon className="size-5 text-chart-1" />
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <LineChartIcon className="size-4 sm:size-5 text-chart-1" />
                   Performance trends
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Threshold tuning and latency envelopes from the latest training benchmark.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-8">
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">F1 vs. threshold</span>
-                    <span className="text-xs text-muted-foreground">
+              <CardContent className="flex flex-col gap-6 sm:gap-8 px-4 sm:px-6">
+                <div className="flex flex-col gap-2 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">
+                      F1 vs. threshold
+                    </span>
+                    <span className="text-[11px] sm:text-xs text-muted-foreground">
                       Latest F1:{" "}
                       <strong className="text-foreground">
                         {thresholdSeries.length
@@ -1069,7 +1132,7 @@ export default function HomePage() {
                     </span>
                   </div>
                   {isLoadingThresholds ? (
-                    <Skeleton className="h-36 w-full" />
+                    <Skeleton className="h-32 sm:h-36 w-full" />
                   ) : thresholdSeries.length ? (
                     <LineChart
                       points={thresholdSeries}
@@ -1081,8 +1144,8 @@ export default function HomePage() {
                     />
                   ) : (
                     <Alert>
-                      <AlertTitle>No threshold sweep found</AlertTitle>
-                      <AlertDescription>
+                      <AlertTitle className="text-sm">No threshold sweep found</AlertTitle>
+                      <AlertDescription className="text-xs">
                         Run the training pipeline to regenerate threshold metrics and plots.
                       </AlertDescription>
                     </Alert>
@@ -1091,10 +1154,12 @@ export default function HomePage() {
 
                 <Separator />
 
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-foreground">Latency envelopes</span>
-                    <span className="text-xs text-muted-foreground">
+                <div className="flex flex-col gap-2 sm:gap-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                    <span className="text-xs sm:text-sm font-semibold text-foreground">
+                      Latency envelopes
+                    </span>
+                    <span className="text-[11px] sm:text-xs text-muted-foreground">
                       Throughput @ batch 32:{" "}
                       <strong className="text-foreground">
                         {latencyBars.length
@@ -1108,13 +1173,13 @@ export default function HomePage() {
                     </span>
                   </div>
                   {isLoadingLatency ? (
-                    <Skeleton className="h-36 w-full" />
+                    <Skeleton className="h-32 sm:h-36 w-full" />
                   ) : latencyBars.length ? (
                     <LatencyChart bars={latencyBars} />
                   ) : (
                     <Alert>
-                      <AlertTitle>No latency benchmark</AlertTitle>
-                      <AlertDescription>
+                      <AlertTitle className="text-sm">No latency benchmark</AlertTitle>
+                      <AlertDescription className="text-xs">
                         Execute the benchmark suite to populate latency statistics.
                       </AlertDescription>
                     </Alert>
@@ -1122,68 +1187,70 @@ export default function HomePage() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="size-5 text-chart-4" />
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Target className="size-4 sm:size-5 text-chart-4" />
                   Slices to review
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Lowest F1 slices from the latest evaluation so you can focus manual audits where
                   the model struggles most.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-3 sm:gap-4 px-4 sm:px-6">
                 {isLoadingSliceMetrics ? (
-                  <div className="grid gap-3">
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
-                    <Skeleton className="h-20 w-full" />
+                  <div className="grid gap-2 sm:gap-3">
+                    <Skeleton className="h-16 sm:h-20 w-full" />
+                    <Skeleton className="h-16 sm:h-20 w-full" />
+                    <Skeleton className="h-16 sm:h-20 w-full" />
                   </div>
                 ) : sliceMetricsError ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="size-4" />
-                    <AlertTitle>Slice metrics unavailable</AlertTitle>
-                    <AlertDescription>
+                    <AlertTitle className="text-sm">Slice metrics unavailable</AlertTitle>
+                    <AlertDescription className="text-xs">
                       {sliceMetricsError instanceof Error
                         ? sliceMetricsError.message
                         : "Failed to load slice-level performance."}
                     </AlertDescription>
                   </Alert>
                 ) : sliceMetrics && sliceMetrics.items.length ? (
-                  <ul className="grid gap-3">
+                  <ul className="grid gap-2 sm:gap-3">
                     {sliceMetrics.items.map((item) => (
                       <li
                         key={`${item.slice}-${item.category}`}
-                        className="rounded-xl border border-border/60 bg-card/70 px-4 py-3"
+                        className="rounded-xl border border-border/60 bg-card/70 px-3 sm:px-4 py-2.5 sm:py-3"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-semibold text-foreground">
+                        <div className="flex items-start justify-between gap-2 sm:gap-3">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs sm:text-sm font-semibold text-foreground truncate">
                               {item.category && item.category !== "<missing>"
                                 ? item.category
                                 : "Missing value"}
                             </span>
-                            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                            <span className="text-[10px] sm:text-xs uppercase tracking-wide text-muted-foreground">
                               {item.slice}
                             </span>
                           </div>
-                          <Badge variant="outline">n={item.count}</Badge>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs shrink-0">
+                            n={item.count}
+                          </Badge>
                         </div>
-                        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                          <div className="flex items-center justify-between gap-2">
+                        <div className="mt-2 sm:mt-3 grid grid-cols-3 gap-2 text-[11px] sm:text-xs text-muted-foreground">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2">
                             <span>F1</span>
                             <span className="font-medium text-foreground">
                               {formatMetric(item.f1, { maximumFractionDigits: 3 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2">
                             <span>Precision</span>
                             <span className="font-medium text-foreground">
                               {formatMetric(item.precision, { maximumFractionDigits: 3 })}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 sm:gap-2">
                             <span>Recall</span>
                             <span className="font-medium text-foreground">
                               {formatMetric(item.recall, { maximumFractionDigits: 3 })}
@@ -1194,7 +1261,7 @@ export default function HomePage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Slice metrics are not available yet. Re-run the evaluation suite to surface
                     segment-level performance.
                   </p>
@@ -1203,20 +1270,20 @@ export default function HomePage() {
             </Card>
           </div>
 
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart4 className="size-5 text-primary" />
+          <div className="flex flex-col gap-4 sm:gap-5 lg:gap-6 min-w-0">
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <BarChart4 className="size-4 sm:size-5 text-primary" />
                   Model snapshot
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Validation and held-out test scores from the most recent training run.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-3 sm:gap-4 px-4 sm:px-6">
                 {isLoadingMetadata ? (
-                  <div className="grid gap-3">
+                  <div className="grid gap-2 sm:gap-3">
                     <Skeleton className="h-4 w-full" />
                     <Skeleton className="h-4 w-11/12" />
                     <Skeleton className="h-4 w-10/12" />
@@ -1224,8 +1291,8 @@ export default function HomePage() {
                 ) : metadataError ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="size-4" />
-                    <AlertTitle>Metadata unavailable</AlertTitle>
-                    <AlertDescription>
+                    <AlertTitle className="text-sm">Metadata unavailable</AlertTitle>
+                    <AlertDescription className="text-xs">
                       {metadataError instanceof Error
                         ? metadataError.message
                         : "Failed to load model metrics."}
@@ -1233,25 +1300,27 @@ export default function HomePage() {
                   </Alert>
                 ) : metadata ? (
                   <>
-                    <div className="flex flex-col gap-1">
-                      <h2 className="text-lg font-semibold">{metadata.model_name}</h2>
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1">
-                          <Flame className="size-4 text-chart-4" />
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <h2 className="text-base sm:text-lg font-semibold truncate break-words">
+                        {metadata.model_name}
+                      </h2>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 sm:py-1">
+                          <Flame className="size-3 sm:size-4 text-chart-4" />
                           {metadata.model_type} · {metadata.feature_type}
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-1">
-                          <Activity className="size-4 text-chart-2" />
+                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 sm:py-1">
+                          <Activity className="size-3 sm:size-4 text-chart-2" />
                           Test ECE: {formatMetric(metadata.test_ece, { maximumFractionDigits: 3 })}
                         </span>
                       </div>
                     </div>
-                    <div className="grid gap-3">
+                    <div className="grid gap-2 sm:gap-3">
                       {metrics.map((metric) => (
-                        <div key={metric.key} className="flex flex-col gap-1.5">
-                          <div className="flex items-end justify-between text-xs uppercase text-muted-foreground">
+                        <div key={metric.key} className="flex flex-col gap-1 sm:gap-1.5">
+                          <div className="flex flex-col xs:flex-row xs:items-end xs:justify-between gap-1 xs:gap-0 text-[10px] sm:text-xs uppercase text-muted-foreground">
                             <span>{metric.label}</span>
-                            <span>
+                            <span className="text-[11px] sm:text-xs">
                               Val:{" "}
                               <strong className="text-foreground">
                                 {formatMetric(metric.validation)}
@@ -1262,7 +1331,7 @@ export default function HomePage() {
                               </strong>
                             </span>
                           </div>
-                          <div className="relative h-2 rounded-full bg-muted">
+                          <div className="relative h-1.5 sm:h-2 rounded-full bg-muted">
                             <div
                               className="absolute inset-y-0 left-0 rounded-full bg-primary/80 transition-all"
                               style={{ width: `${metricToPercent(metric.testing) || 0}%` }}
@@ -1277,18 +1346,18 @@ export default function HomePage() {
               {grayZoneDetails ? (
                 <>
                   <Separator className="mt-2" />
-                  <CardFooter className="flex flex-col gap-2 pt-4">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <CardFooter className="flex flex-col gap-1.5 sm:gap-2 pt-3 sm:pt-4 px-4 sm:px-6">
+                    <div className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Gray-zone policy
                     </div>
-                    <dl className="grid gap-1 text-sm">
+                    <dl className="grid gap-0.5 sm:gap-1 text-xs sm:text-sm">
                       {grayZoneDetails.map((item) => (
                         <div
                           key={item.label}
                           className="flex items-center justify-between gap-2 text-muted-foreground"
                         >
                           <dt>{item.label}</dt>
-                          <dd className="font-medium text-foreground">{item.value}</dd>
+                          <dd className="font-medium text-foreground text-right">{item.value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -1333,7 +1402,7 @@ export default function HomePage() {
                   </Tooltip>
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 sm:px-6">
                 {isLoadingModels ? (
                   <div className="grid gap-2">
                     <Skeleton className="h-5 w-full" />
@@ -1343,131 +1412,167 @@ export default function HomePage() {
                 ) : modelsError ? (
                   <Alert variant="destructive">
                     <AlertTriangle className="size-4" />
-                    <AlertTitle>Model leaderboard unavailable</AlertTitle>
-                    <AlertDescription>
+                    <AlertTitle className="text-sm">Model leaderboard unavailable</AlertTitle>
+                    <AlertDescription className="text-xs">
                       {modelsError instanceof Error
                         ? modelsError.message
                         : "Failed to load model records."}
                     </AlertDescription>
                   </Alert>
                 ) : modelSummaries.length ? (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <SortableTableHead
-                            label="Model"
-                            sortKey="model"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                          />
-                          <SortableTableHead
-                            label="Val F1"
-                            sortKey="val_f1"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                            align="right"
-                          />
-                          <SortableTableHead
-                            label="Test F1"
-                            sortKey="test_f1"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                            align="right"
-                          />
-                          <SortableTableHead
-                            label="Test Precision"
-                            sortKey="test_precision"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                            align="right"
-                          />
-                          <SortableTableHead
-                            label="Test Recall"
-                            sortKey="test_recall"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                            align="right"
-                          />
-                          <SortableTableHead
-                            label="Threshold"
-                            sortKey="threshold"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                            align="right"
-                          />
-                          <SortableTableHead
-                            label="Updated"
-                            sortKey="timestamp"
-                            currentSort={leaderboardSort}
-                            onToggle={toggleLeaderboardSort}
-                          />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {paginatedModelSummaries.map((summary, index) => (
-                          <TableRow
-                            key={`${summary.model_name}-${summary.timestamp ?? pageStartIndex + index}`}
-                            className={
-                              metadata?.model_name === summary.model_name
-                                ? "bg-muted/60"
-                                : undefined
-                            }
+                  <div className="rounded-xl border overflow-hidden">
+                    <div className="border-b px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs text-muted-foreground flex items-start sm:items-center justify-between gap-2">
+                      <span>
+                        Recent training runs captured in the lightweight tracker. Default order is
+                        Test F1 (high to low).
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full border border-border/60 text-muted-foreground transition hover:text-foreground shrink-0"
+                            aria-label="Leaderboard details"
                           >
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="font-medium text-foreground max-w-[220px] truncate whitespace-nowrap"
-                                    title={summary.model_name}
-                                  >
-                                    {summary.model_name}
-                                  </span>
-                                  {metadata?.model_name === summary.model_name ? (
-                                    <Badge variant="secondary" className="text-[10px] uppercase">
-                                      Serving
-                                    </Badge>
-                                  ) : null}
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {summary.model_type}
-                                  {summary.calibration_method
-                                    ? ` · ${summary.calibration_method}`
-                                    : ""}
-                                </span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-medium">
-                              {formatMetric(summary.validation?.f1)}
-                            </TableCell>
-                            <TableCell className="text-right text-sm font-medium">
-                              {formatMetric(summary.test?.f1)}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">
-                              {formatMetric(summary.test?.precision)}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">
-                              {formatMetric(summary.test?.recall)}
-                            </TableCell>
-                            <TableCell className="text-right text-xs text-muted-foreground">
-                              {summary.threshold !== undefined && summary.threshold !== null
-                                ? formatMetric(summary.threshold, { maximumFractionDigits: 3 })
-                                : "-"}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">
-                              {formatTimestamp(summary.timestamp)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    <div className="flex flex-wrap items-center justify-between gap-3 px-2 py-3 text-xs text-muted-foreground">
+                            <Info className="size-3 sm:size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          align="end"
+                          className="max-w-xs sm:max-w-sm text-[11px] sm:text-xs leading-relaxed"
+                        >
+                          Each row is a fully trained model candidate that survived evaluation. Even
+                          if two rows share the same algorithm name (e.g., `linear_svm_C1.0`), they
+                          can differ by calibration choice, feature bundle, config hash, or training
+                          time. The tracker de-duplicates only when every parameter matches exactly,
+                          so you can compare how each distinct model variant performed before the
+                          winner is promoted to "Serving".
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[800px] px-3 sm:px-4">
+                        <Table className="text-xs sm:text-sm">
+                          <TableHeader>
+                            <TableRow>
+                              <SortableTableHead
+                                label="Model"
+                                sortKey="model"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                              />
+                              <SortableTableHead
+                                label="Val F1"
+                                sortKey="val_f1"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Test F1"
+                                sortKey="test_f1"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Test Precision"
+                                sortKey="test_precision"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Test Recall"
+                                sortKey="test_recall"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Threshold"
+                                sortKey="threshold"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                                align="right"
+                              />
+                              <SortableTableHead
+                                label="Updated"
+                                sortKey="timestamp"
+                                currentSort={leaderboardSort}
+                                onToggle={toggleLeaderboardSort}
+                              />
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {paginatedModelSummaries.map((summary, index) => (
+                              <TableRow
+                                key={`${summary.model_name}-${summary.timestamp ?? pageStartIndex + index}`}
+                                className={
+                                  metadata?.model_name === summary.model_name
+                                    ? "bg-muted/60"
+                                    : undefined
+                                }
+                              >
+                                <TableCell>
+                                  <div className="flex flex-col gap-1 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span
+                                        className="font-medium text-foreground max-w-[120px] sm:max-w-[220px] truncate whitespace-nowrap"
+                                        title={summary.model_name}
+                                      >
+                                        {summary.model_name}
+                                      </span>
+                                      {metadata?.model_name === summary.model_name ? (
+                                        <Badge
+                                          variant="secondary"
+                                          className="text-[10px] uppercase"
+                                        >
+                                          Serving
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      {summary.model_type}
+                                      {summary.calibration_method
+                                        ? ` · ${summary.calibration_method}`
+                                        : ""}
+                                    </span>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-medium">
+                                  {formatMetric(summary.validation?.f1)}
+                                </TableCell>
+                                <TableCell className="text-right text-sm font-medium">
+                                  {formatMetric(summary.test?.f1)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                  {formatMetric(summary.test?.precision)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                  {formatMetric(summary.test?.recall)}
+                                </TableCell>
+                                <TableCell className="text-right text-xs text-muted-foreground">
+                                  {summary.threshold !== undefined && summary.threshold !== null
+                                    ? formatMetric(summary.threshold, { maximumFractionDigits: 3 })
+                                    : "-"}
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                  {formatTimestamp(summary.timestamp)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                    <div className="border-t px-3 sm:px-4 py-2 sm:py-3 flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center justify-between gap-2 sm:gap-3 text-[11px] sm:text-xs text-muted-foreground">
                       <span>
                         {leaderboardTotal
                           ? `Showing ${pageStartIndex + 1}-${pageEndIndex} of ${leaderboardTotal}`
                           : "No tracked model runs yet."}
                       </span>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
                         <span>
                           Page {Math.min(leaderboardPage + 1, totalPages)} of {totalPages}
                         </span>
@@ -1478,8 +1583,9 @@ export default function HomePage() {
                             onClick={goToPrevLeaderboardPage}
                             disabled={!canGoPrev || !leaderboardTotal}
                             aria-label="Previous leaderboard page"
+                            className="h-7 w-7 sm:h-8 sm:w-8"
                           >
-                            <ChevronLeft className="size-4" />
+                            <ChevronLeft className="size-3.5 sm:size-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -1487,43 +1593,48 @@ export default function HomePage() {
                             onClick={goToNextLeaderboardPage}
                             disabled={!canGoNext || !leaderboardTotal}
                             aria-label="Next leaderboard page"
+                            className="h-7 w-7 sm:h-8 sm:w-8"
                           >
-                            <ChevronRight className="size-4" />
+                            <ChevronRight className="size-3.5 sm:size-4" />
                           </Button>
                         </div>
                       </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
                     No tracked model runs yet. Train a model to populate this leaderboard.
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2">
-                  <Brain className="size-5 text-chart-5" />
+            <Card className="overflow-hidden">
+              <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Brain className="size-4 sm:size-5 text-chart-5" />
                   Feature signals
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
                   Inspect how tokens influence the calibration stack across fraud (positive) and
                   legitimate (negative) labels.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-3 sm:gap-4 px-4 sm:px-6">
                 <Tabs defaultValue="importance">
-                  <TabsList>
-                    <TabsTrigger value="importance">Token importance</TabsTrigger>
-                    <TabsTrigger value="frequency">Token frequency</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="importance" className="text-xs sm:text-sm">
+                      Token importance
+                    </TabsTrigger>
+                    <TabsTrigger value="frequency" className="text-xs sm:text-sm">
+                      Token frequency
+                    </TabsTrigger>
                   </TabsList>
                   <TabsContent value="importance" className="mt-3">
                     {isLoadingImportance ? (
-                      <Skeleton className="h-36 w-full" />
+                      <Skeleton className="h-32 sm:h-36 w-full" />
                     ) : tokenImportance ? (
-                      <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="grid gap-3 sm:gap-4 lg:grid-cols-2">
                         <TokenList
                           title="Fraud-leaning tokens"
                           tone="text-destructive"
@@ -1537,8 +1648,8 @@ export default function HomePage() {
                       </div>
                     ) : (
                       <Alert>
-                        <AlertTitle>No token importance available</AlertTitle>
-                        <AlertDescription>
+                        <AlertTitle className="text-sm">No token importance available</AlertTitle>
+                        <AlertDescription className="text-xs">
                           The current artifacts do not expose token weights. Re-run training with
                           reporting enabled.
                         </AlertDescription>
@@ -1547,68 +1658,76 @@ export default function HomePage() {
                   </TabsContent>
                   <TabsContent value="frequency" className="mt-3">
                     {isLoadingFrequency ? (
-                      <Skeleton className="h-36 w-full" />
+                      <Skeleton className="h-32 sm:h-36 w-full" />
                     ) : tokenFrequency ? (
-                      <div className="rounded-xl border">
-                        <div className="border-b px-4 py-2 text-xs text-muted-foreground">
+                      <div className="rounded-xl border overflow-hidden">
+                        <div className="border-b px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs text-muted-foreground">
                           Default order is Δ (fraud minus legit) high to low. Click any column
                           header to change the sort.
                         </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <SortableTableHead
-                                label="Token"
-                                sortKey="token"
-                                currentSort={tokenFrequencySort}
-                                onToggle={toggleTokenFrequencySort}
-                              />
-                              <SortableTableHead
-                                label="Fraud count"
-                                sortKey="positive_count"
-                                currentSort={tokenFrequencySort}
-                                onToggle={toggleTokenFrequencySort}
-                                align="right"
-                              />
-                              <SortableTableHead
-                                label="Legit count"
-                                sortKey="negative_count"
-                                currentSort={tokenFrequencySort}
-                                onToggle={toggleTokenFrequencySort}
-                                align="right"
-                              />
-                              <SortableTableHead
-                                label="Δ"
-                                sortKey="difference"
-                                currentSort={tokenFrequencySort}
-                                onToggle={toggleTokenFrequencySort}
-                                align="right"
-                              />
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedTokenFrequency.map((item) => (
-                              <TableRow key={item.token}>
-                                <TableCell className="font-medium">{item.token}</TableCell>
-                                <TableCell className="text-right">{item.positive_count}</TableCell>
-                                <TableCell className="text-right">{item.negative_count}</TableCell>
-                                <TableCell
-                                  className={`text-right font-semibold ${
-                                    item.difference >= 0 ? "text-chart-1" : "text-chart-2"
-                                  }`}
-                                >
-                                  {item.difference >= 0 ? "+" : ""}
-                                  {item.difference}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[500px] px-3 sm:px-4">
+                            <Table className="text-xs sm:text-sm">
+                              <TableHeader>
+                                <TableRow>
+                                  <SortableTableHead
+                                    label="Token"
+                                    sortKey="token"
+                                    currentSort={tokenFrequencySort}
+                                    onToggle={toggleTokenFrequencySort}
+                                  />
+                                  <SortableTableHead
+                                    label="Fraud count"
+                                    sortKey="positive_count"
+                                    currentSort={tokenFrequencySort}
+                                    onToggle={toggleTokenFrequencySort}
+                                    align="right"
+                                  />
+                                  <SortableTableHead
+                                    label="Legit count"
+                                    sortKey="negative_count"
+                                    currentSort={tokenFrequencySort}
+                                    onToggle={toggleTokenFrequencySort}
+                                    align="right"
+                                  />
+                                  <SortableTableHead
+                                    label="Δ"
+                                    sortKey="difference"
+                                    currentSort={tokenFrequencySort}
+                                    onToggle={toggleTokenFrequencySort}
+                                    align="right"
+                                  />
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {sortedTokenFrequency.map((item) => (
+                                  <TableRow key={item.token}>
+                                    <TableCell className="font-medium">{item.token}</TableCell>
+                                    <TableCell className="text-right">
+                                      {item.positive_count}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      {item.negative_count}
+                                    </TableCell>
+                                    <TableCell
+                                      className={`text-right font-semibold ${
+                                        item.difference >= 0 ? "text-chart-1" : "text-chart-2"
+                                      }`}
+                                    >
+                                      {item.difference >= 0 ? "+" : ""}
+                                      {item.difference}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <Alert>
-                        <AlertTitle>No frequency breakdown</AlertTitle>
-                        <AlertDescription>
+                        <AlertTitle className="text-sm">No frequency breakdown</AlertTitle>
+                        <AlertDescription className="text-xs">
                           Run the training pipeline with insights enabled to populate frequency
                           slices.
                         </AlertDescription>
@@ -1635,9 +1754,13 @@ function MetricCallout({
   accent?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-card px-4 py-3 text-sm">
-      <div className="text-muted-foreground text-xs uppercase tracking-wide">{label}</div>
-      <div className={`text-lg font-semibold ${accent ?? "text-foreground"}`}>{value}</div>
+    <div className="rounded-lg border border-border/60 bg-card px-3 sm:px-4 py-2 sm:py-3">
+      <div className="text-muted-foreground text-[10px] sm:text-xs uppercase tracking-wide">
+        {label}
+      </div>
+      <div className={`text-base sm:text-lg font-semibold ${accent ?? "text-foreground"}`}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -1654,21 +1777,23 @@ function TokenList({
   items: TokenWeightItem[];
 }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+    <div className="flex min-w-0 flex-col rounded-xl border border-border/60 bg-card/70 p-3 sm:p-4">
+      <div className="mb-2 sm:mb-3 flex items-center justify-between gap-2">
+        <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           {title}
         </span>
-        <span className={`inline-flex items-center gap-1 text-xs font-medium ${tone}`}>
-          <ArrowRight className="size-4" />
+        <span
+          className={`inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium ${tone} shrink-0`}
+        >
+          <ArrowRight className="size-3 sm:size-4" />
           Influence
         </span>
       </div>
-      <ul className="grid gap-2">
+      <ul className="grid gap-1.5 sm:gap-2">
         {items.slice(0, 12).map((token) => (
           <li
             key={`${title}-${token.term}`}
-            className="flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-sm"
+            className="flex w-full min-w-0 items-start justify-between gap-2 sm:gap-3 rounded-lg border border-border/60 bg-background/60 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm"
           >
             <span className="flex-1 min-w-0 break-words font-medium leading-snug text-foreground">
               {token.term}
@@ -1679,7 +1804,7 @@ function TokenList({
           </li>
         ))}
         {items.length === 0 ? (
-          <li className="text-muted-foreground text-sm">No tokens surfaced.</li>
+          <li className="text-muted-foreground text-xs sm:text-sm">No tokens surfaced.</li>
         ) : null}
       </ul>
     </div>
@@ -1699,33 +1824,35 @@ export function ContributionColumn({
 }) {
   if (!items.length) {
     return (
-      <div className="flex flex-col gap-2">
-        <div className="text-sm font-semibold text-foreground">{title}</div>
-        <p className="text-xs text-muted-foreground">{emptyLabel}</p>
+      <div className="flex flex-col gap-1.5 sm:gap-2">
+        <div className="text-xs sm:text-sm font-semibold text-foreground">{title}</div>
+        <p className="text-[11px] sm:text-xs text-muted-foreground">{emptyLabel}</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-2">
-      <div className="text-sm font-semibold text-foreground">{title}</div>
+    <div className="flex min-w-0 flex-col gap-1.5 sm:gap-2">
+      <div className="text-xs sm:text-sm font-semibold text-foreground">{title}</div>
       <ul className="grid gap-1.5">
         {items.map((item) => (
           <li
             key={`${title}-${item.feature}-${item.source}`}
-            className="border-border/70 bg-card/60 flex w-full min-w-0 items-start justify-between gap-3 rounded-lg border px-3 py-2 shadow-sm transition-colors hover:bg-card"
+            className="border-border/70 bg-card/60 flex w-full min-w-0 items-start justify-between gap-2 sm:gap-3 rounded-lg border px-2.5 sm:px-3 py-1.5 sm:py-2 shadow-sm transition-colors hover:bg-card"
           >
             <div className="flex min-w-0 flex-col">
-              <span className="text-sm font-medium text-foreground break-words leading-snug">
+              <span className="text-xs sm:text-sm font-medium text-foreground break-words leading-snug">
                 {item.feature}
               </span>
-              <span className="text-xs text-muted-foreground capitalize">{item.source}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground capitalize">
+                {item.source}
+              </span>
             </div>
             <span
               className={
                 direction === "negative"
-                  ? "text-chart-2 shrink-0 text-right text-sm font-semibold tabular-nums"
-                  : "text-destructive shrink-0 text-right text-sm font-semibold tabular-nums"
+                  ? "text-chart-2 shrink-0 text-right text-xs sm:text-sm font-semibold tabular-nums"
+                  : "text-destructive shrink-0 text-right text-xs sm:text-sm font-semibold tabular-nums"
               }
             >
               {formatContribution(item.contribution)}
@@ -1802,8 +1929,13 @@ function LineChart({
   const yFormatter = formatY ?? ((value: number) => value.toFixed(2));
 
   return (
-    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-40 w-full" aria-hidden="true" role="img">
+    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-3 sm:p-4">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="h-32 sm:h-40 w-full"
+        aria-hidden="true"
+        role="img"
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.45" />
@@ -1824,11 +1956,11 @@ function LineChart({
           strokeLinejoin="round"
         />
       </svg>
-      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+      <div className="mt-1.5 sm:mt-2 flex justify-between text-[11px] sm:text-xs text-muted-foreground">
         <span>{xFormatter(minX)}</span>
         <span>{xFormatter(maxX)}</span>
       </div>
-      <div className="mt-1 flex justify-end text-xs text-muted-foreground">
+      <div className="mt-0.5 sm:mt-1 flex justify-end text-[11px] sm:text-xs text-muted-foreground">
         <span>
           Top:{" "}
           <strong className="text-foreground">
@@ -1855,38 +1987,40 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
   const maxLatency = bars.reduce((max, bar) => Math.max(max, bar.p95), 0) || 1;
 
   return (
-    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-6">
-      <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-chart-2" />
+    <div className="rounded-xl border border-border/60 bg-gradient-to-b from-background/60 to-background/20 p-4 sm:p-6">
+      <div className="mb-3 sm:mb-4 flex flex-wrap items-center gap-3 sm:gap-4 text-[11px] sm:text-xs text-muted-foreground">
+        <span className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-chart-2" />
           p50 latency
         </span>
-        <span className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-destructive/70" />
+        <span className="flex items-center gap-1.5 sm:gap-2">
+          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-destructive/70" />
           p95 latency
         </span>
       </div>
-      <div className="flex h-48 items-end justify-between gap-4">
+      <div className="flex h-40 sm:h-48 items-end justify-between gap-2 sm:gap-4">
         {bars.map((bar) => {
           const p95Height = Math.max(6, (bar.p95 / maxLatency) * 100);
           const p50Height = Math.max(4, (bar.p50 / maxLatency) * 100);
           return (
             <div
               key={bar.batchSize}
-              className="flex min-w-[56px] flex-1 flex-col items-center gap-2"
+              className="flex min-w-[44px] sm:min-w-[56px] flex-1 flex-col items-center gap-1.5 sm:gap-2"
             >
-              <div className="relative flex h-32 w-full max-w-[72px] items-end justify-center">
+              <div className="relative flex h-28 sm:h-32 w-full max-w-[56px] sm:max-w-[72px] items-end justify-center">
                 <div
-                  className="absolute bottom-0 w-3/5 max-w-[36px] rounded-md bg-destructive/70"
+                  className="absolute bottom-0 w-3/5 max-w-[28px] sm:max-w-[36px] rounded-md bg-destructive/70"
                   style={{ height: `${p95Height}%` }}
                 />
                 <div
-                  className="absolute bottom-0 w-2/5 max-w-[24px] rounded-md bg-chart-2"
+                  className="absolute bottom-0 w-2/5 max-w-[18px] sm:max-w-[24px] rounded-md bg-chart-2"
                   style={{ height: `${p50Height}%` }}
                 />
               </div>
-              <div className="text-xs font-medium text-foreground">×{bar.batchSize}</div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="text-[11px] sm:text-xs font-medium text-foreground">
+                ×{bar.batchSize}
+              </div>
+              <div className="text-[10px] sm:text-[11px] text-muted-foreground text-center">
                 {formatMetric(bar.throughput, {
                   maximumFractionDigits: 0,
                   minimumFractionDigits: 0,
@@ -1897,7 +2031,7 @@ function LatencyChart({ bars }: { bars: LatencyBar[] }) {
           );
         })}
       </div>
-      <div className="mt-3 flex w-full justify-between text-xs text-muted-foreground">
+      <div className="mt-2 sm:mt-3 flex w-full justify-between text-[11px] sm:text-xs text-muted-foreground">
         <span>0 ms</span>
         <span>
           {formatMetric(maxLatency, { maximumFractionDigits: 0, minimumFractionDigits: 0 })} ms

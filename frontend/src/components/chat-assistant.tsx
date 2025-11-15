@@ -69,7 +69,7 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({
         behavior: streamingMessage ? "auto" : "smooth", // Instant scroll while streaming
-        block: "nearest"
+        block: "nearest",
       });
     });
   }, [messages, streamingMessage]);
