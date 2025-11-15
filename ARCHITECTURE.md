@@ -347,4 +347,4 @@ Optuna's visualization tools help analyze hyperparameter optimization results. B
 
 ---
 
-With this architecture, Spot the Scam maintains a reproducible end-to-end pipeline, calibrated serving layer, and user-facing analytics dashboard ready for operational deployment or further research iterations. !*** End Patch
+With this architecture, Spot the Scam maintains a reproducible end-to-end pipeline, calibrated serving layer, and user-facing analytics dashboard ready for operational deployment or further research iterations.

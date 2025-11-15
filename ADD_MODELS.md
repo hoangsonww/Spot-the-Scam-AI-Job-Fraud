@@ -97,5 +97,3 @@ After training, check:
 Need to compare multiple winners? Repeat with different configs and diff the resulting artifacts.
 
 ---
-
-Happy experimenting! Ping the pipeline maintainers before merging large model grids so CI time stays manageable.
