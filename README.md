@@ -26,7 +26,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 
 ## Features
 - **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
-- **Hyperparameter optimization**: Integrated Optuna support for Bayesian hyperparameter tuning with intelligent search strategies (see [docs/optuna_tuning.md](docs/optuna_tuning.md)).
+- **Hyperparameter optimization**: Integrated Optuna support for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
