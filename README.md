@@ -9,6 +9,7 @@
 ![NumPy](https://img.shields.io/badge/NumPy-1.26-013243?logo=numpy&logoColor=white)
 ![Plotly](https://img.shields.io/badge/Plotly-5.15-3F4F75?logo=plotly&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-4-00A0E9?logo=lightgbm&logoColor=white)
+![Optuna](https://img.shields.io/badge/Optuna-3-2E2E2E?logo=optuna&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-2.12-13B6FF?logo=mlflow&logoColor=white)
 ![ONNX](https://img.shields.io/badge/ONNX-1.15-000000?logo=onnx&logoColor=white)
 ![PyTest](https://img.shields.io/badge/PyTest-7-ED8B00?logo=pytest&logoColor=white)
@@ -25,6 +26,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 
 ## Features
 - **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
+- **Hyperparameter optimization**: Integrated Optuna support for Bayesian hyperparameter tuning with intelligent search strategies (see [docs/optuna_tuning.md](docs/optuna_tuning.md)).
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.

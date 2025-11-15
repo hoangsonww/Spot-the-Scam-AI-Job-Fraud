@@ -153,7 +153,40 @@ PYTHONPATH=src python -m spot_scam.pipeline.quantize
 
 This writes `artifacts/transformer/quantized/model.pt` and updates metadata. Quantization is opt-in; the standard (FP32) weights remain default.
 
-### 5.4 Automatic ONNX + MLflow Export (OPTIONAL)
+### 5.4 Hyperparameter Tuning with Optuna (OPTIONAL)
+
+For more advanced hyperparameter optimization beyond grid search, use Optuna to intelligently explore the hyperparameter space:
+
+**Tune Logistic Regression:**
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
+```
+
+**Tune Linear SVM:**
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 30
+```
+
+Optuna uses Bayesian optimization (TPE sampler) to find optimal hyperparameters. Unlike grid search, it can discover intermediate values (e.g., C=2.34 instead of just [0.1, 1.0, 10.0]).
+
+**After tuning:**
+1. Copy the best parameters from Optuna output
+2. Update `configs/defaults.yaml` with the discovered values
+3. Re-run full training: `PYTHONPATH=src python -m spot_scam.pipeline.train`
+
+See [docs/optuna_tuning.md](docs/optuna_tuning.md) for detailed documentation and [docs/optuna_quickstart.md](docs/optuna_quickstart.md) for quick examples.
+
+Quick visualization of tuning results (after a run):
+```bash
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
+```
+Then choose the study (e.g., `logistic_regression_tuning` or `linear_svm_tuning`) from the dashboard dropdown.
+
+<p align="center">
+  <img src="docs/images/optuna1.png" alt="Optuna Dashboard" width="100%"/>
+</p>
+
+### 5.5 Automatic ONNX + MLflow Export (OPTIONAL)
 
 Every completed training run attempts to:
 
@@ -288,6 +321,9 @@ npm run check-all
 
 > [!TIP]
 > Run `npm run check-all` before committing to ensure code quality.
+
+> [!IMPORTANT]
+> Run `source .venv/bin/activate && python -m black . && (cd frontend && npm run format)` to format both backend and frontend codebases, BEFORE committing changes and pushing to remote!!!
 
 ---
 
