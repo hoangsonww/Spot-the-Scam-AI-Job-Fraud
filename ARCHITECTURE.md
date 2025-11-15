@@ -47,12 +47,13 @@ flowchart TD
 | Path | Description |
 |------|-------------|
 | `configs/` | YAML configs (defaults, overrides). |
-| `scripts/` | Utility CLIs (`download_data.py`, `run_api.py`). |
-| `src/spot_scam/` | Python package (ETL, features, models, evaluation, inference, API). |
+| `scripts/` | Utility CLIs (`download_data.py`, `run_api.py`, `tune_with_optuna.py`). |
+| `src/spot_scam/` | Python package (ETL, features, models, evaluation, inference, API, tuning). |
 | `artifacts/` | Generated model assets (vectorizers, weights, metadata). |
 | `experiments/` | Reports, figures, tables after training. |
 | `frontend/` | Next.js + Tailwind + shadcn dashboard. |
 | `tests/` | Python unit tests. |
+| `docs/` | Documentation (pipeline walkthrough, deployment, explainability, Optuna tuning). |
 
 ---
 
@@ -74,6 +75,9 @@ graph LR
         M1[models.classical]
         M2[models.transformer]
     end
+    subgraph Tuning
+        T1[tuning.optuna_tuner]
+    end
     subgraph Evaluation
         E1[evaluation.metrics]
         E2[evaluation.curves]
@@ -91,6 +95,9 @@ graph LR
     D1 --> D2 --> D3 --> F3
     F3 --> M1
     F3 --> M2
+    F3 --> T1
+    T1 -.optimize.-> M1
+    T1 -.optimize.-> M2
     M1 --> E1
     M2 --> E1
     E1 --> E2
@@ -117,6 +124,13 @@ graph LR
 - **Models**  
   - `models.classical`: logistic regression, linear SVM, LightGBM with config-driven grids.  
   - `models.transformer`: DistilBERT fine-tune with HF Trainer (AMP + early stopping).
+
+- **Tuning**  
+  - `tuning.optuna_tuner`: Bayesian hyperparameter optimization using Optuna.  
+  - Intelligent search with TPE (Tree-structured Parzen Estimator) sampler.  
+  - Supports continuous hyperparameter spaces (e.g., C from 0.01 to 100.0).  
+  - CLI interface via `scripts/tune_with_optuna.py` for easy integration.  
+  - Returns best hyperparameters, F1 score, and study object for visualization.
 
 - **Evaluation**  
   - Metrics (F1, PR-AUC, calibration).  
@@ -301,6 +315,18 @@ flowchart LR
 
 > [!NOTE]
 > Quick demo video also available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
+
+### Optuna Dashboard
+
+Optuna's visualization tools help analyze hyperparameter optimization results. Below are sample plots generated from an Optuna study optimizing Logistic Regression hyperparameters.
+
+<p align="center">
+  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
+</p>
+
+<p align="center">
+  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
+</p>
 
 ---
 

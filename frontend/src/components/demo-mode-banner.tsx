@@ -16,9 +16,7 @@ export function DemoModeBanner() {
   return (
     <Alert className="mb-6 border-blue-200 bg-blue-50 dark:border-blue-900 dark:bg-blue-950">
       <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-      <AlertTitle className="text-blue-900 dark:text-blue-100">
-        Demo Mode Active
-      </AlertTitle>
+      <AlertTitle className="text-blue-900 dark:text-blue-100">Demo Mode Active</AlertTitle>
       <AlertDescription className="text-blue-800 dark:text-blue-200">
         <div className="space-y-2">
           <p>
@@ -26,8 +24,9 @@ export function DemoModeBanner() {
             <strong>Demo Mode</strong> with realistic mock data to showcase its capabilities.
           </p>
           <p className="text-sm">
-            All features are functional and use simulated responses that mirror the actual system's behavior.
-            To enable full functionality with the live ML model, start the backend server and refresh this page.
+            All features are functional and use simulated responses that mirror the actual system's
+            behavior. To enable full functionality with the live ML model, start the backend server
+            and refresh this page.
           </p>
           <div className="mt-3 flex items-center gap-3">
             <Button

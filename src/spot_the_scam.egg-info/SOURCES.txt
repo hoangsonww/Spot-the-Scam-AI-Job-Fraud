@@ -32,6 +32,8 @@ src/spot_scam/tracking/feedback.py
 src/spot_scam/tracking/logger.py
 src/spot_scam/tracking/predictions.py
 src/spot_scam/tracking/storage.py
+src/spot_scam/tuning/__init__.py
+src/spot_scam/tuning/optuna_tuner.py
 src/spot_scam/utils/logging.py
 src/spot_scam/utils/paths.py
 src/spot_the_scam.egg-info/PKG-INFO
