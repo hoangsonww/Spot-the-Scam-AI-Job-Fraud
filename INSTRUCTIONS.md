@@ -780,7 +780,3 @@ PYTHONPATH=src python -m spot_scam.pipeline.train
   # Run with verbose output
   mypy --show-error-codes src/
   ```
-
----
-
-You’re all set! The project now provides a calibrated fraud detector with an interactive UI, ready for experimentation and extension. Happy modeling! 🎯
