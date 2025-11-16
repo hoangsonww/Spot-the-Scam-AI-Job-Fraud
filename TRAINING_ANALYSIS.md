@@ -26,7 +26,6 @@ This document provides a comprehensive analysis of the training strategies, hype
 8. [Model Selection Logic](#model-selection-logic)
 9. [Performance Benchmarks](#performance-benchmarks)
 10. [Monitoring & Continuous Improvement](#monitoring--continuous-improvement)
-11. [Optuna Integration for Hyperparameter Optimization](#optuna-integration-for-hyperparameter-optimization)
 
 ---
 
@@ -636,7 +635,7 @@ This adaptive thresholding is crucial for imbalanced datasets where the default 
 ### Optuna-Based Hyperparameter Optimization
 
 **Overview:**
-The project integrates Optuna for intelligent Bayesian hyperparameter optimization as an alternative to grid search. Optuna uses Tree-structured Parzen Estimator (TPE) sampling to efficiently explore continuous hyperparameter spaces.
+The project integrates Optuna for intelligent Bayesian hyperparameter optimization as an alternative to grid search. Optuna uses Tree-structured Parzen Estimator (TPE) sampling to efficiently explore continuous hyperparameter spaces and discover optimal values that fall between traditional grid points.
 
 **Advantages Over Grid Search:**
 
@@ -667,7 +666,7 @@ Linear SVM:
 - C: Log-uniform(0.01, 100.0) - regularization strength
 - max_iter: Uniform(1000, 3000, step=500) - maximum iterations
 
-**Usage Example:**
+**Quick Start Commands:**
 
 ```bash
 # Tune Logistic Regression with 20 trials
@@ -676,29 +675,98 @@ PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-tria
 # Tune Linear SVM with 30 trials
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 30
 
-# Output includes best hyperparameters and F1 score
-# Update configs/defaults.yaml with discovered values
-# Re-run training pipeline to use optimized hyperparameters
+# Custom configuration
+PYTHONPATH=src python scripts/tune_with_optuna.py \
+    --model-type logistic \
+    --n-trials 50 \
+    -c custom.yaml
 ```
 
 **Integration Workflow:**
 
-1. Run grid search (default training) to get baseline
-2. Identify promising model families (e.g., Logistic Regression)
-3. Run Optuna to refine hyperparameters around baseline
-4. Update config with Optuna's best parameters
-5. Re-train with optimized config
-6. Validate on test set to ensure improvement
+1. **Baseline Training:** Run standard grid search training
+   ```bash
+   PYTHONPATH=src python -m spot_scam.pipeline.train
+   ```
 
-**Expected Performance Gains:**
+2. **Hyperparameter Tuning:** Use Optuna to refine hyperparameters
+   ```bash
+   PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
+   ```
 
-Based on typical fraud detection datasets:
-- Baseline (grid search): F1 = 0.819
-- After Optuna (20 trials): F1 = 0.825-0.835 (0.6-1.6% improvement)
-- Diminishing returns beyond 30-40 trials
-- Most gains come from discovering optimal C values between grid points
+3. **Update Configuration:** Copy best params from Optuna output to `configs/defaults.yaml`
+   ```yaml
+   models:
+     classical:
+       logistic_regression:
+         Cs: [2.34]  # From Optuna
+         max_iter: 450
+   ```
 
-See [docs/optuna_tuning.md](docs/optuna_tuning.md) for comprehensive documentation and [docs/optuna_quickstart.md](docs/optuna_quickstart.md) for quick start guide.
+4. **Retrain with Optimal Params:** Run training with updated config
+   ```bash
+   PYTHONPATH=src python -m spot_scam.pipeline.train
+   ```
+
+5. **Validate Improvement:** Check test metrics to confirm gains
+
+**Performance Expectations:**
+
+Based on typical runs with the fraud detection dataset:
+
+```
+Baseline (Grid Search):
+├── Logistic Regression: F1 = 0.819
+├── Training time: ~15 seconds
+└── Trials: 3 C values
+
+After Optuna (20 trials):
+├── Logistic Regression: F1 = 0.825-0.835
+├── Training time: ~45 seconds
+├── Improvement: +0.6-1.6%
+└── Discovered params: C=2.34, max_iter=450
+```
+
+**Study Tracking & Visualization:**
+
+Optuna trials are persisted to SQLite by default (`sqlite:///optuna_study.db`) and can be resumed or inspected:
+
+```python
+import optuna
+import optuna.visualization as vis
+
+# Load study
+study = optuna.load_study(
+    study_name="logistic_regression_tuning", 
+    storage="sqlite:///optuna_study.db"
+)
+
+# Plot optimization history
+fig = vis.plot_optimization_history(study)
+fig.show()
+
+# Plot parameter importance
+fig = vis.plot_param_importances(study)
+fig.show()
+
+# Plot parameter relationships
+fig = vis.plot_parallel_coordinate(study)
+fig.show()
+```
+
+Or use the dashboard CLI:
+```bash
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db \
+    --server wsgiref --host 127.0.0.1 --port 8080
+```
+
+**Documentation References:**
+- Comprehensive Guide: [docs/optuna_tuning.md](docs/optuna_tuning.md)
+- Quick Start: [docs/optuna_quickstart.md](docs/optuna_quickstart.md)
+- Optuna Official Docs: https://optuna.readthedocs.io/
+- TPE Algorithm Paper: https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization
+
+**Note:** Optuna integration is optional. The existing grid search approach remains the default and works well for most use cases. Use Optuna when you need to squeeze out extra performance or explore larger hyperparameter spaces.
 
 ---
 
@@ -1230,120 +1298,3 @@ def detect_drift(recent_predictions, baseline_predictions):
    → Gradually shift traffic (10% → 50% → 100%)
 5. Monitor for 7 days before full rollout
 ```
-
-## Optuna Integration for Hyperparameter Optimization
-
-Optuna is integrated into the training pipeline to enable advanced hyperparameter optimization using Bayesian methods. This allows for more efficient exploration of hyperparameter spaces compared to traditional grid search.
-
-### Quick Start Commands
-
-**Tune Logistic Regression:**
-```bash
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
-```
-
-**Tune Linear SVM:**
-```bash
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 30
-```
-
-**Custom configuration:**
-```bash
-PYTHONPATH=src python scripts/tune_with_optuna.py \
-    --model-type logistic \
-    --n-trials 50 \
-    -c custom.yaml
-```
-
-### Expected Workflow
-
-1. **Baseline Training:** Run standard grid search training
-   ```bash
-   PYTHONPATH=src python -m spot_scam.pipeline.train
-   ```
-
-2. **Hyperparameter Tuning:** Use Optuna to refine hyperparameters
-   ```bash
-   PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
-   ```
-
-3. **Update Configuration:** Copy best params from Optuna output to `configs/defaults.yaml`
-   ```yaml
-   models:
-     classical:
-       logistic_regression:
-         Cs: [2.34]  # From Optuna
-         max_iter: 450
-   ```
-
-4. **Retrain with Optimal Params:** Run training with updated config
-   ```bash
-   PYTHONPATH=src python -m spot_scam.pipeline.train
-   ```
-
-5. **Validate Improvement:** Check test metrics to confirm gains
-
-### Performance Expectations
-
-Based on typical runs with the fraud detection dataset:
-
-```
-Baseline (Grid Search):
-├── Logistic Regression: F1 = 0.819
-├── Training time: ~15 seconds
-└── Trials: 3 C values
-
-After Optuna (20 trials):
-├── Logistic Regression: F1 = 0.825-0.835
-├── Training time: ~45 seconds
-├── Improvement: +0.6-1.6%
-└── Discovered params: C=2.34, max_iter=450
-```
-
-<p align="center">
-  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
-</p>
-
-<p align="center">
-  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
-</p>
-
-### Visualization
-
-After running Optuna, visualize results:
-
-```python
-import optuna
-import optuna.visualization as vis
-
-# Load study (if using persistent storage)
-study = optuna.load_study(study_name="logistic_regression_tuning", 
-                          storage="sqlite:///optuna_study.db")
-
-# Plot optimization history
-fig = vis.plot_optimization_history(study)
-fig.show()
-
-# Plot parameter importance
-fig = vis.plot_param_importances(study)
-fig.show()
-
-# Plot parameter relationships
-fig = vis.plot_parallel_coordinate(study)
-fig.show()
-```
-
-Or use the dashboard CLI for a quick view of trials:
-```bash
-OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
-# Then pick the study (e.g., logistic_regression_tuning) from the dropdown
-```
-
-### Documentation References
-
-- **Comprehensive Guide:** [docs/optuna_tuning.md](docs/optuna_tuning.md)
-- **Quick Start:** [docs/optuna_quickstart.md](docs/optuna_quickstart.md)
-- **Optuna Official Docs:** https://optuna.readthedocs.io/
-- **TPE Algorithm Paper:** https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization
-
-**Note:** Optuna integration is optional. The existing grid search approach remains the default and works well for most use cases. Use Optuna when you need to squeeze out extra performance or explore larger hyperparameter spaces.
