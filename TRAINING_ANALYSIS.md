@@ -1231,6 +1231,8 @@ def detect_drift(recent_predictions, baseline_predictions):
 5. Monitor for 7 days before full rollout
 ```
 
+---
+
 ## Optuna Integration for Hyperparameter Optimization
 
 Optuna is integrated into the training pipeline to enable advanced hyperparameter optimization using Bayesian methods. This allows for more efficient exploration of hyperparameter spaces compared to traditional grid search.
