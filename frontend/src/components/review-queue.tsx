@@ -2,22 +2,11 @@
 
 import { useEffect, useState } from "react";
 import useSWR, { mutate as mutateGlobal } from "swr";
-import {
-  fetchReviewCases,
-  submitFeedback,
-  type ReviewCase,
-} from "@/lib/api";
+import { fetchReviewCases, submitFeedback, type ReviewCase } from "@/lib/api";
 import TopNav from "@/components/top-nav";
-import {
-  formatContribution,
-  formatMetric,
-  ContributionColumn,
-} from "@/components/home-page";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@/components/ui/alert";
+import { DemoModeBanner } from "@/components/demo-mode-banner";
+import { formatContribution, formatMetric, ContributionColumn } from "@/components/home-page";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Card,
   CardContent,
@@ -54,13 +43,10 @@ export default function ReviewQueue() {
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [page, setPage] = useState(0);
 
-  const {
-    data,
-    isLoading,
-    mutate,
-    error,
-  } = useSWR(["review-cases", PAGE_SIZE, page], ([, limit, pageIndex]) =>
-    fetchReviewCases(limit as number, "gray-zone", (pageIndex as number) * (limit as number)),
+  const { data, isLoading, mutate, error } = useSWR(
+    ["review-cases", PAGE_SIZE, page],
+    ([, limit, pageIndex]) =>
+      fetchReviewCases(limit as number, "gray-zone", (pageIndex as number) * (limit as number)),
     { keepPreviousData: true }
   );
 
@@ -76,7 +62,8 @@ export default function ReviewQueue() {
   }, [currentPage, page]);
 
   const startIndex = totalPending === 0 ? 0 : currentPage * PAGE_SIZE + 1;
-  const endIndex = totalPending === 0 ? 0 : Math.min(totalPending, currentPage * PAGE_SIZE + cases.length);
+  const endIndex =
+    totalPending === 0 ? 0 : Math.min(totalPending, currentPage * PAGE_SIZE + cases.length);
 
   const goPrev = () => {
     setPage((prev) => Math.max(prev - 1, 0));
@@ -86,10 +73,7 @@ export default function ReviewQueue() {
     setPage((prev) => Math.min(prev + 1, totalPages - 1));
   };
 
-  const handleSubmit = async (
-    item: ReviewCase,
-    reviewerLabel: "fraud" | "legit" | "unsure"
-  ) => {
+  const handleSubmit = async (item: ReviewCase, reviewerLabel: "fraud" | "legit" | "unsure") => {
     setSubmittingId(item.request_id);
     setToast(null);
     try {
@@ -132,10 +116,7 @@ export default function ReviewQueue() {
     } catch (err) {
       setToast({
         type: "error",
-        message:
-          err instanceof Error
-            ? err.message
-            : "Failed to submit feedback. Please retry.",
+        message: err instanceof Error ? err.message : "Failed to submit feedback. Please retry.",
       });
     } finally {
       setSubmittingId(null);
@@ -148,6 +129,7 @@ export default function ReviewQueue() {
     <div className="min-h-screen bg-gradient-to-b from-background via-background/90 to-background">
       <TopNav />
       <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-8">
+        <DemoModeBanner />
         <header className="flex flex-col gap-3">
           <Badge variant="secondary" className="w-fit">
             Human-in-the-loop Queue
@@ -156,17 +138,22 @@ export default function ReviewQueue() {
             Review uncertain job postings
           </h1>
           <p className="text-muted-foreground max-w-3xl text-base">
-            Confirm or override the classifier&apos;s call on the most ambiguous listings.
-            Feedback is logged for retraining and calibration monitoring.
+            Confirm or override the classifier&apos;s call on the most ambiguous listings. Feedback
+            is logged for retraining and calibration monitoring.
           </p>
           <div className="text-sm text-muted-foreground">
-            Pending cases:{" "}
-            <span className="font-semibold text-foreground">{totalPending}</span>
+            Pending cases: <span className="font-semibold text-foreground">{totalPending}</span>
           </div>
           {toast ? (
             <Alert variant={toast.type === "error" ? "destructive" : "default"}>
-              {toast.type === "error" ? <AlertTriangle className="size-4" /> : <CheckCircle2 className="size-4" />}
-              <AlertTitle>{toast.type === "error" ? "Submission failed" : "Feedback captured"}</AlertTitle>
+              {toast.type === "error" ? (
+                <AlertTriangle className="size-4" />
+              ) : (
+                <CheckCircle2 className="size-4" />
+              )}
+              <AlertTitle>
+                {toast.type === "error" ? "Submission failed" : "Feedback captured"}
+              </AlertTitle>
               <AlertDescription>{toast.message}</AlertDescription>
             </Alert>
           ) : null}
@@ -175,7 +162,9 @@ export default function ReviewQueue() {
               <AlertTriangle className="size-4" />
               <AlertTitle>Unable to load queue</AlertTitle>
               <AlertDescription>
-                {error instanceof Error ? error.message : "An unexpected error occurred while loading review cases."}
+                {error instanceof Error
+                  ? error.message
+                  : "An unexpected error occurred while loading review cases."}
               </AlertDescription>
             </Alert>
           ) : null}
@@ -192,7 +181,8 @@ export default function ReviewQueue() {
             <CheckCircle2 className="size-10 text-chart-2" />
             <h2 className="text-lg font-semibold text-foreground">Queue is clear</h2>
             <p className="text-sm text-muted-foreground">
-              No gray-zone predictions waiting for review right now. Come back after the next batch of predictions.
+              No gray-zone predictions waiting for review right now. Come back after the next batch
+              of predictions.
             </p>
           </div>
         ) : (
@@ -222,7 +212,9 @@ export default function ReviewQueue() {
                       </span>
                       <span>
                         Model decision:{" "}
-                        <strong className="capitalize text-foreground">{item.predicted_label}</strong>
+                        <strong className="capitalize text-foreground">
+                          {item.predicted_label}
+                        </strong>
                       </span>
                       <span>
                         Model version:{" "}
@@ -235,10 +227,21 @@ export default function ReviewQueue() {
                       <h3 className="text-sm font-semibold text-foreground">Listing snapshot</h3>
                       <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
                         <FieldPresenter label="Location" value={item.payload.location} />
-                        <FieldPresenter label="Employment type" value={item.payload.employment_type} />
+                        <FieldPresenter
+                          label="Employment type"
+                          value={item.payload.employment_type}
+                        />
                       </div>
-                      <FieldPresenter label="Description" value={item.payload.description} multiline />
-                      <FieldPresenter label="Requirements" value={item.payload.requirements} multiline />
+                      <FieldPresenter
+                        label="Description"
+                        value={item.payload.description}
+                        multiline
+                      />
+                      <FieldPresenter
+                        label="Requirements"
+                        value={item.payload.requirements}
+                        multiline
+                      />
                     </section>
 
                     <section className="flex flex-col gap-4">
@@ -303,10 +306,8 @@ export default function ReviewQueue() {
                   <CardFooter className="flex flex-col gap-3 border-t border-border/60 bg-card/40 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="text-xs text-muted-foreground">
                       Logged at{" "}
-                      <span className="font-medium text-foreground">
-                        {localizedCreatedAt}
-                      </span>
-                      . Reviewer overrides feed the next calibration pass.
+                      <span className="font-medium text-foreground">{localizedCreatedAt}</span>.
+                      Reviewer overrides feed the next calibration pass.
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -322,9 +323,7 @@ export default function ReviewQueue() {
                         disabled={isSubmitting}
                         onClick={() => handleSubmit(item, "legit")}
                       >
-                        {isSubmitting ? (
-                          <Loader2 className="mr-2 size-4 animate-spin" />
-                        ) : null}
+                        {isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
                         Confirm Legit
                       </Button>
                       <Button
@@ -332,9 +331,7 @@ export default function ReviewQueue() {
                         disabled={isSubmitting}
                         onClick={() => handleSubmit(item, "fraud")}
                       >
-                        {isSubmitting ? (
-                          <Loader2 className="mr-2 size-4 animate-spin" />
-                        ) : null}
+                        {isSubmitting ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
                         Confirm Fraud
                       </Button>
                     </div>
@@ -366,11 +363,7 @@ export default function ReviewQueue() {
                     variant="outline"
                     size="icon"
                     onClick={goNext}
-                    disabled={
-                      isLoading ||
-                      totalPending === 0 ||
-                      currentPage >= totalPages - 1
-                    }
+                    disabled={isLoading || totalPending === 0 || currentPage >= totalPages - 1}
                     aria-label="Next page"
                   >
                     <ChevronRight className="size-4" />

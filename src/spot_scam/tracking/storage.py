@@ -20,9 +20,7 @@ PREDICTIONS_DIR = TRACKING_PREDICTIONS_DIR
 FEEDBACK_DIR = TRACKING_FEEDBACK_DIR
 
 EMAIL_REGEX = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-PHONE_REGEX = re.compile(
-    r"(?:(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4})"
-)
+PHONE_REGEX = re.compile(r"(?:(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4})")
 
 
 def _ensure_dir(path: Path) -> None:

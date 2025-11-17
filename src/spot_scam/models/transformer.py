@@ -101,6 +101,7 @@ def train_transformer_model(
 
     # Detect platform for FP16 compatibility
     import platform
+
     use_fp16 = transformer_conf.get("fp16", False)
     if use_fp16 and platform.system() == "Darwin":
         logger.warning("Disabling FP16 on macOS due to MPS backend limitations")
@@ -215,7 +216,9 @@ def train_transformer_model(
 def _precision_recall_f1(y_true, y_pred):
     from sklearn.metrics import precision_recall_fscore_support
 
-    precision, recall, f1, _ = precision_recall_fscore_support(y_true, y_pred, average="binary", zero_division=0)
+    precision, recall, f1, _ = precision_recall_fscore_support(
+        y_true, y_pred, average="binary", zero_division=0
+    )
     return precision, recall, f1, _
 
 

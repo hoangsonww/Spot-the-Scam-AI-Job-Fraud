@@ -53,7 +53,9 @@ def plot_calibration_curve(y_true: np.ndarray, y_scores: np.ndarray, *, path: Pa
     logger.info("Saved calibration curve to %s", path)
 
 
-def plot_confusion_matrix(cm: np.ndarray, labels: Sequence[str], *, path: Path, normalize: bool = False) -> None:
+def plot_confusion_matrix(
+    cm: np.ndarray, labels: Sequence[str], *, path: Path, normalize: bool = False
+) -> None:
     if normalize:
         cm = cm.astype(float) / cm.sum(axis=1, keepdims=True).clip(min=1e-9)
     plt.figure(figsize=(4, 4))

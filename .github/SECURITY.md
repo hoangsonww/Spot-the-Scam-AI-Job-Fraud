@@ -14,7 +14,7 @@ This document describes the security vulnerability disclosure process for the **
 | `1.0.x`   | YES       |
 | `< 1.0.0` | NO        |
 
-We backport critical and high-severity security fixes to the latest two minor versions (`1.1.x` and `1.0.x`) for at least 90 days after release. Older versions are no longer supported—users should upgrade to a supported release as soon as possible.
+We backport critical and high-severity security fixes to the latest two minor versions (`1.1.x` and `1.0.x`) for at least 90 days after release. Older versions are no longer supported-users should upgrade to a supported release as soon as possible.
 
 ---
 
@@ -70,7 +70,7 @@ We welcome and appreciate good-faith security research. As long as you:
 - Do not degrade the service for other users.
 - Promptly report any issues you find to us.
 
-—you will not face legal action from the Spot the Scam team.
+and you will not face legal action from the Spot the Scam team.
 
 ---
 

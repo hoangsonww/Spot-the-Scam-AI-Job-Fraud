@@ -1,4 +1,19 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+import * as MockData from "./mock-data";
+import { useBackendStatus, useDemoReviewQueue } from "./backend-status";
+import { API_BASE_URL, getApiBaseUrl } from "./config";
+
+// Function to check if we should use mock data
+function shouldUseMockData(): boolean {
+  if (typeof window === "undefined") return false; // Server-side, try real API
+
+  // Check if backend status store indicates disconnection
+  try {
+    const status = useBackendStatus.getState();
+    return !status.isConnected;
+  } catch {
+    return false;
+  }
+}
 
 export type JobPostingInput = {
   title: string;
@@ -209,30 +224,51 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchMetadata(): Promise<MetadataResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchMetadata();
+  }
   return request<MetadataResponse>("/metadata");
 }
 
 export async function fetchModelSummaries(limit = 20): Promise<ModelsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchModelSummaries(limit);
+  }
   return request<ModelsResponse>(`/models?limit=${limit}`);
 }
 
 export async function fetchTokenImportance(limit = 20): Promise<TokenImportanceResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchTokenImportance(limit);
+  }
   return request<TokenImportanceResponse>(`/insights/token-importance?limit=${limit}`);
 }
 
 export async function fetchTokenFrequency(limit = 20): Promise<TokenFrequencyResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchTokenFrequency(limit);
+  }
   return request<TokenFrequencyResponse>(`/insights/token-frequency?limit=${limit}`);
 }
 
 export async function fetchThresholdMetrics(limit = 50): Promise<ThresholdMetricsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchThresholdMetrics(limit);
+  }
   return request<ThresholdMetricsResponse>(`/insights/threshold-metrics?limit=${limit}`);
 }
 
 export async function fetchLatencySummary(): Promise<LatencySummaryResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchLatencySummary();
+  }
   return request<LatencySummaryResponse>("/insights/latency");
 }
 
 export async function fetchSliceMetrics(limit = 6): Promise<SliceMetricsResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchSliceMetrics(limit);
+  }
   return request<SliceMetricsResponse>(`/insights/slice-metrics?limit=${limit}`);
 }
 
@@ -241,6 +277,9 @@ export async function fetchReviewCases(
   policy = "gray-zone",
   offset = 0
 ): Promise<CasesResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchReviewCases(limit, policy, offset);
+  }
   return request<CasesResponse>(`/cases?policy=${policy}&limit=${limit}&offset=${offset}`);
 }
 
@@ -250,6 +289,24 @@ export async function fetchReviewCount(): Promise<number> {
 }
 
 export async function submitFeedback(records: FeedbackPayload[]): Promise<void> {
+  if (shouldUseMockData()) {
+    // Simulate successful feedback submission in demo mode
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // Remove cases from demo queue
+    if (typeof window !== "undefined") {
+      try {
+        const demoQueue = useDemoReviewQueue.getState();
+        records.forEach((record) => {
+          demoQueue.removeCase(record.request_id);
+        });
+      } catch (e) {
+        console.error("Failed to remove cases from demo queue:", e);
+      }
+    }
+
+    return;
+  }
   await request<{ inserted: number }>("/feedback", {
     method: "POST",
     body: JSON.stringify(records),
@@ -257,6 +314,9 @@ export async function submitFeedback(records: FeedbackPayload[]): Promise<void> 
 }
 
 export async function predictBatch(instances: JobPostingInput[]): Promise<PredictionBatchResponse> {
+  if (shouldUseMockData()) {
+    return MockData.mockPredictBatch(instances);
+  }
   return request<PredictionBatchResponse>("/predict", {
     method: "POST",
     body: JSON.stringify({ instances }),
@@ -268,13 +328,122 @@ export async function predictSingle(instance: JobPostingInput): Promise<Predicti
   if (!predictions.length) {
     throw new Error("No predictions returned by API");
   }
-  return predictions[0];
+
+  const prediction = predictions[0];
+
+  // In demo mode, add gray-zone cases to the review queue
+  if (shouldUseMockData() && prediction.decision === "review") {
+    if (typeof window !== "undefined") {
+      try {
+        const demoQueue = useDemoReviewQueue.getState();
+        demoQueue.addCase(prediction, instance);
+      } catch (e) {
+        console.error("Failed to add case to demo queue:", e);
+      }
+    }
+  }
+
+  return prediction;
 }
 
 export async function fetchHealth() {
+  if (shouldUseMockData()) {
+    return MockData.mockFetchHealth();
+  }
   return request<{ status: string; model_type: string; threshold: number }>("/health");
 }
 
-export function getApiBaseUrl(): string {
-  return API_BASE_URL;
+// Re-export getApiBaseUrl for backward compatibility
+export { getApiBaseUrl };
+
+// Chat API types
+export type ChatContext = {
+  request_id?: string | null;
+  job_posting?: JobPostingInput | null;
+  prediction?: PredictionResponse | null;
+};
+
+export type ChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp?: string;
+};
+
+export type ChatRequest = {
+  message: string;
+  context?: ChatContext | null;
+  session_id?: string | null;
+  history?: ChatMessage[] | null;
+};
+
+export type ChatStreamChunk = {
+  chunk: string;
+  done: boolean;
+};
+
+// Chat streaming function
+export async function streamChat(
+  request: ChatRequest,
+  onChunk: (chunk: string) => void,
+  onComplete: () => void,
+  onError: (error: Error) => void
+): Promise<void> {
+  // Use mock chat in demo mode
+  if (shouldUseMockData()) {
+    return MockData.mockStreamChat(request.message, onChunk, onComplete, onError);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Chat API error: ${response.status} - ${errorText}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      throw new Error("No response body reader available");
+    }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const jsonStr = line.slice(6);
+            const data: ChatStreamChunk = JSON.parse(jsonStr);
+            if (data.chunk) {
+              onChunk(data.chunk);
+            }
+            if (data.done) {
+              onComplete();
+              return;
+            }
+          } catch (e) {
+            console.error("Failed to parse SSE data:", e);
+          }
+        }
+      }
+    }
+
+    onComplete();
+  } catch (error) {
+    onError(error as Error);
+  }
 }

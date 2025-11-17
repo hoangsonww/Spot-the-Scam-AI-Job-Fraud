@@ -9,7 +9,7 @@ If you want to experiment with new model architectures in Spot the Scam, this gu
 - **Classical (scikit-learn / LightGBM style)**: Lives in `src/spot_scam/models/classical.py`. Models train on TF‑IDF + tabular bundles and are automatically calibrated + evaluated.
 - **Transformers (Hugging Face)**: Implemented in `src/spot_scam/models/transformer.py`. Fine-tunes any sequence-classification checkpoint on `text_all`.
 
-Both tracks funnel into `_select_best_artifact` (`src/spot_scam/pipeline/train.py:217-231`), which keeps the winner-selection logic intact—just add more candidates.
+Both tracks funnel into `_select_best_artifact` (`src/spot_scam/pipeline/train.py:217-231`), which keeps the winner-selection logic intact-just add more candidates.
 
 ---
 
@@ -60,7 +60,7 @@ for depth in classical_conf["random_forest"]["max_depth"]:
     runs.append(ModelRun(...))
 ```
 
-Everything returned in `runs` is automatically calibrated (`train.py:234-275`) and evaluated on the test set—no extra wiring needed.
+Everything returned in `runs` is automatically calibrated (`train.py:234-275`) and evaluated on the test set-no extra wiring needed.
 
 ---
 
@@ -97,5 +97,3 @@ After training, check:
 Need to compare multiple winners? Repeat with different configs and diff the resulting artifacts.
 
 ---
-
-Happy experimenting! Ping the pipeline maintainers before merging large model grids so CI time stays manageable.

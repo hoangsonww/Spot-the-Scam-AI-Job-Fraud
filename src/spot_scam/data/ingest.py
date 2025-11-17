@@ -61,17 +61,20 @@ def load_raw_dataset(config: Dict, raw_dir: Optional[Path] = None) -> pd.DataFra
 
     key_columns = data_conf.get(
         "dedup_key_columns",
-        ["title", "location", "requirements", "employment_type", "industry", "function", "fraudulent"],
+        [
+            "title",
+            "location",
+            "requirements",
+            "employment_type",
+            "industry",
+            "function",
+            "fraudulent",
+        ],
     )
     for column in key_columns:
         if column not in df.columns:
             df[column] = pd.NA
-    key_values = (
-        df[key_columns]
-        .fillna("")
-        .astype(str)
-        .agg("||".join, axis=1)
-    )
+    key_values = df[key_columns].fillna("").astype(str).agg("||".join, axis=1)
     before = len(df)
     df = df.loc[~key_values.duplicated()].reset_index(drop=True)
     if len(df) != before:
@@ -85,7 +88,9 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     Standardize column names to snake_case and strip whitespace.
     """
     df = df.copy()
-    df.columns = [re.sub(r"[^0-9a-zA-Z]+", "_", col.strip().lower()).strip("_") for col in df.columns]
+    df.columns = [
+        re.sub(r"[^0-9a-zA-Z]+", "_", col.strip().lower()).strip("_") for col in df.columns
+    ]
     return df
 
 

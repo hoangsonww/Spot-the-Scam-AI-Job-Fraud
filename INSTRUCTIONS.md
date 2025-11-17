@@ -12,6 +12,7 @@ This guide walks through end-to-end setup, training, and serving of the Spot the
 | **Node.js 18+ / npm 9+** | Required for the Next.js dashboard in `frontend/`. |
 | **CUDA-capable GPU** | Optional but recommended for transformer training. |
 | **Kaggle CLI** | Needed to download the Kaggle dataset (set up API token). |
+| **Google Gemini API Key** | Optional; required for AI chatbot feature. Get from [Google AI Studio](https://makersuite.google.com/app/apikey). |
 
 Ensure `python3`, `pip`, `node`, and `npm` are on your `PATH`.
 
@@ -63,11 +64,45 @@ The script downloads and extracts `fake_job_postings.csv` (and the alternate `Fa
 
 ## 4. Preparing the Environment
 
+### 4.1 Directory Setup
+
 The training pipeline expects certain directories; they are created automatically, but you can ensure they exist with:
 
 ```bash
 python -c "from spot_scam.utils.paths import ensure_directories; ensure_directories()"
 ```
+
+### 4.2 Environment Variables
+
+Create a `.env` file in the project root for backend configuration:
+
+```bash
+# Backend Environment Variables (.env)
+
+# Required for AI chatbot (optional - chatbot won't work without this)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# CORS origins (comma-separated)
+SPOT_SCAM_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+
+# Optional: Use quantized transformer model
+SPOT_SCAM_USE_QUANTIZED=0
+
+# MLflow tracking
+MLFLOW_TRACKING_URI=file:///app/mlruns
+```
+
+For the frontend, create `frontend/.env.local`:
+
+```bash
+# Frontend Environment Variables (frontend/.env.local)
+
+# API base URL (defaults to http://localhost:8000 if not set)
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
+
+> [!TIP]
+> Use `.env.example` and `frontend/.env.local.example` as templates. Never commit these files to version control (already in `.gitignore`).
 
 ---
 
@@ -118,7 +153,40 @@ PYTHONPATH=src python -m spot_scam.pipeline.quantize
 
 This writes `artifacts/transformer/quantized/model.pt` and updates metadata. Quantization is opt-in; the standard (FP32) weights remain default.
 
-### 5.4 Automatic ONNX + MLflow Export (OPTIONAL)
+### 5.4 Hyperparameter Tuning with Optuna (OPTIONAL)
+
+For more advanced hyperparameter optimization beyond grid search, use Optuna to intelligently explore the hyperparameter space:
+
+**Tune Logistic Regression:**
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
+```
+
+**Tune Linear SVM:**
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 30
+```
+
+Optuna uses Bayesian optimization (TPE sampler) to find optimal hyperparameters. Unlike grid search, it can discover intermediate values (e.g., C=2.34 instead of just [0.1, 1.0, 10.0]).
+
+**After tuning:**
+1. Copy the best parameters from Optuna output
+2. Update `configs/defaults.yaml` with the discovered values
+3. Re-run full training: `PYTHONPATH=src python -m spot_scam.pipeline.train`
+
+See [docs/optuna_tuning.md](docs/optuna_tuning.md) for detailed documentation and [docs/optuna_quickstart.md](docs/optuna_quickstart.md) for quick examples.
+
+Quick visualization of tuning results (after a run):
+```bash
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
+```
+Then choose the study (e.g., `logistic_regression_tuning` or `linear_svm_tuning`) from the dashboard dropdown.
+
+<p align="center">
+  <img src="docs/images/optuna1.png" alt="Optuna Dashboard" width="100%"/>
+</p>
+
+### 5.5 Automatic ONNX + MLflow Export (OPTIONAL)
 
 Every completed training run attempts to:
 
@@ -171,6 +239,7 @@ PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
 | `POST /predict/single`           | Single prediction (body is `JobPostingInput`).                 |
 | `GET /insights/token-importance` | Top TF‑IDF coefficients for fraud/legit terms.                 |
 | `GET /insights/token-frequency`  | Token frequency differences between classes.                   |
+| `POST /chat`                     | Stream chat responses from Google Gemini (requires API key).   |
 
 Example curl:
 
@@ -211,19 +280,144 @@ npm run dev
 ```
 
 Visit `http://localhost:3000` to access the dashboard:
-- Submit job postings for scoring.
-- Review calibrated metrics, decision rationale, and gray-zone band.
-- Inspect token-level insights (requires classical model artifacts).
+- **Score page (`/`)**: Submit job postings for scoring, view metrics and decision rationale
+- **Review page (`/review`)**: Human-in-the-loop feedback and case triage
+- **Chat page (`/chat`)**: AI-powered chatbot for fraud detection insights
 
-### 7.4 Linting (optional)
+### 7.4 Code Quality & Linting
+
+The frontend includes comprehensive formatting and linting tools:
 
 ```bash
+# Check code formatting
+npm run format:check
+
+# Auto-format all code
+npm run format
+
+# Lint TypeScript/JavaScript
 npm run lint
+
+# Auto-fix linting issues
+npm run lint:fix
+
+# Type check with TypeScript
+npm run type-check
+
+# Run all checks
+npm run check-all
 ```
+
+**Available Scripts:**
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Lint code with ESLint
+- `npm run lint:fix` - Auto-fix linting issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check code formatting
+- `npm run type-check` - Run TypeScript compiler
+- `npm run check-all` - Run all checks (type + lint + format)
+
+> [!TIP]
+> Run `npm run check-all` before committing to ensure code quality.
+
+> [!IMPORTANT]
+> Run `source .venv/bin/activate && python -m black . && (cd frontend && npm run format)` to format both backend and frontend codebases, BEFORE committing changes and pushing to remote!!!
 
 ---
 
-## 8. Human-in-the-Loop Review & Feedback
+## 8. AI Chatbot (Google Gemini Integration)
+
+The project includes an AI-powered chatbot that helps users understand fraud detection results.
+
+### 8.1 Setup
+
+1. **Get your Gemini API Key:**
+   - Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Sign in and create an API key
+   - Copy the generated key
+
+2. **Add to environment:**
+   ```bash
+   # In .env file (project root)
+   GEMINI_API_KEY=your_api_key_here
+   ```
+
+3. **Restart the backend server:**
+   ```bash
+   make serve
+   # or
+   PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+### 8.2 Features
+
+- **Streaming Responses**: Real-time AI responses powered by Google Gemini 1.5 Flash
+- **Context-Aware**: Automatically includes fraud detection results and job posting details
+- **Persistent History**: Chat history saved in browser localStorage
+- **Beautiful UI**: Modern chat interface with animations and gradients
+- **Error Robust**: Works even without prediction context
+
+### 8.3 Usage
+
+**Option 1: From Score Page**
+1. Analyze a job posting on the Score page (`/`)
+2. Click the **"Ask AI about this result"** button
+3. Start chatting with context automatically loaded
+
+**Option 2: Direct Access**
+1. Click the **"Chat"** tab in navigation
+2. Ask general questions about job fraud detection
+
+**Example Questions:**
+- "Why is this job posting flagged as fraudulent?"
+- "What are the red flags in this posting?"
+- "Should I apply to this job?"
+- "Explain the fraud indicators in simple terms"
+
+### 8.4 Keyboard Shortcuts
+
+- `Enter` - Send message
+- `Shift + Enter` - New line in message
+
+### 8.5 API Endpoint
+
+**POST /chat** - Stream chat responses
+
+```bash
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Why is this job suspicious?",
+    "context": {
+      "job_posting": {...},
+      "prediction": {...}
+    }
+  }'
+```
+
+Response is streamed as Server-Sent Events (SSE):
+```
+data: {"chunk": "This job posting ", "done": false}
+data: {"chunk": "appears suspicious because...", "done": false}
+data: {"chunk": "", "done": true}
+```
+
+### 8.6 Troubleshooting
+
+**Problem: "GEMINI_API_KEY not set" error**
+- Solution: Add `GEMINI_API_KEY=your_key` to `.env` and restart backend
+
+**Problem: CORS errors**
+- Solution: Check `SPOT_SCAM_ALLOWED_ORIGINS` includes your frontend URL
+
+**Problem: Chatbot works but no job context**
+- Solution: Navigate from Score page after running a prediction, or use chatbot standalone (works without context)
+
+---
+
+## 9. Human-in-the-Loop Review & Feedback
 
 1. **Serve the API for review workflows**
    ```bash
@@ -259,35 +453,225 @@ npm run lint
 
 ---
 
-## 9. Helpful Make Targets
+## 10. Code Quality & Development Tools
+
+The project includes comprehensive formatting and linting tools for both Python and TypeScript.
+
+### 10.1 Python Tools
+
+**Formatting (Black):**
+```bash
+make format              # Format all Python code
+make format-check        # Check formatting without changes
+```
+
+**Linting (Ruff):**
+```bash
+make lint                # Check for linting issues
+make lint-fix            # Auto-fix linting issues
+```
+
+**Type Checking (mypy):**
+```bash
+make type-check          # Run mypy on src/
+```
+
+**All Checks:**
+```bash
+make check-all           # Run format-check + lint + type-check
+```
+
+**Cleanup:**
+```bash
+make clean               # Remove Python cache files
+```
+
+### 10.2 TypeScript/Frontend Tools
+
+**Formatting (Prettier):**
+```bash
+make frontend-format          # Format all TypeScript code
+make frontend-format-check    # Check formatting
+```
+
+**Linting (ESLint):**
+```bash
+make frontend-lint            # Check for linting issues
+make frontend-lint-fix        # Auto-fix linting issues
+```
+
+**Type Checking (TypeScript):**
+```bash
+make frontend-type-check      # Run TypeScript compiler
+```
+
+**All Checks:**
+```bash
+make frontend-check           # Run all frontend checks
+```
+
+### 10.3 Pre-commit Hooks
+
+Install pre-commit hooks to automatically check code quality before commits:
+
+```bash
+# Install pre-commit
+pip install pre-commit
+
+# Install hooks
+pre-commit install
+
+# Run manually on all files
+pre-commit run --all-files
+```
+
+**What gets checked:**
+- Trailing whitespace removal
+- End-of-file fixing
+- YAML/JSON/TOML validation
+- Python: Black formatting, Ruff linting, mypy type checking
+- TypeScript: Prettier formatting, ESLint linting
+
+**Skip hooks (not recommended):**
+```bash
+git commit --no-verify -m "commit message"
+```
+
+### 10.4 Help Command
+
+View all available Make commands:
+
+```bash
+make help
+```
+
+---
+
+## 11. Helpful Make Targets
 
 From project root:
 
-| Command                 | Purpose                                                        |
-|-------------------------|----------------------------------------------------------------|
-| `make install`          | Install Python dependencies (same as `pip install -e .[dev]`). |
-| `make train`            | Run full training pipeline.                                    |
-| `make train-fast`       | Train classical models only.                                   |
-| `make serve`            | Launch FastAPI server on port 8000.                            |
-| `make serve-queue`      | Launch FastAPI server with review endpoints (same host/port).  |
-| `make test`             | Execute unit tests with coverage.                              |
-| `make lint`             | Run Ruff + Black checks.                                       |
-| `make frontend-install` | Install frontend dependencies (`npm install`).                 |
-| `make frontend`         | Start Next.js dev server (`npm run dev`).                      |
-| `make review-sample`    | Sample uncertain predictions into `experiments/tables/active_sample.csv`. |
-| `make retrain-with-feedback` | Run training with reviewer overrides applied (`USE_FEEDBACK=1`). |
+### Training & Serving
+
+| Command                      | Purpose                                                        |
+|------------------------------|----------------------------------------------------------------|
+| `make install`               | Install Python dependencies (same as `pip install -e .[dev]`). |
+| `make train`                 | Run full training pipeline.                                    |
+| `make train-fast`            | Train classical models only.                                   |
+| `make serve`                 | Launch FastAPI server on port 8000.                            |
+| `make serve-queue`           | Launch FastAPI server with review endpoints.                   |
+| `make test`                  | Execute unit tests with coverage.                              |
+| `make review-sample`         | Sample uncertain predictions.                                  |
+| `make retrain-with-feedback` | Run training with reviewer overrides.                          |
+
+### Python Code Quality
+
+| Command              | Purpose                                    |
+|----------------------|--------------------------------------------|
+| `make format`        | Format Python code with Black.             |
+| `make format-check`  | Check Python formatting.                   |
+| `make lint`          | Lint Python code with Ruff.                |
+| `make lint-fix`      | Auto-fix Python linting issues.            |
+| `make type-check`    | Run mypy type checking.                    |
+| `make check-all`     | Run all Python checks.                     |
+| `make clean`         | Clean Python cache files.                  |
+
+### Frontend Development
+
+| Command                      | Purpose                                    |
+|------------------------------|--------------------------------------------|
+| `make frontend-install`      | Install frontend dependencies.             |
+| `make frontend`              | Start Next.js dev server.                  |
+| `make frontend-format`       | Format TypeScript code with Prettier.      |
+| `make frontend-format-check` | Check TypeScript formatting.               |
+| `make frontend-lint`         | Lint TypeScript code with ESLint.          |
+| `make frontend-lint-fix`     | Auto-fix TypeScript linting issues.        |
+| `make frontend-type-check`   | Run TypeScript type checking.              |
+| `make frontend-check`        | Run all frontend checks.                   |
+
+### Utilities
+
+| Command      | Purpose                              |
+|--------------|--------------------------------------|
+| `make help`  | Show all available make commands.    |
+
+> [!TIP]
+> Run `make check-all` and `make frontend-check` before committing code.
 
 ---
 
-## 10. Testing & Quality Assurance
+## 12. Testing & Quality Assurance
 
-- **Python tests:** `source .venv/bin/activate && PYTHONPATH=src pytest`
-- **Frontend lint:** `cd frontend && npm run lint`
-- **Manual verification:** Use FastAPI’s `/metadata` and `/predict/single` endpoints or the dashboard.
+### 12.1 Python Tests
+
+```bash
+# Run all tests with coverage
+make test
+
+# Or manually
+source .venv/bin/activate
+PYTHONPATH=src pytest
+```
+
+### 12.2 Code Quality Checks
+
+**Before committing, always run:**
+
+```bash
+# Python checks
+make check-all         # Runs format-check + lint + type-check
+
+# TypeScript checks
+make frontend-check    # Runs format-check + lint + type-check
+```
+
+**Or use pre-commit hooks:**
+
+```bash
+pip install pre-commit
+pre-commit install
+
+# Now checks run automatically on git commit
+```
+
+### 12.3 Manual API Testing
+
+```bash
+# Health check
+curl http://localhost:8000/health
+
+# Single prediction
+curl -X POST http://localhost:8000/predict/single \
+  -H "Content-Type: application/json" \
+  -d '{"title": "Software Engineer", "description": "..."}'
+
+# Chat endpoint
+curl -X POST http://localhost:8000/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello!"}'
+```
+
+### 12.4 Frontend Testing
+
+```bash
+cd frontend
+
+# Type check
+npm run type-check
+
+# Lint
+npm run lint
+
+# Format check
+npm run format:check
+
+# All checks
+npm run check-all
+```
 
 ---
 
-## 11. Docker & Devcontainer
+## 13. Docker & Devcontainer
 
 ### 11.1 Docker Compose Runtime
 
@@ -306,15 +690,18 @@ docker compose exec api bash
 PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 ```
 
-### 11.2 Devcontainer (VS Code)
+### 13.2 Devcontainer (VS Code)
 
 1. Install the Dev Containers extension.
 2. Open the repository and select **“Reopen in Container”**.
 3. The container provisions Python 3.12 and Node 20, runs `pip install -e .[dev] && npm install --prefix frontend`, and forwards ports `8000/3000`.
 
+> [!NOTE]
+> When using Docker, environment variables can be passed via `docker-compose.yml` or a `.env` file. Make sure to set `GEMINI_API_KEY` if you want to use the chatbot feature.
+
 ---
 
-## 11. Cleanup & Regeneration
+## 14. Cleanup & Regeneration
 
 To regenerate artifacts/experiments:
 
@@ -327,13 +714,69 @@ PYTHONPATH=src python -m spot_scam.pipeline.train
 
 ---
 
-## 12. Troubleshooting Tips
+## 15. Troubleshooting Tips
+
+### General Issues
 
 - **Missing CUDA / GPU fallback:** Transformer training will automatically use CPU if CUDA is unavailable (slower). Ensure `torch.cuda.is_available()` returns `True` for GPU acceleration.
 - **Network hiccups when installing packages:** Retry with `--no-cache-dir`, or pre-download wheels if proxies are involved.
 - **Kaggle authentication errors:** Ensure `KAGGLE_USERNAME` and `KAGGLE_KEY` env vars are set or `~/.kaggle/kaggle.json` has correct permissions (`chmod 600`).
 - **Frontend 404s:** Confirm FastAPI and Next.js are running; check `NEXT_PUBLIC_API_BASE_URL`.
 
----
+### Chatbot Issues
 
-You’re all set! The project now provides a calibrated fraud detector with an interactive UI, ready for experimentation and extension. Happy modeling! 🎯
+- **"GEMINI_API_KEY not set" error:**
+  - Add `GEMINI_API_KEY=your_key` to `.env` file in project root
+  - Restart the backend server
+  - Verify the key is correct from Google AI Studio
+
+- **CORS errors in chatbot:**
+  - Check `SPOT_SCAM_ALLOWED_ORIGINS` in `.env`
+  - Ensure it includes your frontend URL (e.g., `http://localhost:3000`)
+  - Restart backend after changes
+
+- **Streaming not working:**
+  - Check browser DevTools → Network tab for SSE connection
+  - Try a different browser (Chrome/Firefox recommended)
+  - Ensure backend is returning `text/event-stream` content type
+
+- **Chat has no context:**
+  - This is normal when accessing `/chat` directly
+  - Navigate from Score page after running a prediction to include context
+  - Chatbot works fine without context, just won't have specific job details
+
+### Code Quality Issues
+
+- **Black and Ruff conflicts:**
+  ```bash
+  # Format with Black first
+  black src/
+  # Then run Ruff
+  ruff check --fix src/
+  ```
+
+- **ESLint cache issues:**
+  ```bash
+  cd frontend
+  rm -rf .eslintcache node_modules/.cache
+  npm install
+  npm run lint
+  ```
+
+- **Pre-commit hook failures:**
+  ```bash
+  # Update hooks
+  pre-commit autoupdate
+  # Clear cache
+  pre-commit clean
+  # Reinstall
+  pre-commit install --install-hooks
+  ```
+
+- **Type checking errors:**
+  ```bash
+  # Install type stubs
+  pip install types-all
+  # Run with verbose output
+  mypy --show-error-codes src/
+  ```

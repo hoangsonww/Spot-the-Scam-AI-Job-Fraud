@@ -14,7 +14,9 @@ class ConfigError(Exception):
     """Raised when configuration loading fails."""
 
 
-def _deep_merge(base: MutableMapping[str, Any], updates: Mapping[str, Any]) -> MutableMapping[str, Any]:
+def _deep_merge(
+    base: MutableMapping[str, Any], updates: Mapping[str, Any]
+) -> MutableMapping[str, Any]:
     """
     Recursively merge two dictionaries.
 
@@ -95,8 +97,8 @@ def config_hash(config: Mapping[str, Any]) -> str:
     """
     serialized = json.dumps(config, sort_keys=True, separators=(",", ":"))
     # Fowler–Noll–Vo (FNV-1a) 64-bit hash
-    hash_val = 0xcbf29ce484222325
-    fnv_prime = 0x100000001b3
+    hash_val = 0xCBF29CE484222325
+    fnv_prime = 0x100000001B3
     for char in serialized:
         hash_val ^= ord(char)
         hash_val = (hash_val * fnv_prime) & 0xFFFFFFFFFFFFFFFF
@@ -109,4 +111,3 @@ __all__ = [
     "dump_config",
     "config_hash",
 ]
-

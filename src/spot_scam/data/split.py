@@ -30,12 +30,16 @@ def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> Sp
     target_col = data_conf["target_column"]
 
     if target_col not in df.columns:
-        raise ValueError(f"Target column '{target_col}' not found in dataframe columns: {df.columns}")
+        raise ValueError(
+            f"Target column '{target_col}' not found in dataframe columns: {df.columns}"
+        )
 
-    logger.info("Creating stratified train/val/test splits (%.0f/%.0f/%.0f)",
-                splits_conf["train"] * 100,
-                splits_conf["val"] * 100,
-                splits_conf["test"] * 100)
+    logger.info(
+        "Creating stratified train/val/test splits (%.0f/%.0f/%.0f)",
+        splits_conf["train"] * 100,
+        splits_conf["val"] * 100,
+        splits_conf["test"] * 100,
+    )
 
     # Compute deterministic checksums to avoid duplicates across splits
     checksum_col = "_checksum"
@@ -47,7 +51,9 @@ def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> Sp
 
     if df[checksum_col].duplicated().any():
         dup_count = df[checksum_col].duplicated().sum()
-        logger.warning("Detected %d duplicate records based on text checksum; dropping duplicates.", dup_count)
+        logger.warning(
+            "Detected %d duplicate records based on text checksum; dropping duplicates.", dup_count
+        )
         df = df.drop_duplicates(subset=checksum_col)
 
     stratify = df[target_col] if splits_conf.get("stratify", True) else None
@@ -73,7 +79,9 @@ def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> Sp
 
     for split_name, split_df in zip(["train", "val", "test"], [train_df, val_df, test_df]):
         ratio = split_df[target_col].mean()
-        logger.info("%s split size: %d | fraud ratio: %.3f", split_name.capitalize(), len(split_df), ratio)
+        logger.info(
+            "%s split size: %d | fraud ratio: %.3f", split_name.capitalize(), len(split_df), ratio
+        )
 
     train_df = train_df.drop(columns=[checksum_col])
     val_df = val_df.drop(columns=[checksum_col])
@@ -82,7 +90,9 @@ def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> Sp
     return SplitResult(train=train_df, val=val_df, test=test_df)
 
 
-def _persist_splits_indices(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame, config: Dict) -> None:
+def _persist_splits_indices(
+    train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame, config: Dict
+) -> None:
     processed_dir = Path(config["data"]["processed_dir"])
     processed_dir.mkdir(parents=True, exist_ok=True)
     splits_path = processed_dir / "split_indices.npz"
@@ -104,4 +114,3 @@ def load_split_indices(config: Dict) -> Tuple[np.ndarray, np.ndarray, np.ndarray
 
 
 __all__ = ["create_splits", "SplitResult", "load_split_indices"]
-

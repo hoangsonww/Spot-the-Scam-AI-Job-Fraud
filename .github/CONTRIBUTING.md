@@ -46,4 +46,4 @@ Thanks for your interest in contributing! Please take a moment to read this guid
 
 2. Open a PR against `develop` and fill out the PR template.
 3. Ensure CI passes (lint, tests, build).
-4. Respond to review feedback—thank you!
+4. Respond to review feedback - thank you!

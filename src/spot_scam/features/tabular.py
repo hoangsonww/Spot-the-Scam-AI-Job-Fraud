@@ -73,7 +73,13 @@ def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
             features[column] = numeric
 
     # Additional metadata counts (presence)
-    optional_columns = ["employment_type", "required_experience", "required_education", "industry", "function"]
+    optional_columns = [
+        "employment_type",
+        "required_experience",
+        "required_education",
+        "industry",
+        "function",
+    ]
     for column in optional_columns:
         if column in df.columns:
             raw = df[column]

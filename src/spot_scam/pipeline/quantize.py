@@ -14,8 +14,14 @@ logger = configure_logging(__name__)
 
 
 def main(
-    output_dir: Path = typer.Option(ARTIFACTS_DIR / "transformer" / "quantized", "--output-dir", help="Destination for quantized weights."),
-    dtype: str = typer.Option("qint8", "--dtype", help="Target dtype (currently only qint8 supported)."),
+    output_dir: Path = typer.Option(
+        ARTIFACTS_DIR / "transformer" / "quantized",
+        "--output-dir",
+        help="Destination for quantized weights.",
+    ),
+    dtype: str = typer.Option(
+        "qint8", "--dtype", help="Target dtype (currently only qint8 supported)."
+    ),
 ) -> None:
     """Quantize the fine-tuned transformer checkpoint using dynamic quantization."""
     best_dir = ARTIFACTS_DIR / "transformer" / "best"
@@ -29,7 +35,9 @@ def main(
         raise typer.Exit("Only qint8 dynamic quantization is supported at the moment.")
 
     logger.info("Applying dynamic quantization (torch.nn.Linear -> int8)...")
-    quantized_model = torch.quantization.quantize_dynamic(model, {torch.nn.Linear}, dtype=torch.qint8)
+    quantized_model = torch.quantization.quantize_dynamic(
+        model, {torch.nn.Linear}, dtype=torch.qint8
+    )
 
     output_dir.mkdir(parents=True, exist_ok=True)
     target_path = output_dir / "model.pt"
@@ -42,11 +50,13 @@ def main(
     else:
         metadata = {}
     metadata.setdefault("quantized", {})
-    metadata["quantized"].update({
-        "available": True,
-        "dtype": "dynamic_int8",
-        "path": str(target_path.relative_to(ARTIFACTS_DIR)),
-    })
+    metadata["quantized"].update(
+        {
+            "available": True,
+            "dtype": "dynamic_int8",
+            "path": str(target_path.relative_to(ARTIFACTS_DIR)),
+        }
+    )
     metadata_path.write_text(json.dumps(metadata, indent=2))
     logger.info("Metadata updated with quantized model info.")
 

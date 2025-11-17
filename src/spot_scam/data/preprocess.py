@@ -40,7 +40,11 @@ def preprocess_dataframe(df: pd.DataFrame, config: Dict) -> Tuple[pd.DataFrame, 
     drop_cols = set(config["data"].get("drop_columns", []))
     existing_drop_cols = [col for col in drop_cols if col in df.columns]
     if existing_drop_cols:
-        logger.info("Dropping %d columns marked for removal: %s", len(existing_drop_cols), existing_drop_cols)
+        logger.info(
+            "Dropping %d columns marked for removal: %s",
+            len(existing_drop_cols),
+            existing_drop_cols,
+        )
         df = df.drop(columns=existing_drop_cols)
 
     categorical_fields = config["data"].get("categorical_fields", [])

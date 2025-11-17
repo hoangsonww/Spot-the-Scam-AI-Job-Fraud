@@ -47,6 +47,10 @@ Requires-Dist: onnxruntime>=1.17.0
 Requires-Dist: onnxmltools>=1.11.0
 Requires-Dist: skl2onnx>=1.15.0
 Requires-Dist: optimum[onnxruntime]>=1.17.0
+Requires-Dist: google-generativeai>=0.3.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: optuna>=3.5.0
+Requires-Dist: optuna-dashboard>=0.14.0
 Provides-Extra: dev
 Requires-Dist: pytest>=7.4.0; extra == "dev"
 Requires-Dist: pytest-cov>=4.1.0; extra == "dev"

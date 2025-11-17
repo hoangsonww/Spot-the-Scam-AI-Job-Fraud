@@ -15,9 +15,14 @@ app = typer.Typer(add_completion=False)
 
 def _check_kaggle_cli() -> None:
     try:
-        subprocess.run(["kaggle", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.run(
+            ["kaggle", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
     except Exception as exc:  # pragma: no cover
-        typer.secho("Kaggle CLI not found. Install with `pip install kaggle` and configure your API token.", fg=typer.colors.RED)
+        typer.secho(
+            "Kaggle CLI not found. Install with `pip install kaggle` and configure your API token.",
+            fg=typer.colors.RED,
+        )
         raise typer.Exit(code=1) from exc
 
 
