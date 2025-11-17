@@ -9,7 +9,7 @@ This document provides a comprehensive analysis of the training strategies, hype
 - **Current Configuration:** 3 epochs for DistilBERT transformer with early stopping
 - **Performance:** Strong results across all metrics (Test F1: 0.819, Precision: 0.919, Recall: 0.738)
 - **Model Winner:** Classical models (Linear SVM and Logistic Regression) consistently outperform the transformer approach
-- **Expanded classical stack:** This branch adds an aggressive-yet-capped XGBoost sweep plus weighted ensembles so the tfidf+tabular pipeline can chase extra validation lift without destabilizing runtime.
+- **Expanded classical stack:** Adds an aggressive-yet-capped XGBoost sweep plus weighted ensembles so the tfidf+tabular pipeline can chase extra validation lift without destabilizing runtime.
 - **Benchmark & reproducibility upgrades:** Train/val/test splits are persisted to `data/processed/*.parquet` and each run exports latency benchmarks + per-variant XGBoost artifacts for auditing.
 - **System Maturity:** Production-grade architecture with comprehensive monitoring, calibration, explainability, and human-in-the-loop feedback
 - **Verdict:** Current training configuration is optimal for this dataset size and problem domain
@@ -69,9 +69,9 @@ The classical pipeline wins primarily due to:
 4. Low inference latency (2-5ms per prediction)
 5. Smaller memory footprint (50MB vs 250MB)
 
-##### New XGBoost Extension
+##### XGBoost Extension
 
-To keep squeezing headroom from the classical track, this branch introduces a dedicated `XGBoostModel` wrapper (`src/spot_scam/models/xgboost_model.py`) that trains and evaluates up to 12 carefully curated variants per run. The grid explores:
+To keep squeezing headroom from the classical track, we introduced a dedicated `XGBoostModel` wrapper (`src/spot_scam/models/xgboost_model.py`) that trains and evaluates up to 12 carefully curated variants per run. The grid explores:
 
 ```
 max_depth: [4, 6, 8]
@@ -126,6 +126,7 @@ Competitive with classical models but doesn't justify the overhead
 - **LightGBM 4.x:** Gradient boosting option (currently not selected)
 - **PyTorch:** Deep learning framework with CUDA support
 - **ONNX 1.15:** Model export and optimization format
+- **XGBoost 1.7:** Gradient boosting with efficient tree learning
 
 **MLOps & Serving:**
 - **FastAPI 0.121:** High-performance API serving

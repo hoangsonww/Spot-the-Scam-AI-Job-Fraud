@@ -198,7 +198,7 @@ flowchart TD
     L --> M[append tracking CSV]
 ```
 
-**Enhancements in this branch**
+**New Enhancements**
 
 - Splits are written to `data/processed/{train,val,test}.parquet`, so downstream notebooks and Optuna sweeps can consume the exact data used during training.
 - A dedicated `XGBoostModel` wrapper runs an aggressive-yet-capped hyperparameter sweep, logging every calibrated variant under `artifacts/xgboost*` for forensic analysis.
