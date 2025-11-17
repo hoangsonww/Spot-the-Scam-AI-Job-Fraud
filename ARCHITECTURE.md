@@ -11,7 +11,7 @@ flowchart TD
     subgraph Offline Training
         A1[Raw Kaggle CSV] -->|Download| A2[Data Ingestion]
         A2 --> A3[Preprocessing & Feature Engineering]
-        A3 --> A4[Classical Models]
+        A3 --> A4[Classical Models & Ensembles]
         A3 --> A5[DistilBERT Fine-tuning]
         A4 --> A6[Calibration & Selection]
         A5 --> A6
@@ -73,7 +73,8 @@ graph LR
     end
     subgraph Models
         M1[models.classical]
-        M2[models.transformer]
+        M2[models.xgboost_model]
+        M3[models.transformer]
     end
     subgraph Tuning
         T1[tuning.optuna_tuner]
@@ -95,16 +96,20 @@ graph LR
     D1 --> D2 --> D3 --> F3
     F3 --> M1
     F3 --> M2
+    F3 --> M3
     F3 --> T1
     T1 -.optimize.-> M1
     T1 -.optimize.-> M2
+    T1 -.optimize.-> M3
     M1 --> E1
     M2 --> E1
+    M3 --> E1
     E1 --> E2
     E1 --> E3
     E1 --> E4
     M1 --> I1
     M2 --> I1
+    M3 --> I1
     I1 --> I2
     I1 --> I4
     I4 --> I3
@@ -122,15 +127,17 @@ graph LR
   - `features.builders`: orchestrates vectorizer + tabular scaler combo.
 
 - **Models**  
-  - `models.classical`: logistic regression, linear SVM, LightGBM with config-driven grids.  
-  - `models.transformer`: DistilBERT fine-tune with HF Trainer (AMP + early stopping).
+  - `models.classical`: logistic regression, linear SVM, LightGBM with config-driven grids and calibration wrappers.  
+  - `models.xgboost_model`: rich XGBoost search with dynamic grids, metadata logging, and artifact persistence.  
+  - `models.transformer`: DistilBERT fine-tune with HF Trainer (AMP + early stopping).  
+  - Weighted ensembles layer the strongest tfidf+tabular stacks for extra validation lift.
 
 - **Tuning**  
   - `tuning.optuna_tuner`: Bayesian hyperparameter optimization using Optuna.  
   - Intelligent search with TPE (Tree-structured Parzen Estimator) sampler.  
   - Supports continuous hyperparameter spaces (e.g., C from 0.01 to 100.0).  
-  - CLI interface via `scripts/tune_with_optuna.py` for easy integration.  
-  - Returns best hyperparameters, F1 score, and study object for visualization.
+  - CLI interface via `scripts/tune_with_optuna.py` and docs in `docs/optuna_quickstart.md` / `docs/optuna_tuning.md`.  
+  - Returns best hyperparameters, F1 score, study object, and ready-to-copy YAML overrides.
 
 - **Evaluation**  
   - Metrics (F1, PR-AUC, calibration).  
@@ -164,7 +171,7 @@ sequenceDiagram
     Data->>Data: preprocess_dataframe()
     Data->>Data: create_splits()
     Data->>Features: build_feature_bundle()
-    Features->>Models: train_classical_models()
+    Features->>Models: train_classical_models() + XGBoost search
     Features->>Models: train_transformer_model()
     Models->>Eval: compute_metrics()
     Eval->>Persist: save artifacts + plots + tables
@@ -180,16 +187,23 @@ flowchart TD
     B --> C[load_raw_dataset & merge CSVs]
     C --> D[preprocess_dataframe]
     D --> E[create_splits & persist indices]
-    E --> F[build_feature_bundle]
-    F --> G[train_classical_models]
+    E --> F[build_feature_bundle + persist parquet splits]
+    F --> G[train_classical_models + XGBoost variants]
     F --> H[train_transformer_model]
-    G --> I[select best model]
+    G --> I[ensembles + select best model]
     H --> I
-    I --> J[calibrate & evaluate]
+    I --> J[calibrate, benchmark & evaluate]
     J --> K[persist artifacts & metadata]
     K --> L[generate reports & benchmarks]
     L --> M[append tracking CSV]
 ```
+
+**Enhancements in this branch**
+
+- Splits are written to `data/processed/{train,val,test}.parquet`, so downstream notebooks and Optuna sweeps can consume the exact data used during training.
+- A dedicated `XGBoostModel` wrapper runs an aggressive-yet-capped hyperparameter sweep, logging every calibrated variant under `artifacts/xgboost*` for forensic analysis.
+- The best TF-IDF + tabular candidates feed probabilistic ensembles whose weights are optimized via validation F1 (using `optimal_threshold` for consistent decision points).
+- After selection, the pipeline benchmarks latency/throughput across configurable batch sizes, producing CSVs + plots for the dashboard.
 
 ---
 
@@ -200,11 +214,13 @@ flowchart TD
 | `artifacts/model.joblib`         | Calibrated estimator (used in inference).              |
 | `artifacts/base_model.joblib`    | Uncalibrated base (pre-calibration).                   |
 | `artifacts/features/`            | TF-IDF vectorizer (`*.joblib`), scaler, feature names. |
+| `artifacts/xgboost*`             | Variant-specific calibrated/base estimators.           |
 | `artifacts/transformer/`         | DistilBERT checkpoints (`best/`, tokenizers).          |
 | `artifacts/metadata.json`        | Metrics summary, gray-zone policy, threshold.          |
+| `data/processed/*.parquet`       | Persisted train/val/test splits for reproducibility.   |
 | `artifacts/test_predictions.csv` | Final test set with decisions.                         |
 | `experiments/figs/`              | PR curve, calibration curve, confusion matrix.         |
-| `experiments/tables/`            | Token importances, frequency analysis, slice metrics.  |
+| `experiments/tables/`            | Token importances, frequency analysis, slice metrics, latency benchmarks.  |
 | `experiments/report.md`          | Markdown report for quick consumption.                 |
 
 ---

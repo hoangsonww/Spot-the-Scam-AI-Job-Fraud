@@ -25,13 +25,14 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 > Intelligent fraud triage for job postings - built for transparency and speed! 
 
 ## Features
-- **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
-- **Hyperparameter optimization**: Integrated Optuna support for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
+- **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, a capped-yet-aggressive XGBoost sweep, weighted ensembles, DistilBERT fine-tuning, and strict artifact persistence.
+- **Hyperparameter optimization**: Integrated Optuna support (see `docs/optuna_quickstart.md` / `docs/optuna_tuning.md`) plus the `scripts/tune_with_optuna.py` CLI for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
 - **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
+- **Benchmark-ready artifacts**: Every run saves `data/processed/{train,val,test}.parquet`, per-variant XGBoost artifacts, and latency benchmarks (`experiments/tables/benchmark_*.csv`, `experiments/figs/latency_throughput.png`) so notebooks, dashboards, and Ops teams have deterministic inputs and real measurements.
 
 ## Outputs & File Structure
 - `artifacts/` - models, vectorizers, calibration metadata, final predictions.
@@ -42,7 +43,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 - `tracking/` - MLflow experiment runs and artifacts.
 - `experiments/report.md` - markdown report summarizing key results and insights.
 - `frontend/` - Next.js + shadcn UI + TailwindCSS source code.
-- `data/` - raw and processed datasets.
+- `data/` - raw Kaggle exports plus `processed/` parquet splits created by the training pipeline.
 - `INSTRUCTIONS.md` - step-by-step setup, training, serving, and frontend guidance.
 - `ARCHITECTURE.md` - detailed system architecture with flow diagrams.
 
