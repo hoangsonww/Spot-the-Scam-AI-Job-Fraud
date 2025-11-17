@@ -31,10 +31,14 @@ from spot_scam.evaluation.curves import (
     plot_probability_vs_feature,
     plot_latency_curve,
 )
-from spot_scam.evaluation.metrics import MetricResults, compute_metrics, expected_calibration_error
+from spot_scam.evaluation.metrics import MetricResults, compute_metrics, expected_calibration_error, optimal_threshold
 from spot_scam.features.builders import FeatureBundle, build_feature_bundle
 from spot_scam.models.classical import ModelRun, train_classical_models
-from spot_scam.models.transformer import TransformerRun, train_transformer_model
+from spot_scam.models.xgboost_model import XGBoostModel
+from sklearn.calibration import CalibratedClassifierCV
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:  # avoid heavy imports unless actually training transformer
+    from spot_scam.models.transformer import TransformerRun  # type: ignore
 from spot_scam.tracking.logger import append_run_record
 from spot_scam.tracking.feedback import load_feedback_dataframe
 from spot_scam.policy.gray_zone import classify_probability
@@ -42,7 +46,6 @@ from spot_scam.utils.logging import configure_logging
 from spot_scam.utils.paths import ARTIFACTS_DIR, FIGS_DIR, TABLES_DIR, EXPERIMENTS_DIR, ensure_directories
 from spot_scam.evaluation.reporting import render_markdown_report
 from spot_scam.explainability.textual import top_tfidf_terms, token_frequency_analysis
-from spot_scam.explainability.shapley import compute_tabular_shap
 from spot_scam.export import log_model_to_mlflow, MLFlowExportError
 
 app = typer.Typer(add_completion=False)
@@ -111,6 +114,7 @@ def run(
     ),
 ) -> None:
     """Execute the end-to-end training pipeline."""
+    print("RUN FUNCTION ENTERED")
     config = load_config(config_path=config_path)
     use_feedback_env = os.getenv("USE_FEEDBACK", "").lower() in {"1", "true", "yes"}
     use_feedback_enabled = use_feedback or use_feedback_env
@@ -160,6 +164,97 @@ def run(
     y_test = splits.test[config["data"]["target_column"]].values
 
     classical_runs = train_classical_models(bundle, y_train, y_val, config)
+
+    # ------------------------------------------------------------------
+    # Train multiple XGBoost variants to seek higher validation/test F1.
+    # Grid chosen to vary depth, learning rate, regularization, and class balance.
+    xgb_grid = []
+    pos = int((y_train == 1).sum())
+    neg = int((y_train == 0).sum())
+    spw_default = max(int(neg / max(pos, 1)), 1)  # scale_pos_weight heuristic
+    for max_depth in [4, 6, 8]:
+        for learning_rate in [0.05, 0.03, 0.02]:
+            for n_estimators in [600, 800, 1000]:
+                for subsample in [0.9]:
+                    for colsample in [0.9]:
+                        for min_child_weight in [1, 5, 10]:
+                            for reg_alpha in [0, 0.1, 0.3]:
+                                for reg_lambda in [1, 2, 5]:
+                                    for spw in [int(spw_default*0.7), spw_default, int(spw_default*1.3)]:
+                                        xgb_grid.append({
+                                            "max_depth": max_depth,
+                                            "learning_rate": learning_rate,
+                                            "n_estimators": n_estimators,
+                                            "subsample": subsample,
+                                            "colsample_bytree": colsample,
+                                            "min_child_weight": min_child_weight,
+                                            "reg_alpha": reg_alpha,
+                                            "reg_lambda": reg_lambda,
+                                            "scale_pos_weight": spw,
+                                        })
+
+    # Limit total variants to avoid excessive runtime if grid explodes
+    MAX_XGB_VARIANTS = 12
+    if len(xgb_grid) > MAX_XGB_VARIANTS:
+        # Simple down-select: keep first MAX_XGB_VARIANTS evenly spread
+        step = len(xgb_grid) / MAX_XGB_VARIANTS
+        xgb_grid = [xgb_grid[int(i * step)] for i in range(MAX_XGB_VARIANTS)]
+
+    xgb_result = None
+    for params in xgb_grid:
+        try:
+            start_xgb = time.time()
+            # Construct model instance on-the-fly overriding base estimator hyperparams
+            xgb_model = XGBoostModel(config)
+            # Override internal base_estimator parameters
+            xgb_model.base_estimator.set_params(**params, eval_metric="logloss", tree_method="hist", use_label_encoder=False)
+            xgb_result = xgb_model.fit(bundle, y_train, y_val)
+            xgb_train_time = time.time() - start_xgb
+            variant_name = (
+                f"XGBOOST_d{params['max_depth']}_lr{params['learning_rate']}_ne{params['n_estimators']}"
+                f"_mcw{params['min_child_weight']}_a{params['reg_alpha']}_l{params['reg_lambda']}_spw{params['scale_pos_weight']}"
+            )
+            logger.info(
+                "%s trained (%.1fs) F1=%.3f P=%.3f R=%.3f Thr=%.3f",
+                variant_name,
+                xgb_train_time,
+                xgb_result.val_metrics.values.get("f1", float('nan')),
+                xgb_result.val_metrics.values.get("precision", float('nan')),
+                xgb_result.val_metrics.values.get("recall", float('nan')),
+                xgb_result.threshold if xgb_result.threshold is not None else float('nan'),
+            )
+            classical_runs.append(
+                ModelRun(
+                    name=variant_name,
+                    estimator=xgb_result.calibrated_estimator,
+                    val_scores=xgb_result.val_probabilities,
+                    val_metrics=xgb_result.val_metrics,
+                    train_time=xgb_train_time,
+                    config=params,
+                    threshold=xgb_result.threshold,
+                    feature_type="tfidf+tabular",
+                )
+            )
+            # Persist each variant artifacts in its own subdirectory for potential analysis
+            try:
+                variant_dir = ARTIFACTS_DIR / "xgboost_variants" / variant_name
+                variant_dir.mkdir(parents=True, exist_ok=True)
+                joblib.dump(xgb_result.calibrated_estimator, variant_dir / "model.joblib")
+                joblib.dump(xgb_result.base_estimator, variant_dir / "base_model.joblib")
+            except Exception as exc:  # pragma: no cover
+                logger.warning("Failed to persist artifacts for %s: %s", variant_name, exc)
+        except Exception as exc:  # pragma: no cover - continue other variants
+            logger.warning("XGBoost variant %s failed: %s", params, exc)
+
+    # Persist XGBoost artifacts regardless of selection outcome
+    try:
+        if xgb_result is not None:
+            xgb_dir = ARTIFACTS_DIR / "xgboost"
+            xgb_dir.mkdir(parents=True, exist_ok=True)
+            joblib.dump(xgb_result.calibrated_estimator, xgb_dir / "model.joblib")
+            joblib.dump(xgb_result.base_estimator, xgb_dir / "base_model.joblib")
+    except Exception as exc:  # pragma: no cover - non critical
+        logger.warning("Failed to persist XGBoost artifacts: %s", exc)
     classical_artifacts = [
         _evaluate_classical_on_test(run, bundle, splits, config, y_val, y_test)
         for run in classical_runs
@@ -167,6 +262,8 @@ def run(
 
     transformer_artifact: Optional[BestModelArtifacts] = None
     if not skip_transformer:
+        # Lazy import to avoid pulling heavy deps during classical-only runs
+        from spot_scam.models.transformer import train_transformer_model
         transformer_run = train_transformer_model(
             splits.train,
             splits.val,
@@ -177,6 +274,143 @@ def run(
         transformer_artifact = _evaluate_transformer_on_test(transformer_run, config, y_test)
 
     candidate_artifacts: List[BestModelArtifacts] = list(classical_artifacts)
+
+    # ------------------------------------------------------------------
+    # Probabilistic ensemble of top K tfidf+tabular classical models.
+    try:
+        TOP_K = 3
+        tfidf_artifacts = [a for a in classical_artifacts if a.feature_type == "tfidf+tabular"]
+        tfidf_sorted = sorted(
+            tfidf_artifacts,
+            key=lambda a: a.val_metrics.values.get("f1", -np.inf),
+            reverse=True,
+        )
+        ensemble_components = tfidf_sorted[:TOP_K]
+        if len(ensemble_components) >= 2:
+            # Average calibrated probabilities
+            val_stack = np.vstack([c.val_probabilities for c in ensemble_components])
+            test_stack = np.vstack([c.test_probabilities for c in ensemble_components])
+            ensemble_val = val_stack.mean(axis=0)
+            ensemble_test = test_stack.mean(axis=0)
+            ensemble_threshold = optimal_threshold(
+                y_val,
+                ensemble_val,
+                metric=config["evaluation"]["thresholds"]["optimize_metric"],
+            )
+            ensemble_val_metrics = compute_metrics(
+                y_val,
+                ensemble_val,
+                metrics_list=config["evaluation"]["metrics"],
+                threshold=ensemble_threshold,
+                positive_label=1,
+            )
+            ensemble_test_metrics = compute_metrics(
+                y_test,
+                ensemble_test,
+                metrics_list=config["evaluation"]["metrics"],
+                threshold=ensemble_threshold,
+                positive_label=1,
+            )
+            ensemble_artifact = BestModelArtifacts(
+                name="ensemble_top3",
+                model_type="classical",  # treat as classical for inference compatibility
+                estimator=None,
+                base_estimator=None,
+                threshold=ensemble_threshold,
+                calibration_method=None,
+                val_metrics=ensemble_val_metrics,
+                val_probabilities=ensemble_val,
+                test_metrics=ensemble_test_metrics,
+                test_probabilities=ensemble_test,
+                test_labels=y_test,
+                feature_type="tfidf+tabular",
+                extra={
+                    "components": [c.name for c in ensemble_components],
+                    "is_ensemble": True,
+                },
+            )
+            candidate_artifacts.append(ensemble_artifact)
+            logger.info(
+                "Ensemble (top %d) F1=%.3f Precision=%.3f Recall=%.3f",
+                TOP_K,
+                ensemble_val_metrics.values.get("f1", np.nan),
+                ensemble_val_metrics.values.get("precision", np.nan),
+                ensemble_val_metrics.values.get("recall", np.nan),
+            )
+
+            # Weighted ensemble via simple grid search on validation
+            weights = None
+            best_w_val = ensemble_val
+            best_w_test = ensemble_test
+            best_w_threshold = ensemble_threshold
+            best_w_metrics = ensemble_val_metrics
+            K = len(ensemble_components)
+            if K == 2:
+                import numpy as _np
+                for w in [i/10.0 for i in range(1, 10)]:
+                    w_vec = _np.array([w, 1-w])[:, None]
+                    val_mix = (val_stack[:2] * w_vec).sum(axis=0)
+                    thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+                    m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
+                    if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
+                        weights = [w, 1-w]
+                        best_w_metrics = m
+                        best_w_threshold = thr
+                        best_w_val = val_mix
+                        best_w_test = (test_stack[:2] * w_vec).sum(axis=0)
+            elif K >= 3:
+                import numpy as _np
+                grid = [i/10.0 for i in range(0, 11)]
+                for w1 in grid:
+                    for w2 in grid:
+                        if w1 + w2 > 1.0:
+                            continue
+                        w3 = 1.0 - w1 - w2
+                        w_vec = _np.array([w1, w2, w3])[:, None]
+                        val_mix = (val_stack[:3] * w_vec).sum(axis=0)
+                        thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+                        m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
+                        if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
+                            weights = [w1, w2, w3]
+                            best_w_metrics = m
+                            best_w_threshold = thr
+                            best_w_val = val_mix
+                            best_w_test = (test_stack[:3] * w_vec).sum(axis=0)
+            if weights is not None:
+                w_test_metrics = compute_metrics(
+                    y_test,
+                    best_w_test,
+                    metrics_list=config["evaluation"]["metrics"],
+                    threshold=best_w_threshold,
+                    positive_label=1,
+                )
+                w_artifact = BestModelArtifacts(
+                    name="ensemble_weighted_top3",
+                    model_type="classical",
+                    estimator=None,
+                    base_estimator=None,
+                    threshold=best_w_threshold,
+                    calibration_method=None,
+                    val_metrics=best_w_metrics,
+                    val_probabilities=best_w_val,
+                    test_metrics=w_test_metrics,
+                    test_probabilities=best_w_test,
+                    test_labels=y_test,
+                    feature_type="tfidf+tabular",
+                    extra={
+                        "components": [c.name for c in ensemble_components[:3]],
+                        "weights": weights,
+                        "is_ensemble": True,
+                    },
+                )
+                candidate_artifacts.append(w_artifact)
+                logger.info(
+                    "Weighted ensemble F1=%.3f (weights=%s)",
+                    best_w_metrics.values.get("f1", np.nan),
+                    weights,
+                )
+    except Exception as exc:  # pragma: no cover
+        logger.warning("Failed to build ensemble: %s", exc)
     if transformer_artifact is not None:
         candidate_artifacts.append(transformer_artifact)
 
@@ -242,7 +476,11 @@ def _evaluate_classical_on_test(
     X_val, X_test = _prepare_features_for_run(run, bundle, splits)
 
     calibration_methods = config["calibration"]["methods"]
-    calibration_results = calibrate_prefit_model(run.estimator, X_val, y_val, calibration_methods)
+    # Skip second calibration for any pre-calibrated estimator
+    if isinstance(run.estimator, CalibratedClassifierCV):
+        calibration_results = []
+    else:
+        calibration_results = calibrate_prefit_model(run.estimator, X_val, y_val, calibration_methods)
     best_calibration = calibration_results[0] if calibration_results else None
 
     if best_calibration:
@@ -251,12 +489,22 @@ def _evaluate_classical_on_test(
         chosen_method = best_calibration.method
     else:
         estimator = run.estimator
-        chosen_method = None
-        if hasattr(estimator, "predict_proba"):
+        # Attempt to record calibration method if estimator is already calibrated
+        if isinstance(estimator, CalibratedClassifierCV):
+            calibrated = estimator.calibrated_classifiers_[0]
+            cal = calibrated.calibrator
+            if cal.__class__.__name__ == "LogisticRegression":
+                chosen_method = "platt"
+            else:
+                chosen_method = "isotonic"
             val_probs = estimator.predict_proba(X_val)[:, 1]
         else:
-            val_scores = estimator.decision_function(X_val)
-            val_probs = 1.0 / (1.0 + np.exp(-val_scores))
+            chosen_method = None
+            if hasattr(estimator, "predict_proba"):
+                val_probs = estimator.predict_proba(X_val)[:, 1]
+            else:
+                val_scores = estimator.decision_function(X_val)
+                val_probs = 1.0 / (1.0 + np.exp(-val_scores))
 
     val_metrics = compute_metrics(
         y_val,
@@ -280,6 +528,9 @@ def _evaluate_classical_on_test(
         positive_label=1,
     )
 
+    extra = {}
+    if run.name == "XGBOOST":
+        extra["artifact_subdir"] = "xgboost"
     return BestModelArtifacts(
         name=run.name,
         model_type="classical",
@@ -293,7 +544,7 @@ def _evaluate_classical_on_test(
         test_probabilities=test_probs,
         test_labels=y_test,
         feature_type=run.feature_type,
-        extra={},
+        extra=extra,
     )
 
 
@@ -307,7 +558,7 @@ def _prepare_features_for_run(run: ModelRun, bundle: FeatureBundle, splits: Spli
     return X_val, X_test
 
 
-def _evaluate_transformer_on_test(run: TransformerRun, config: Dict, y_test: np.ndarray) -> BestModelArtifacts:
+def _evaluate_transformer_on_test(run, config: Dict, y_test: np.ndarray) -> BestModelArtifacts:
     test_metrics = compute_metrics(
         run.test_labels,
         run.test_scores,
@@ -597,6 +848,7 @@ def _generate_report_assets(
 
     if artifacts.feature_type == "tabular" and artifacts.base_estimator is not None:
         try:
+            from spot_scam.explainability.shapley import compute_tabular_shap
             compute_tabular_shap(
                 artifacts.base_estimator,
                 bundle.tabular_test.toarray(),

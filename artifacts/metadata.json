@@ -1,9 +1,9 @@
 {
-  "model_name": "linear_svm_C1.0",
+  "model_name": "ensemble_top3",
   "model_type": "classical",
   "feature_type": "tfidf+tabular",
-  "calibration_method": "isotonic",
-  "threshold": 0.5452064366991646,
+  "calibration_method": null,
+  "threshold": 0.4136752136752137,
   "gray_zone": {
     "width": 0.1,
     "positive_label": "fraud",
@@ -11,21 +11,28 @@
     "review_label": "review"
   },
   "val_metrics": {
-    "f1": 0.8106060606060606,
-    "precision": 0.9385964912280702,
-    "recall": 0.7133333333333334,
-    "roc_auc": 0.9881615715936548,
-    "pr_auc": 0.8718187749510917,
-    "brier": 0.011708387025871228
+    "f1": 0.8540925266903915,
+    "precision": 0.916030534351145,
+    "recall": 0.8,
+    "roc_auc": 0.9867254963756698,
+    "pr_auc": 0.8928815894622958,
+    "brier": 0.010780068341526035
   },
   "test_metrics": {
-    "f1": 0.789272030651341,
-    "precision": 0.9196428571428571,
-    "recall": 0.6912751677852349,
-    "roc_auc": 0.9814421283668058,
-    "pr_auc": 0.8453520635351476,
-    "brier": 0.014119844039025718
+    "f1": 0.7664233576642335,
+    "precision": 0.84,
+    "recall": 0.7046979865771812,
+    "roc_auc": 0.9833261440479061,
+    "pr_auc": 0.8576358152326706,
+    "brier": 0.014868545438859975
   },
-  "test_ece": 0.006142298360536347,
-  "extra": {}
+  "test_ece": 0.008717674227778369,
+  "extra": {
+    "components": [
+      "linear_svm_C3.0",
+      "linear_svm_C5.0",
+      "linear_svm_C10.0"
+    ],
+    "is_ensemble": true
+  }
 }

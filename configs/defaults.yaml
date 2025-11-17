@@ -83,9 +83,9 @@ preprocessing:
   fill_missing: "<missing>"
   max_text_length: 5000
   duplicate_threshold: 0.95
-  max_vocabulary_size: 50000
+  max_vocabulary_size: 100000
   min_df: 3
-  max_df: 0.8
+  max_df: 0.9
 
 features:
   tabular:
@@ -114,7 +114,7 @@ models:
     tfidf:
       ngram_range: [1, 2]
       min_df: 3
-      max_df: 0.8
+      max_df: 0.9
       sublinear_tf: true
       lowercase: true
     logistic_regression:
@@ -122,18 +122,25 @@ models:
       penalty: "l2"
       class_weight: "balanced"
       max_iter: 500
-    linear_svm:
+    logistic_regression_l1:
       Cs: [0.1, 1.0, 10.0]
+      class_weight: "balanced"
+      max_iter: 3000
+    linear_svm:
+      Cs: [0.1, 0.5, 1.0, 3.0, 5.0, 10.0, 30.0]
       class_weight: "balanced"
       max_iter: 2000
     lightgbm:
-      num_leaves: [31, 63]
+      num_leaves: [64]
       max_depth: [-1]
-      learning_rate: [0.05, 0.1]
-      n_estimators: [200, 400]
-      subsample: [0.8, 1.0]
-      colsample_bytree: [0.8, 1.0]
+      learning_rate: [0.05]
+      n_estimators: [800]
+      subsample: [0.9]
+      colsample_bytree: [0.9]
       class_weight: "balanced"
+  xgboost:
+    calibration_method: "isotonic"  # "sigmoid" (Platt) or "isotonic"
+    early_stopping_rounds: 50        # 0 to disable early stopping
   transformer:
     model_name: "distilbert-base-uncased"
     max_length: 128
