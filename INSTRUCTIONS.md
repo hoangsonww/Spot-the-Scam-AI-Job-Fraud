@@ -124,6 +124,9 @@ This run:
 > [!NOTE]
 > If you have limited resources on your machine, consider using the classical-only training mode below for faster iterations. The Transformer training can be time and memory intensive.
 
+> [!CAUTION]
+> After the XGBoost update, the pipeline is now considerably longer to run (up to 3-4 hrs depending on hardware), even without Transformer training. Please be patient as the system has to explore multiple hyperparameter combinations.
+
 ### 5.2 Classical-Only Training (faster)
 
 This mode skips transformer training for quicker iterations:
