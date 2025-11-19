@@ -17,7 +17,6 @@ type BackendStatusStore = BackendStatus & {
   setConnected: (connected: boolean) => void;
 };
 
-// Store for demo mode review queue
 type DemoReviewQueueStore = {
   cases: ReviewCase[];
   addCase: (prediction: PredictionResponse, jobPosting: JobPostingInput) => void;
@@ -26,7 +25,6 @@ type DemoReviewQueueStore = {
   getCount: () => number;
 };
 
-// Global store for backend status
 export const useBackendStatus = create<BackendStatusStore>((set, get) => ({
   isConnected: false,
   isChecking: false,
@@ -35,14 +33,14 @@ export const useBackendStatus = create<BackendStatusStore>((set, get) => ({
 
   checkConnection: async () => {
     const { isChecking } = get();
-    if (isChecking) return; // Prevent concurrent checks
+    if (isChecking) return;
 
     set({ isChecking: true, error: null });
 
     try {
       const apiBaseUrl = getApiBaseUrl();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(`${apiBaseUrl}/health`, {
         method: "GET",
@@ -83,12 +81,9 @@ export const useBackendStatus = create<BackendStatusStore>((set, get) => ({
   },
 }));
 
-// Initialize backend check on app start
 if (typeof window !== "undefined") {
-  // Check immediately on load
   useBackendStatus.getState().checkConnection();
 
-  // Optional: Periodic health checks (every 5 minutes)
   setInterval(
     () => {
       useBackendStatus.getState().checkConnection();
@@ -97,17 +92,14 @@ if (typeof window !== "undefined") {
   );
 }
 
-// Global store for demo review queue (persisted in localStorage)
 export const useDemoReviewQueue = create<DemoReviewQueueStore>()(
   persist(
     (set, get) => ({
       cases: [],
 
       addCase: (prediction: PredictionResponse, jobPosting: JobPostingInput) => {
-        // Only add if it's a review decision
         if (prediction.decision !== "review") return;
 
-        // Create a ReviewCase from the prediction
         const reviewCase: ReviewCase = {
           request_id: prediction.request_id,
           created_at: new Date().toISOString(),
@@ -134,7 +126,7 @@ export const useDemoReviewQueue = create<DemoReviewQueueStore>()(
         };
 
         set((state) => ({
-          cases: [reviewCase, ...state.cases], // Add to beginning
+          cases: [reviewCase, ...state.cases],
         }));
       },
 
@@ -153,7 +145,7 @@ export const useDemoReviewQueue = create<DemoReviewQueueStore>()(
       },
     }),
     {
-      name: "demo-review-queue-storage", // localStorage key
+      name: "demo-review-queue-storage",
     }
   )
 );

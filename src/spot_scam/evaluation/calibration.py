@@ -12,8 +12,6 @@ from spot_scam.evaluation.metrics import expected_calibration_error
 
 
 class IsotonicCalibratedModel:
-    """Top-level wrapper to remain picklable when saving calibrated estimators."""
-
     def __init__(self, base_estimator, iso_model):
         self.base_estimator = base_estimator
         self.iso_model = iso_model
@@ -46,9 +44,6 @@ def calibrate_prefit_model(
     y_val,
     methods: Iterable[str],
 ) -> List[CalibrationResult]:
-    """
-    Apply calibration methods to a pre-fit estimator and return results sorted by Brier score.
-    """
     results: List[CalibrationResult] = []
     for method in methods:
         if method in {"platt", "sigmoid"}:

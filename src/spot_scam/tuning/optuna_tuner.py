@@ -1,5 +1,3 @@
-"""Optuna-based hyperparameter optimization for fraud detection models."""
-
 from __future__ import annotations
 
 import time
@@ -28,28 +26,13 @@ def optimize_logistic_regression(
     storage_url: Optional[str] = "sqlite:///optuna_study.db",
     study_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Use Optuna to find optimal hyperparameters for Logistic Regression.
-
-    Args:
-        bundle: Feature bundle containing train/val features
-        y_train: Training labels
-        y_val: Validation labels
-        config: Configuration dictionary
-        n_trials: Number of Optuna trials to run
-
-    Returns:
-        Dictionary with best hyperparameters and validation metrics
-    """
     X_train = sparse.hstack([bundle.tfidf_train, bundle.tabular_train]).tocsr()
     X_val = sparse.hstack([bundle.tfidf_val, bundle.tabular_val]).tocsr()
 
     def objective(trial: optuna.Trial) -> float:
-        # Suggest hyperparameters
         C = trial.suggest_float("C", 0.01, 100.0, log=True)
         max_iter = trial.suggest_int("max_iter", 300, 1000, step=100)
 
-        # Train model
         model = LogisticRegression(
             C=C,
             penalty="l2",
@@ -60,7 +43,6 @@ def optimize_logistic_regression(
         )
         model.fit(X_train, y_train)
 
-        # Evaluate on validation set
         val_probs = model.predict_proba(X_val)[:, 1]
         threshold = optimal_threshold(
             y_val, val_probs, metric=config["evaluation"]["thresholds"]["optimize_metric"]
@@ -73,10 +55,8 @@ def optimize_logistic_regression(
             positive_label=1,
         )
 
-        # Return F1 score for optimization
         return metrics.values.get("f1", 0.0)
 
-    # Create study and optimize
     resolved_study_name = study_name or "logistic_regression_tuning"
     logger.info(
         "Starting Optuna optimization for Logistic Regression (%d trials) [study=%s]",
@@ -123,28 +103,13 @@ def optimize_linear_svm(
     storage_url: Optional[str] = "sqlite:///optuna_study.db",
     study_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """
-    Use Optuna to find optimal hyperparameters for Linear SVM.
-
-    Args:
-        bundle: Feature bundle containing train/val features
-        y_train: Training labels
-        y_val: Validation labels
-        config: Configuration dictionary
-        n_trials: Number of Optuna trials to run
-
-    Returns:
-        Dictionary with best hyperparameters and validation metrics
-    """
     X_train = sparse.hstack([bundle.tfidf_train, bundle.tabular_train]).tocsr()
     X_val = sparse.hstack([bundle.tfidf_val, bundle.tabular_val]).tocsr()
 
     def objective(trial: optuna.Trial) -> float:
-        # Suggest hyperparameters
         C = trial.suggest_float("C", 0.01, 100.0, log=True)
         max_iter = trial.suggest_int("max_iter", 1000, 3000, step=500)
 
-        # Train model
         model = LinearSVC(
             C=C,
             class_weight="balanced",
@@ -153,11 +118,9 @@ def optimize_linear_svm(
         )
         model.fit(X_train, y_train)
 
-        # Get decision scores and convert to probabilities
         decision_scores = model.decision_function(X_val)
         val_probs = 1 / (1 + np.exp(-decision_scores))
 
-        # Evaluate on validation set
         threshold = optimal_threshold(
             y_val, val_probs, metric=config["evaluation"]["thresholds"]["optimize_metric"]
         )
@@ -169,10 +132,8 @@ def optimize_linear_svm(
             positive_label=1,
         )
 
-        # Return F1 score for optimization
         return metrics.values.get("f1", 0.0)
 
-    # Create study and optimize
     resolved_study_name = study_name or "linear_svm_tuning"
     logger.info(
         "Starting Optuna optimization for Linear SVM (%d trials) [study=%s]",

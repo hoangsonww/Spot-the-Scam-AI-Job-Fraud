@@ -26,12 +26,6 @@ class XGBoostTrainingResult:
 
 
 class XGBoostModel:
-    """Wrapper for training a calibrated XGBoost classifier on TF-IDF + tabular features.
-
-    This class mirrors the interface expectations of the existing classical models
-    so it can be integrated into the training pipeline seamlessly.
-    """
-
     def __init__(self, config: Dict) -> None:
         self.config = config
         self.logger = configure_logging(__name__ + ".xgb")
@@ -56,7 +50,6 @@ class XGBoostModel:
     def fit(
         self, bundle: FeatureBundle, y_train: np.ndarray, y_val: np.ndarray
     ) -> XGBoostTrainingResult:
-        # Build combined sparse matrices (TF-IDF + tabular) identical to other classical models.
         X_train = sparse.hstack([bundle.tfidf_train, bundle.tabular_train]).tocsr()
         X_val = sparse.hstack([bundle.tfidf_val, bundle.tabular_val]).tocsr()
 
@@ -106,7 +99,6 @@ class XGBoostModel:
         self.base_estimator.fit(X_train, y_train, **fit_kwargs)
         self.logger.info("Completed XGBoost fit")
 
-        # Calibrate using validation set (prefit mode). Method can be 'sigmoid' (Platt) or 'isotonic'.
         method = (
             self.calibration_method
             if self.calibration_method in {"sigmoid", "isotonic"}

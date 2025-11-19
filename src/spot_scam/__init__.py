@@ -9,7 +9,6 @@ from importlib.metadata import version, PackageNotFoundError
 
 
 def get_version() -> str:
-    """Return the package version, falling back to development."""
     try:
         return version("spot-the-scam")
     except PackageNotFoundError:

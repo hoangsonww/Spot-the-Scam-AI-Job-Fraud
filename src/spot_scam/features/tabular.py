@@ -15,16 +15,12 @@ SCAM_TERMS_PATTERN_CACHE: Dict[str, re.Pattern] = {}
 
 
 def _get_pattern(term: str) -> re.Pattern:
-    """Compile and cache regex patterns for scam indicator terms."""
     if term not in SCAM_TERMS_PATTERN_CACHE:
         SCAM_TERMS_PATTERN_CACHE[term] = re.compile(re.escape(term), flags=re.IGNORECASE)
     return SCAM_TERMS_PATTERN_CACHE[term]
 
 
 def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
-    """
-    Generate lightweight numerical features from text and metadata.
-    """
     feature_conf = config["features"]["tabular"]
 
     if "text_all" not in df.columns:
@@ -63,7 +59,6 @@ def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
                 lambda txt, pat=pattern: len(pat.findall(txt))
             ).astype(np.float32)
 
-    # Binary metadata columns if present
     binary_columns = ["telecommuting", "has_company_logo", "has_questions"]
     for column in binary_columns:
         if column in df.columns:
@@ -72,7 +67,6 @@ def create_tabular_features(df: pd.DataFrame, config: Dict) -> pd.DataFrame:
             numeric = pd.to_numeric(col, errors="coerce").fillna(0.0).astype(np.float32)
             features[column] = numeric
 
-    # Additional metadata counts (presence)
     optional_columns = [
         "employment_type",
         "required_experience",

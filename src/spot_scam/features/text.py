@@ -6,10 +6,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 def build_tfidf_vectorizer(config: Dict) -> Tuple[TfidfVectorizer, Dict]:
-    """
-    Create a TF-IDF vectorizer according to the classical model configuration.
-    Returns the vectorizer and a metadata dictionary describing key hyperparameters.
-    """
     tfidf_conf = config["models"]["classical"]["tfidf"]
     vectorizer = TfidfVectorizer(
         ngram_range=tuple(tfidf_conf["ngram_range"]),

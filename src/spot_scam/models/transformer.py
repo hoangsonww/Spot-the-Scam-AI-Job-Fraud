@@ -25,11 +25,6 @@ logger = configure_logging(__name__)
 
 
 def _ensure_safe_accelerate_optimizer():
-    """
-    Older accelerate releases expose a wrapper optimizer whose ``train``/``eval`` methods
-    blindly forward to the underlying torch optimizer. Torch optimizers do not implement
-    these methods which raises AttributeError inside Hugging Face Trainer.
-    """
     try:
         from accelerate.optimizer import AcceleratedOptimizer
     except Exception:  # pragma: no cover - accelerate not installed
@@ -75,9 +70,6 @@ def train_transformer_model(
     config: Dict,
     output_dir: Path,
 ) -> TransformerRun:
-    """
-    Fine-tune a compact transformer (DistilBERT by default) on the `text_all` feature.
-    """
     _ensure_safe_accelerate_optimizer()
     transformer_conf = config["models"]["transformer"]
     project_conf = config["project"]
@@ -131,7 +123,6 @@ def train_transformer_model(
     num_labels = len(np.unique(train_df[config["data"]["target_column"]]))
     model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=num_labels)
 
-    # Detect platform for FP16 compatibility
     import platform
 
     use_fp16 = transformer_conf.get("fp16", False)
@@ -160,7 +151,7 @@ def train_transformer_model(
         "save_strategy": "epoch",
         "overwrite_output_dir": True,
     }
-    # Hugging Face 4.57 renamed evaluation_strategy -> eval_strategy.
+
     if "eval_strategy" in TrainingArguments.__init__.__code__.co_varnames:
         training_args_kwargs["eval_strategy"] = "epoch"
     else:  # pragma: no cover - backwards compatibility

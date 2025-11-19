@@ -30,9 +30,6 @@ def compute_slice_metrics(
     metrics_list: Iterable[str],
     min_count: int = 30,
 ) -> List[SliceMetric]:
-    """
-    Compute metrics on specified categorical slices to assess bias and robustness.
-    """
     slices: List[SliceMetric] = []
     for column in slice_columns:
         if column not in df.columns:

@@ -28,7 +28,6 @@ def _check_kaggle_cli() -> None:
 
 @app.command()
 def download(dataset: str = typer.Argument(DEFAULT_DATASET, help="Kaggle dataset slug.")) -> None:
-    """Download and extract the dataset into the ./data directory."""
     _check_kaggle_cli()
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     typer.echo(f"Downloading {dataset} to {DATA_DIR}...")

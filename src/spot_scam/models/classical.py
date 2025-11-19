@@ -42,9 +42,6 @@ def train_classical_models(
     y_val: np.ndarray,
     config: Dict,
 ) -> List[ModelRun]:
-    """
-    Train logistic regression, linear SVM, and LightGBM models with simple grid search.
-    """
     runs: List[ModelRun] = []
     classical_conf = config["models"]["classical"]
 
@@ -98,7 +95,6 @@ def train_classical_models(
             metric_results.values.get("recall", np.nan),
         )
 
-    # Logistic Regression L1 (saga)
     if "logistic_regression_l1" in classical_conf:
         l1_conf = classical_conf["logistic_regression_l1"]
         logger.info(
@@ -150,7 +146,6 @@ def train_classical_models(
                 metric_results.values.get("recall", np.nan),
             )
 
-    # Linear SVM
     logger.info("Training %d Linear SVM variants", len(classical_conf["linear_svm"]["Cs"]))
     for C in classical_conf["linear_svm"]["Cs"]:
         params = dict(classical_conf["linear_svm"])
@@ -196,7 +191,6 @@ def train_classical_models(
             metric_results.values.get("recall", np.nan),
         )
 
-    # LightGBM (tabular only)
     tab_train = bundle.tabular_train
     tab_val = bundle.tabular_val
     lightgbm_conf = classical_conf["lightgbm"]

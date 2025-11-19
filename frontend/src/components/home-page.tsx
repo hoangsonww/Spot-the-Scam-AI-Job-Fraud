@@ -394,7 +394,6 @@ export default function HomePage() {
   const handleAskAI = useCallback(() => {
     if (!prediction) return;
 
-    // Build job posting from form
     const jobPosting: JobPostingInput = {
       title: form.title.trim(),
       location: normalizeTextField(form.location),
@@ -412,7 +411,6 @@ export default function HomePage() {
       has_questions: form.has_questions ? 1 : 0,
     };
 
-    // Save context to localStorage for chat page
     const context = {
       request_id: prediction.request_id,
       job_posting: jobPosting,
@@ -420,7 +418,6 @@ export default function HomePage() {
     };
     localStorage.setItem("spot-scam-chat-context", JSON.stringify(context));
 
-    // Navigate to chat
     router.push("/chat");
   }, [prediction, form, router]);
 

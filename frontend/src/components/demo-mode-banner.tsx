@@ -8,7 +8,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 export function DemoModeBanner() {
   const { isConnected, isChecking, error, checkConnection } = useBackendStatus();
 
-  // Don't show banner if backend is connected
   if (isConnected) {
     return null;
   }

@@ -11,11 +11,6 @@ logger = configure_logging(__name__)
 
 
 def preprocess_dataframe(df: pd.DataFrame, config: Dict) -> Tuple[pd.DataFrame, Iterable[str]]:
-    """
-    Apply standard preprocessing: sanitize text fields, fill missing values, and create `text_all`.
-
-    Returns the processed dataframe and the list of textual fields used to create `text_all`.
-    """
     preprocessing_conf = config["preprocessing"]
     text_fields = config["data"]["text_fields"]
     fill_value = preprocessing_conf["fill_missing"]

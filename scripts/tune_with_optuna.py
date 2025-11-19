@@ -6,7 +6,6 @@ from pathlib import Path
 
 import typer
 
-# Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from spot_scam.config.loader import load_config as _load_config
@@ -84,7 +83,6 @@ def tune(
     logger.info("Time: %.1fs", result["optimization_time"])
     logger.info("=" * 60)
 
-    # Optionally save study for visualization
     study = result["study"]
     logger.info("\nTo visualize results, use:")
     logger.info(

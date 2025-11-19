@@ -17,10 +17,6 @@ def generate_lime_explanations(
     num_samples: int = 10,
     num_features: int = 8,
 ) -> Optional[List[str]]:
-    """
-    Produce simple textual explanations using LIME for a subset of inputs.
-    Returns HTML strings for visualization; gracefully degrades if LIME is unavailable.
-    """
     try:
         from lime.lime_text import LimeTextExplainer
     except ImportError:
