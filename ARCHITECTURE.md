@@ -303,19 +303,19 @@ flowchart LR
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="experiments/figs/ui.png" alt="UI Screenshot" width="100%"/>
+    <img src="docs/images/ui.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="experiments/figs/ui1.png" alt="UI Screenshot" width="100%"/>
+    <img src="docs/images/ui1.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="experiments/figs/ui2.png" alt="UI Screenshot" width="100%"/>
+    <img src="docs/images/ui2.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
@@ -327,7 +327,7 @@ flowchart LR
 - `.env.local` controls `NEXT_PUBLIC_API_BASE_URL`
 
 > [!IMPORTANT]
-> **DEMO FRONTEND: Hosted at [https://spot-the-scam-job-fraud.vercel.app/](https://spot-the-scam-job-fraud.vercel.app/).**
+> **DEMO FRONTEND: Hosted at [https://spot-the-scam-job-fraud.vercel.app/](https://spot-the-scam-job-fraud.vercel.app/).** It runs with fake data and a demo model for exploration as we did not have the resources needed to deploy and run the models on the cloud... To have a fully functional version, please follow the instructions in the `DOCKER.md` to build and run the API and frontend containers locally.
 
 > [!NOTE]
 > Quick demo video also available at [https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing](https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing).
@@ -367,4 +367,4 @@ Optuna's visualization tools help analyze hyperparameter optimization results. B
 
 ---
 
-With this architecture, Spot the Scam maintains a reproducible end-to-end pipeline, calibrated serving layer, and user-facing analytics dashboard ready for operational deployment or further research iterations.
+Thanks for visiting Spot the Scam! We hope this project helps with your fraud detection needs. For questions or contributions, please open an issue or pull request on our GitHub repo!

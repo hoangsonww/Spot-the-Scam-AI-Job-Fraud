@@ -23,51 +23,72 @@
 Spot the Scam delivers an uncertainty-aware job-posting fraud detector with calibrated probabilities, a gray-zone review policy, and an interactive dashboard for analysis.
 
 > [!NOTE]
-> Intelligent fraud triage for job postings - built for transparency and speed! 
+> Intelligent fraud triage for job postings - built for transparency and speed!
 
-## Features
-- **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, a capped-yet-aggressive XGBoost sweep, weighted ensembles, DistilBERT fine-tuning, and strict artifact persistence.
-- **Hyperparameter optimization**: Integrated Optuna support (see `docs/optuna_quickstart.md` / `docs/optuna_tuning.md`) plus the `scripts/tune_with_optuna.py` CLI for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
-- **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
-- **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
-- **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
-- **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
-- **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
-- **Benchmark-ready artifacts**: Every run saves `data/processed/{train,val,test}.parquet`, per-variant XGBoost artifacts, and latency benchmarks.
+## Training Pipeline
 
-## Outputs & File Structure
-- `artifacts/` - models, vectorizers, calibration metadata, final predictions.
-- `experiments/figs/` - PR & calibration curves, confusion matrices, score distributions, threshold vs metric sweeps, latency plots.
-- `experiments/tables/` - metrics summary, slice reports, token analyses, threshold metrics, latency benchmarks.
-- `src/` - source code for pipeline, model, API, and frontend.
-- `tests/` - unit and integration tests with PyTest.
-- `tracking/` - MLflow experiment runs and artifacts.
-- `experiments/report.md` - markdown report summarizing key results and insights.
-- `frontend/` - Next.js + shadcn UI + TailwindCSS source code.
-- `data/` - raw Kaggle exports plus `processed/` parquet splits created by the training pipeline.
-- `INSTRUCTIONS.md` - step-by-step setup, training, serving, and frontend guidance.
-- `ARCHITECTURE.md` - detailed system architecture with flow diagrams.
+The training pipeline provides a reproducible, config-driven workflow that includes:
+- Automated data ingestion with stratified splitting
+- Feature engineering: TF-IDF vectorization + tabular features
+- Classical baselines (Logistic Regression, Linear SVM, etc.)
+- XGBoost hyperparameter sweeps
+- Weighted ensemble models
+- DistilBERT fine-tuning for advanced text classification
+- Strict artifact persistence
 
-## Explainability & Model Packaging
+All training runs are fully configurable and produce versioned artifacts for downstream deployment.
 
-- Every prediction includes a **local explanation**: the API surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept so reviewers can understand the decision instantly. The Next.js dashboard renders these insights in the “Decision rationale” card.
-- Classical winners (logistic regression, etc.) export linear contributions directly; transformer winners surface gradient-derived token contributions (falling back to attention scores when gradients are unavailable, e.g., quantized mode).
+## Hyperparameter Optimization
 
-### ONNX + MLflow
+Optuna support that enables Bayesian hyperparameter tuning with:
+- Intelligent search strategies
+- Early stopping and pruning
+- Multi-objective optimization capabilities
 
-- The training pipeline automatically converts the selected model to ONNX and logs a ready-to-serve MLflow pyfunc package (vectorizer, scaler, ONNX graph, metadata, and decision policy).
+## Uncertainty-Aware Predictions
 
-### Quantization (optional)
-- Quantization is supported for classical models via `ONNXRuntime` optimizations. Enable with `QUANTIZE_MODEL=1 make train` or `QUANTIZE_MODEL=1 PYTHONPATH=src python -m spot_scam.pipeline.train`.
-- Quantization helps reduce model size and inference latency with minimal accuracy loss, suitable for deployment scenarios with resource constraints.
-- All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch. Expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
+- Validation-driven calibration using Platt scaling/isotonic regression
+- Predictions within an uncertainty range (gray-zone) are flagged for human review
+- Slice-based metrics to analyze performance across different data segments
+- Reliability plots to visualize calibration quality
 
 ## Human-in-the-Loop Review (HITL)
 
-- Cases are automatically added to the review queue. User can submit feedback via the API or frontend.
-- Feedback is logged to `artifacts/hitl_feedback.csv` for retraining and calibration updates. 
+- Cases that the user submits are automatically added to the review queue. User can submit feedback via the API or frontend.
+- Feedback is persisted for retraining and calibration updates.
 - Subsequent pipeline runs can incorporate this feedback to refine model performance and decision thresholds, ensuring continuous improvement based on real-world inputs.
 
-See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams.
+## Explainability
 
-Project licensed under the MIT License. See [LICENSE](LICENSE) for details.
+Every prediction includes an **explanation** that helps reviewers understand the decision:
+- The FastAPI server surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept
+- The Next.js dashboard renders these insights in the "Decision rationale" card
+- Classical models (logistic regression, etc.) export linear contributions directly
+- Transformer models surface gradient-derived token contributions (falling back to attention scores when gradients are unavailable, e.g. in quantized mode)
+
+## Model Packaging
+
+The training pipeline automatically packages models for production deployment:
+- Models are converted to **ONNX** format for efficient, cross-platform inference
+- An **MLflow pyfunc package** is created containing the vectorizer, scaler, ONNX graph, metadata, and decision policy
+- All artifacts are versioned and ready for serving
+
+This packaging approach ensures consistent, reproducible deployments across different environments.
+
+## Quantization
+
+Quantization is supported for classical models via `ONNXRuntime` optimizations:
+- Reduces model size and inference latency with minimal accuracy loss
+- Suitable for deployment scenarios with resource constraints
+
+> [!NOTE]
+> All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch. Expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
+
+> [!IMPORTANT]
+> See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. 
+> 
+> Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams. 
+> 
+> For training results and model diagnostics, refer to [RESULTS.md](RESULTS.md). 
+> 
+> To learn how to extend the model suite, check out [ADD_MODELS.md](ADD_MODELS.md).

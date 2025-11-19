@@ -147,5 +147,3 @@ docker run -d --name scam-ui --network spot-the-scam -p 3000:3000 \
 - If builds fail on CI, inspect the cached artifacts in the workflow run logs for clues.
 
 ---
-
-That’s it! With the local commands and GitHub workflow working together, you can develop, test, and publish Spot the Scam containers reliably. Happy shipping!

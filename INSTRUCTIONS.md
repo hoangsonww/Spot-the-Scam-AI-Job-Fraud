@@ -58,7 +58,7 @@ pip install -e '.[dev]'
 The script downloads and extracts `fake_job_postings.csv` (and the alternate `Fake_Real_Job_Posting.csv`) into `data/`. Raw files remain Git-ignored.
 
 > [!TIP]
-> We have included the full datasets in `data/` for convenience. If you re-download, existing files will be overwritten.
+> We have included the full datasets in `data/` for convenience so you do NOT need to run this command. If you choose to re-download the datasets, existing files will be overwritten.
 
 ---
 

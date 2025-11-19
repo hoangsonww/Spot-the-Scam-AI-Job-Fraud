@@ -1,15 +1,15 @@
-# Results
+# Training Results
 
-This document summarizes the results of the text classification experiment conducted using a logistic regression model with TF-IDF features. The model was trained to classify text data into binary categories.
+This document summarizes the results of the text classification experiment conducted using an ensemble model (ensemble_top3) with TF-IDF and tabular features. The model was trained to classify job postings as fraudulent or legitimate.
 
 ## Performance Snapshot
 | split |       f1 | precision | recall | roc_auc | pr_auc |    brier |
 |:------|--------:|----------:|-------:|--------:|-------:|---------:|
-| validation | 0.9048 | 0.9223 | 0.8879 | 0.9942 | 0.9335 | 0.0070 |
-| test | 0.8187 | 0.9186 | 0.7383 | 0.9736 | 0.8299 | 0.0135 |
+| validation | 0.8541 | 0.9160 | 0.8000 | 0.9867 | 0.8929 | 0.0108 |
+| test | 0.7664 | 0.8400 | 0.7047 | 0.9833 | 0.8576 | 0.0149 |
 
-- Expected calibration error (test): `0.0085`
-- Decision threshold: `0.4963`
+- Expected calibration error (test): `0.0087`
+- Decision threshold: `0.4137`
 - Gray-zone width: `0.10`
 
 ## Model Diagnostics
@@ -43,3 +43,5 @@ This document summarizes the results of the text classification experiment condu
 - Latency summary: `experiments/tables/benchmark_summary.csv`
 
 All supporting CSVs live in `experiments/tables/` for reproducible analysis.
+
+For more details and dynamically updated results, refer to [experiments/report.md](experiments/report.md) - which automatically regenerates all the numbers on each training run.
