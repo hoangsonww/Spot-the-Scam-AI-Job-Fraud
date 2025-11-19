@@ -63,7 +63,12 @@ def load_config(
     config: Dict[str, Any] = _read_yaml(default_path)
 
     if config_path:
-        resolved = config_path if config_path.is_absolute() else CONFIG_DIR / config_path
+        candidate = Path(config_path)
+        if candidate.is_absolute():
+            resolved = candidate
+        else:
+            cwd_candidate = Path.cwd() / candidate
+            resolved = cwd_candidate if cwd_candidate.exists() else CONFIG_DIR / candidate
         user_conf = _read_yaml(resolved)
         config = _deep_merge(config, user_conf)
 

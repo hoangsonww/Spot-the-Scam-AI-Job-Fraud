@@ -179,35 +179,57 @@ def run(
 
     # ------------------------------------------------------------------
     # Train multiple XGBoost variants to seek higher validation/test F1.
-    # Grid chosen to vary depth, learning rate, regularization, and class balance.
-    xgb_grid = []
-    pos = int((y_train == 1).sum())
-    neg = int((y_train == 0).sum())
-    spw_default = max(int(neg / max(pos, 1)), 1)  # scale_pos_weight heuristic
-    for max_depth in [4, 6, 8]:
-        for learning_rate in [0.05, 0.03, 0.02]:
-            for n_estimators in [600, 800, 1000]:
-                for subsample in [0.9]:
-                    for colsample in [0.9]:
-                        for min_child_weight in [1, 5, 10]:
-                            for reg_alpha in [0, 0.1, 0.3]:
-                                for reg_lambda in [1, 2, 5]:
-                                    for spw in [int(spw_default*0.7), spw_default, int(spw_default*1.3)]:
-                                        xgb_grid.append({
-                                            "max_depth": max_depth,
-                                            "learning_rate": learning_rate,
-                                            "n_estimators": n_estimators,
-                                            "subsample": subsample,
-                                            "colsample_bytree": colsample,
-                                            "min_child_weight": min_child_weight,
-                                            "reg_alpha": reg_alpha,
-                                            "reg_lambda": reg_lambda,
-                                            "scale_pos_weight": spw,
-                                        })
+    # Grid can be constrained via config for quicker experimentation.
+    xgb_grid: List[Dict] = []
+    xgb_conf = config["models"].get("xgboost", {})
+    if xgb_conf.get("enabled", True):
+        pos = int((y_train == 1).sum())
+        neg = int((y_train == 0).sum())
+        spw_default = max(int(neg / max(pos, 1)), 1)  # scale_pos_weight heuristic
+
+        def _values_from_conf(key: str, fallback: List):
+            values = xgb_conf.get(key)
+            return list(values) if values else fallback
+
+        max_depths = _values_from_conf("max_depths", [4, 6, 8])
+        learning_rates = _values_from_conf("learning_rates", [0.05, 0.03, 0.02])
+        n_estimators_list = _values_from_conf("n_estimators_list", [600, 800, 1000])
+        subsamples = _values_from_conf("subsamples", [0.9])
+        colsample_bytrees = _values_from_conf("colsample_bytrees", [0.9])
+        min_child_weights = _values_from_conf("min_child_weights", [1, 5, 10])
+        reg_alphas = _values_from_conf("reg_alphas", [0.0, 0.1, 0.3])
+        reg_lambdas = _values_from_conf("reg_lambdas", [1.0, 2.0, 5.0])
+        spw_factors = _values_from_conf("scale_pos_weight_factors", [0.7, 1.0, 1.3])
+
+        for max_depth in max_depths:
+            for learning_rate in learning_rates:
+                for n_estimators in n_estimators_list:
+                    for subsample in subsamples:
+                        for colsample in colsample_bytrees:
+                            for min_child_weight in min_child_weights:
+                                for reg_alpha in reg_alphas:
+                                    for reg_lambda in reg_lambdas:
+                                        for spw_factor in spw_factors:
+                                            spw = max(int(spw_default * float(spw_factor)), 1)
+                                            xgb_grid.append(
+                                                {
+                                                    "max_depth": int(max_depth),
+                                                    "learning_rate": float(learning_rate),
+                                                    "n_estimators": int(n_estimators),
+                                                    "subsample": float(subsample),
+                                                    "colsample_bytree": float(colsample),
+                                                    "min_child_weight": int(min_child_weight),
+                                                    "reg_alpha": float(reg_alpha),
+                                                    "reg_lambda": float(reg_lambda),
+                                                    "scale_pos_weight": spw,
+                                                }
+                                            )
+    else:
+        logger.info("Skipping XGBoost variants (disabled via config).")
 
     # Limit total variants to avoid excessive runtime if grid explodes
-    MAX_XGB_VARIANTS = 12
-    if len(xgb_grid) > MAX_XGB_VARIANTS:
+    MAX_XGB_VARIANTS = int(xgb_conf.get("max_variants", 12))
+    if len(xgb_grid) > MAX_XGB_VARIANTS and MAX_XGB_VARIANTS > 0:
         # Simple down-select: keep first MAX_XGB_VARIANTS evenly spread
         step = len(xgb_grid) / MAX_XGB_VARIANTS
         xgb_grid = [xgb_grid[int(i * step)] for i in range(MAX_XGB_VARIANTS)]
@@ -477,6 +499,24 @@ def _select_best_artifact(artifacts: List[BestModelArtifacts]) -> BestModelArtif
     return best_artifact
 
 
+def _infer_calibration_method(estimator: CalibratedClassifierCV) -> str:
+    """
+    Sklearn 1.4+ renamed the attribute on _CalibratedClassifier from `calibrator`
+    to `calibrators`. Inspect both for compatibility.
+    """
+    if not estimator.calibrated_classifiers_:
+        return "isotonic"
+    calibrated = estimator.calibrated_classifiers_[0]
+    cal = getattr(calibrated, "calibrator", None)
+    if cal is None:
+        calibrators = getattr(calibrated, "calibrators", None)
+        if calibrators:
+            cal = calibrators[0]
+    if cal is None:
+        return "isotonic"
+    return "platt" if cal.__class__.__name__ == "LogisticRegression" else "isotonic"
+
+
 def _evaluate_classical_on_test(
     run: ModelRun,
     bundle: FeatureBundle,
@@ -503,12 +543,7 @@ def _evaluate_classical_on_test(
         estimator = run.estimator
         # Attempt to record calibration method if estimator is already calibrated
         if isinstance(estimator, CalibratedClassifierCV):
-            calibrated = estimator.calibrated_classifiers_[0]
-            cal = calibrated.calibrator
-            if cal.__class__.__name__ == "LogisticRegression":
-                chosen_method = "platt"
-            else:
-                chosen_method = "isotonic"
+            chosen_method = _infer_calibration_method(estimator)
             val_probs = estimator.predict_proba(X_val)[:, 1]
         else:
             chosen_method = None
