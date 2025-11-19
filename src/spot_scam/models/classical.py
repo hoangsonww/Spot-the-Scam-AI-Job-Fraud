@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 import warnings
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Sequence
 
 import numpy as np
 from lightgbm import LGBMClassifier
@@ -34,6 +34,56 @@ class ModelRun:
     config: Dict
     threshold: float
     feature_type: str
+
+
+class ProbabilityEnsemble:
+    """
+    Lightweight wrapper that averages probabilities from multiple pre-fit estimators.
+    """
+
+    def __init__(self, estimators: Sequence[object], weights: Optional[Sequence[float]] = None):
+        self.estimators = [est for est in estimators if est is not None]
+        if not self.estimators:
+            raise ValueError("ProbabilityEnsemble requires at least one estimator.")
+        if weights is None:
+            weight_array = np.ones(len(self.estimators), dtype=np.float64)
+        else:
+            weight_array = np.asarray(list(weights), dtype=np.float64)
+            if weight_array.shape[0] != len(self.estimators):
+                raise ValueError("Number of weights must match the number of estimators.")
+        total = float(weight_array.sum())
+        if not np.isfinite(total) or total == 0.0:
+            raise ValueError("Ensemble weights must sum to a non-zero finite value.")
+        self.weights = weight_array / total
+        ref = self.estimators[0]
+        self.classes_ = getattr(ref, "classes_", np.array([0, 1]))
+        self.n_features_in_ = getattr(ref, "n_features_in_", None)
+
+    def predict_proba(self, X):
+        prob_list: List[np.ndarray] = []
+        for estimator in self.estimators:
+            if hasattr(estimator, "predict_proba"):
+                proba = estimator.predict_proba(X)
+                if proba.ndim == 1:
+                    proba = np.vstack([1 - proba, proba]).T
+            else:
+                scores = estimator.decision_function(X)
+                pos = _sigmoid(scores)
+                proba = np.vstack([1 - pos, pos]).T
+            prob_list.append(proba)
+        stacked = np.stack(prob_list, axis=0)
+        averaged = np.tensordot(self.weights, stacked, axes=1)
+        return averaged
+
+    def decision_function(self, X):
+        probs = self.predict_proba(X)[:, 1]
+        eps = 1e-6
+        probs = np.clip(probs, eps, 1 - eps)
+        return np.log(probs / (1 - probs))
+
+    def predict(self, X):
+        probs = self.predict_proba(X)[:, 1]
+        return (probs >= 0.5).astype(int)
 
 
 def train_classical_models(
@@ -261,4 +311,4 @@ def _sigmoid(scores: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-scores))
 
 
-__all__ = ["train_classical_models", "ModelRun"]
+__all__ = ["train_classical_models", "ModelRun", "ProbabilityEnsemble"]

@@ -470,6 +470,13 @@ def log_model_to_mlflow(
     export_root = Path(tempfile.mkdtemp(prefix="spot_scam_onnx_"))
     logger.info("Exporting model artifacts to temporary directory: %s", export_root)
 
+    if best_model.extra.get("is_ensemble"):
+        logger.warning(
+            "MLflow export skipped: %s is an ensemble model (ONNX export not supported).",
+            best_model.name,
+        )
+        return
+
     if (
         best_model.model_type == "classical"
         and best_model.base_estimator is None

@@ -1,4 +1,5 @@
 {
+  "_name_or_path": "distilbert-base-uncased",
   "activation": "gelu",
   "architectures": [
     "DistilBertForSequenceClassification"
@@ -19,6 +20,6 @@
   "sinusoidal_pos_embds": false,
   "tie_weights_": true,
   "torch_dtype": "float32",
-  "transformers_version": "4.55.4",
+  "transformers_version": "4.46.3",
   "vocab_size": 30522
 }

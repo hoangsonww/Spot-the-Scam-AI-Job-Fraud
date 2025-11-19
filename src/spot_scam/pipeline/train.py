@@ -33,7 +33,7 @@ from spot_scam.evaluation.curves import (
 )
 from spot_scam.evaluation.metrics import MetricResults, compute_metrics, expected_calibration_error, optimal_threshold
 from spot_scam.features.builders import FeatureBundle, build_feature_bundle
-from spot_scam.models.classical import ModelRun, train_classical_models
+from spot_scam.models.classical import ModelRun, ProbabilityEnsemble, train_classical_models
 from spot_scam.models.xgboost_model import XGBoostModel
 from sklearn.calibration import CalibratedClassifierCV
 
@@ -320,7 +320,8 @@ def run(
             reverse=True,
         )
         ensemble_components = tfidf_sorted[:TOP_K]
-        if len(ensemble_components) >= 2:
+        component_estimators = [c.estimator for c in ensemble_components if c.estimator is not None]
+        if len(ensemble_components) >= 2 and len(component_estimators) == len(ensemble_components):
             # Average calibrated probabilities
             val_stack = np.vstack([c.val_probabilities for c in ensemble_components])
             test_stack = np.vstack([c.test_probabilities for c in ensemble_components])
@@ -345,10 +346,11 @@ def run(
                 threshold=ensemble_threshold,
                 positive_label=1,
             )
+            ensemble_model = ProbabilityEnsemble(component_estimators)
             ensemble_artifact = BestModelArtifacts(
                 name="ensemble_top3",
                 model_type="classical",  # treat as classical for inference compatibility
-                estimator=None,
+                estimator=ensemble_model,
                 base_estimator=None,
                 threshold=ensemble_threshold,
                 calibration_method=None,
@@ -411,6 +413,8 @@ def run(
                             best_w_val = val_mix
                             best_w_test = (test_stack[:3] * w_vec).sum(axis=0)
             if weights is not None:
+                weighted_estimators = component_estimators[: len(weights)]
+                weighted_model = ProbabilityEnsemble(weighted_estimators, weights=weights)
                 w_test_metrics = compute_metrics(
                     y_test,
                     best_w_test,
@@ -421,7 +425,7 @@ def run(
                 w_artifact = BestModelArtifacts(
                     name="ensemble_weighted_top3",
                     model_type="classical",
-                    estimator=None,
+                    estimator=weighted_model,
                     base_estimator=None,
                     threshold=best_w_threshold,
                     calibration_method=None,
