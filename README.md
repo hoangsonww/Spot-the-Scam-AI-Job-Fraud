@@ -9,6 +9,7 @@
 ![NumPy](https://img.shields.io/badge/NumPy-1.26-013243?logo=numpy&logoColor=white)
 ![Plotly](https://img.shields.io/badge/Plotly-5.15-3F4F75?logo=plotly&logoColor=white)
 ![LightGBM](https://img.shields.io/badge/LightGBM-4-00A0E9?logo=lightgbm&logoColor=white)
+![XGBoost](https://img.shields.io/badge/XGBoost-1.7-FF9900?logo=xgboost&logoColor=white)
 ![Optuna](https://img.shields.io/badge/Optuna-3-2E2E2E?logo=optuna&logoColor=white)
 ![MLflow](https://img.shields.io/badge/MLflow-2.12-13B6FF?logo=mlflow&logoColor=white)
 ![ONNX](https://img.shields.io/badge/ONNX-1.15-000000?logo=onnx&logoColor=white)
@@ -25,13 +26,14 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 > Intelligent fraud triage for job postings - built for transparency and speed! 
 
 ## Features
-- **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, DistilBERT fine-tuning, and strict artifact persistence.
-- **Hyperparameter optimization**: Integrated Optuna support for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
+- **Reproducible pipeline**: Config-driven ingestion (merges both Kaggle CSV snapshots), stratified splitting, TF-IDF + tabular features, classical baselines, a capped-yet-aggressive XGBoost sweep, weighted ensembles, DistilBERT fine-tuning, and strict artifact persistence.
+- **Hyperparameter optimization**: Integrated Optuna support (see `docs/optuna_quickstart.md` / `docs/optuna_tuning.md`) plus the `scripts/tune_with_optuna.py` CLI for Bayesian hyperparameter tuning with intelligent search strategies and early stopping/pruning.
 - **Uncertainty-aware decisions**: Validation-driven calibration (Platt/isotonic), gray-zone banding, slice metrics, and reliability plots.
 - **Explainability & monitoring**: Per-prediction natural-language rationales with top contributing signals, gradient-based transformer token importances (with attention fallback), token frequency gaps, SHAP summaries, threshold sweeps, probability regressions, and latency benchmarks.
 - **Serving + UX**: FastAPI service exposing prediction/metadata/insights endpoints and a Next.js + shadcn UI for triaging and reporting.
 - **Human-in-the-loop feedback**: Review queue for gray-zone predictions, feedback logging, and retraining hooks so human judgements continuously improve calibration.
 - **Container-ready**: Dockerfile, docker compose, and VS Code devcontainer for reproducible local or cloud environments (see [DOCKER.md](DOCKER.md) for local commands and CI that publishes model/API/frontend images to GHCR).
+- **Benchmark-ready artifacts**: Every run saves `data/processed/{train,val,test}.parquet`, per-variant XGBoost artifacts, and latency benchmarks.
 
 ## Outputs & File Structure
 - `artifacts/` - models, vectorizers, calibration metadata, final predictions.
@@ -42,7 +44,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 - `tracking/` - MLflow experiment runs and artifacts.
 - `experiments/report.md` - markdown report summarizing key results and insights.
 - `frontend/` - Next.js + shadcn UI + TailwindCSS source code.
-- `data/` - raw and processed datasets.
+- `data/` - raw Kaggle exports plus `processed/` parquet splits created by the training pipeline.
 - `INSTRUCTIONS.md` - step-by-step setup, training, serving, and frontend guidance.
 - `ARCHITECTURE.md` - detailed system architecture with flow diagrams.
 
@@ -58,7 +60,7 @@ Spot the Scam delivers an uncertainty-aware job-posting fraud detector with cali
 ### Quantization (optional)
 - Quantization is supported for classical models via `ONNXRuntime` optimizations. Enable with `QUANTIZE_MODEL=1 make train` or `QUANTIZE_MODEL=1 PYTHONPATH=src python -m spot_scam.pipeline.train`.
 - Quantization helps reduce model size and inference latency with minimal accuracy loss, suitable for deployment scenarios with resource constraints.
-- All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch; expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
+- All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch. Expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
 
 ## Human-in-the-Loop Review (HITL)
 

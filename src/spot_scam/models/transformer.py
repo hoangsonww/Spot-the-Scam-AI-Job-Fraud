@@ -24,6 +24,37 @@ from spot_scam.utils.logging import configure_logging
 logger = configure_logging(__name__)
 
 
+def _ensure_safe_accelerate_optimizer():
+    """
+    Older accelerate releases expose a wrapper optimizer whose ``train``/``eval`` methods
+    blindly forward to the underlying torch optimizer. Torch optimizers do not implement
+    these methods which raises AttributeError inside Hugging Face Trainer.
+    """
+    try:
+        from accelerate.optimizer import AcceleratedOptimizer
+    except Exception:  # pragma: no cover - accelerate not installed
+        return
+
+    if getattr(AcceleratedOptimizer, "_spot_scam_safe_mode_patch", False):
+        return
+
+    def _safe_mode_switch(self, attr: str):
+        fn = getattr(self.optimizer, attr, None)
+        if callable(fn):  # pragma: no branch - simple guard
+            return fn()
+        return None
+
+    def _safe_train(self):
+        return _safe_mode_switch(self, "train")
+
+    def _safe_eval(self):
+        return _safe_mode_switch(self, "eval")
+
+    AcceleratedOptimizer.train = _safe_train
+    AcceleratedOptimizer.eval = _safe_eval
+    AcceleratedOptimizer._spot_scam_safe_mode_patch = True
+
+
 @dataclass
 class TransformerRun:
     name: str
@@ -47,6 +78,7 @@ def train_transformer_model(
     """
     Fine-tune a compact transformer (DistilBERT by default) on the `text_all` feature.
     """
+    _ensure_safe_accelerate_optimizer()
     transformer_conf = config["models"]["transformer"]
     project_conf = config["project"]
     set_seed(project_conf["random_seed"])

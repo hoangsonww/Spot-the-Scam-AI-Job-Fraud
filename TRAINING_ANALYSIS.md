@@ -9,6 +9,8 @@ This document provides a comprehensive analysis of the training strategies, hype
 - **Current Configuration:** 3 epochs for DistilBERT transformer with early stopping
 - **Performance:** Strong results across all metrics (Test F1: 0.819, Precision: 0.919, Recall: 0.738)
 - **Model Winner:** Classical models (Linear SVM and Logistic Regression) consistently outperform the transformer approach
+- **Expanded classical stack:** Adds an aggressive-yet-capped XGBoost sweep plus weighted ensembles so the tfidf+tabular pipeline can chase extra validation lift without destabilizing runtime.
+- **Benchmark & reproducibility upgrades:** Train/val/test splits are persisted to `data/processed/*.parquet` and each run exports latency benchmarks + per-variant XGBoost artifacts for auditing.
 - **System Maturity:** Production-grade architecture with comprehensive monitoring, calibration, explainability, and human-in-the-loop feedback
 - **Verdict:** Current training configuration is optimal for this dataset size and problem domain
 
@@ -67,6 +69,28 @@ The classical pipeline wins primarily due to:
 4. Low inference latency (2-5ms per prediction)
 5. Smaller memory footprint (50MB vs 250MB)
 
+##### XGBoost Extension
+
+To keep squeezing headroom from the classical track, we introduced a dedicated `XGBoostModel` wrapper (`src/spot_scam/models/xgboost_model.py`) that trains and evaluates up to 12 carefully curated variants per run. The grid explores:
+
+```
+max_depth: [4, 6, 8]
+learning_rate: [0.05, 0.03, 0.02]
+n_estimators: [600, 800, 1000]
+subsample: [0.9]
+colsample_bytree: [0.9]
+min_child_weight: [1, 5, 10]
+reg_alpha: [0, 0.1, 0.3]
+reg_lambda: [1, 2, 5]
+scale_pos_weight: [0.7×, 1.0×, 1.3× class ratio heuristic]
+```
+
+Because the cartesian product would explode, the pipeline down-samples to twelve diverse combinations, fit each candidate, record validation metrics, and persist both the calibrated and base estimators to `artifacts/xgboost_variants/<variant_name>/`. The best-performing variant is also parked under `artifacts/xgboost/` so later runs (and the inference service) can inspect the winning booster. All of these models use the same TF-IDF+tabular bundle as the linear stack, so they immediately benefit from the existing feature engineering.
+
+##### Weighted Ensembles
+
+Once classical runs (SVM, logistic regression, LightGBM, XGBoost, etc.) finish, the training pipeline now builds probabilistic ensembles that average calibrated scores from the top tfidf+tabular models. Weights are either uniform (simple mean) or optimized through a brute-force sweep while using `optimal_threshold` to pick the best decision point per mixture. Only ensembles that improve validation F1 are kept, and the metadata captures component names + weights so analysts can trace exactly how the blended score was produced.
+
 #### Transformer Pipeline
 
 **Model Architecture:**
@@ -102,6 +126,7 @@ Competitive with classical models but doesn't justify the overhead
 - **LightGBM 4.x:** Gradient boosting option (currently not selected)
 - **PyTorch:** Deep learning framework with CUDA support
 - **ONNX 1.15:** Model export and optimization format
+- **XGBoost 1.7:** Gradient boosting with efficient tree learning
 
 **MLOps & Serving:**
 - **FastAPI 0.121:** High-performance API serving
@@ -131,10 +156,11 @@ The pipeline implements a comprehensive training strategy that evaluates multipl
    ├── Fill missing values with <missing> token
    └── Compute combined text_all field
 
-2. Stratified Splitting
+2. Stratified Splitting & Persistence
    ├── Train: 70% (~12,516 samples)
    ├── Validation: 15% (~2,682 samples)
-   └── Test: 15% (~2,682 samples)
+   ├── Test: 15% (~2,682 samples)
+   └── Persist each split to `data/processed/{train,val,test}.parquet` for notebook reuse
 
 3. Feature Engineering
    ├── TF-IDF Vectorization
@@ -148,10 +174,11 @@ The pipeline implements a comprehensive training strategy that evaluates multipl
        ├── Metadata (company logo, telecommuting)
        └── StandardScaler normalization
 
-4. Classical Model Training
+4. Classical Model Training + XGBoost Sweep
    ├── Logistic Regression grid (C: 0.1, 1.0, 10.0)
    ├── Linear SVM grid (C: 0.1, 1.0, 10.0)
-   └── LightGBM grid (num_leaves, learning_rate, n_estimators)
+   ├── LightGBM grid (num_leaves, learning_rate, n_estimators)
+   └── XGBoost variants: capped 12-combo sweep over depth, lr, estimators, regularization, scale_pos_weight
 
 5. Transformer Fine-tuning
    ├── Load pre-trained DistilBERT
@@ -164,16 +191,21 @@ The pipeline implements a comprehensive training strategy that evaluates multipl
    ├── Try Isotonic regression (non-parametric)
    └── Select method with lowest Brier score
 
-7. Model Selection
-   ├── Compare all candidates on validation F1
-   ├── Evaluate winner on hold-out test set
-   └── Generate comprehensive evaluation report
+7. Ensembling & Model Selection
+   ├── Build weighted/uniform ensembles from top tfidf+tabular candidates
+   ├── Compare all candidates (including ensembles + transformer) via validation F1
+   └── Evaluate winner on hold-out test set
 
-8. Artifact Persistence
-   ├── Serialize winning model
-   ├── Export to ONNX format
-   ├── Log to MLflow registry
+8. Artifact Persistence & Registry Updates
+   ├── Serialize winning model, feature bundle, and metadata
+   ├── Export to ONNX format + log to MLflow registry
+   ├── Persist every XGBoost variant under `artifacts/xgboost_variants/`
    └── Generate visualizations and metrics
+
+9. Benchmarking & Reporting
+   ├── Run latency/throughput benchmarks across configurable batch sizes
+   ├── Save benchmark tables + plots into `experiments/tables/` and `experiments/figs/`
+   └── Append run metadata to the tracking log
 ```
 
 ### Configuration Management
@@ -217,6 +249,8 @@ After Stratified Split:
 ├── Validation: 2,682 samples
 └── Test: 2,682 samples
 ```
+
+Each of those splits now lands in `data/processed/{train,val,test}.parquet`, which lets notebooks, Optuna studies, and downstream analyses ingest the exact rows used in the canonical training run.
 
 With only 626 fraudulent training examples, the risk of overfitting increases dramatically with each additional epoch. The model may start memorizing specific phrases or patterns rather than learning generalizable fraud indicators.
 
@@ -637,6 +671,8 @@ This adaptive thresholding is crucial for imbalanced datasets where the default 
 **Overview:**
 The project integrates Optuna for intelligent Bayesian hyperparameter optimization as an alternative to grid search. Optuna uses Tree-structured Parzen Estimator (TPE) sampling to efficiently explore continuous hyperparameter spaces and discover optimal values that fall between traditional grid points.
 
+> Quick-start commands, environment variables, and visualization tips now live in `docs/optuna_quickstart.md` and the more detailed `docs/optuna_tuning.md`. Both documents walk through running `scripts/tune_with_optuna.py`.
+
 **Advantages Over Grid Search:**
 
 | Feature | Grid Search | Optuna |
@@ -999,6 +1035,8 @@ Classical Model Advantages:
 ---
 
 ## Performance Benchmarks
+
+The training pipeline now invokes `_run_benchmarks` after selecting the best model. This routine spins up `FraudPredictor`, samples batches from the test split, and records latency/throughput across configurable batch sizes. Results are persisted to `experiments/tables/benchmark_latency.csv`, `benchmark_summary.csv`, and plotted as `experiments/figs/latency_throughput.png`, giving both the API and frontend dashboards real measurements instead of hand-wavy estimates.
 
 ### Training Time Breakdown
 

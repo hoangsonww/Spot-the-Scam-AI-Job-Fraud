@@ -470,6 +470,17 @@ def log_model_to_mlflow(
     export_root = Path(tempfile.mkdtemp(prefix="spot_scam_onnx_"))
     logger.info("Exporting model artifacts to temporary directory: %s", export_root)
 
+    if (
+        best_model.model_type == "classical"
+        and best_model.base_estimator is None
+        and best_model.estimator is None
+    ):
+        logger.warning(
+            "MLflow export skipped: %s has no underlying estimator (e.g., ensemble probabilities only).",
+            best_model.name,
+        )
+        return
+
     try:
         exported = _prepare_export_bundle(
             best_model=best_model,
@@ -616,8 +627,14 @@ def _serialize_calibration(
         )
     elif isinstance(estimator, CalibratedClassifierCV):
         calibrated = estimator.calibrated_classifiers_[0]
-        cal = calibrated.calibrator
-        if cal.__class__.__name__ == "LogisticRegression":
+        cal = getattr(calibrated, "calibrator", None)
+        if cal is None:
+            calibrators = getattr(calibrated, "calibrators", None)
+            if calibrators:
+                cal = calibrators[0]
+        if cal is None:
+            calibration["method"] = "none"
+        elif cal.__class__.__name__ == "LogisticRegression":
             coef = float(cal.coef_.ravel()[0])
             intercept = float(cal.intercept_.ravel()[0])
             calibration.update(

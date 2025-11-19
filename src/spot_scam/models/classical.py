@@ -51,11 +51,13 @@ def train_classical_models(
     X_train_linear = sparse.hstack([bundle.tfidf_train, bundle.tabular_train]).tocsr()
     X_val_linear = sparse.hstack([bundle.tfidf_val, bundle.tabular_val]).tocsr()
 
-    # Logistic Regression
+    num_lr = len(classical_conf["logistic_regression"]["Cs"])
+    logger.info("Training %d Logistic Regression variants", num_lr)
     for C in classical_conf["logistic_regression"]["Cs"]:
         params = dict(classical_conf["logistic_regression"])
         params["C"] = C
         start = time.time()
+        logger.info("Starting Logistic Regression fit (C=%s)", C)
         clf = LogisticRegression(
             C=C,
             penalty=params.get("penalty", "l2"),
@@ -96,11 +98,59 @@ def train_classical_models(
             metric_results.values.get("recall", np.nan),
         )
 
+    # Logistic Regression L1 (saga)
+    if "logistic_regression_l1" in classical_conf:
+        l1_conf = classical_conf["logistic_regression_l1"]
+        logger.info("Training %d Logistic Regression L1 variants", len(l1_conf.get("Cs", [0.1, 1.0, 10.0])))
+        for C in l1_conf.get("Cs", [0.1, 1.0, 10.0]):
+            params = dict(l1_conf)
+            params["C"] = C
+            start = time.time()
+            logger.info("Starting Logistic Regression L1 fit (C=%s)", C)
+            clf = LogisticRegression(
+                C=C,
+                penalty="l1",
+                class_weight=params.get("class_weight", "balanced"),
+                max_iter=params.get("max_iter", 3000),
+                solver="saga",
+                n_jobs=-1,
+            )
+            clf.fit(X_train_linear, y_train)
+            train_time = time.time() - start
+            val_scores = clf.predict_proba(X_val_linear)[:, 1]
+            threshold = optimal_threshold(y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+            metric_results = compute_metrics(
+                y_val,
+                val_scores,
+                metrics_list=config["evaluation"]["metrics"],
+                threshold=threshold,
+                positive_label=1,
+            )
+            runs.append(
+                ModelRun(
+                    name=f"logreg_l1_C{C}",
+                    estimator=clf,
+                    val_scores=val_scores,
+                    val_metrics=metric_results,
+                    train_time=train_time,
+                    config=params,
+                    threshold=threshold,
+                    feature_type="tfidf+tabular",
+                )
+            )
+            logger.info("Logistic Regression L1 (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
+                        C,
+                        metric_results.values.get("f1", np.nan),
+                        metric_results.values.get("precision", np.nan),
+                        metric_results.values.get("recall", np.nan))
+
     # Linear SVM
+    logger.info("Training %d Linear SVM variants", len(classical_conf["linear_svm"]["Cs"]))
     for C in classical_conf["linear_svm"]["Cs"]:
         params = dict(classical_conf["linear_svm"])
         params["C"] = C
         start = time.time()
+        logger.info("Starting Linear SVM fit (C=%s)", C)
         svm = LinearSVC(
             C=C,
             class_weight=params.get("class_weight"),
@@ -145,11 +195,13 @@ def train_classical_models(
     tab_val = bundle.tabular_val
     lightgbm_conf = classical_conf["lightgbm"]
     grid = _expand_grid(lightgbm_conf)
+    logger.info("Training %d LightGBM variants", len(grid))
     for params in grid:
         base_params = {"objective": "binary"}
         if "class_weight" not in params and lightgbm_conf.get("class_weight") is not None:
             base_params["class_weight"] = lightgbm_conf.get("class_weight")
         start = time.time()
+        logger.info("Starting LightGBM fit with params: %s", params)
         clf = LGBMClassifier(**base_params, **params)
         clf.fit(tab_train.toarray(), y_train)
         train_time = time.time() - start
