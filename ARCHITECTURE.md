@@ -344,6 +344,10 @@ Optuna's visualization tools help analyze hyperparameter optimization results. B
   <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
 </p>
 
+<p align="center">
+  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
+</p>
+
 ---
 
 ## 9. Environment & Configuration
