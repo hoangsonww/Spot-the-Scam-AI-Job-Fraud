@@ -53,12 +53,19 @@ class XGBoostModel:
         self.calibrated_estimator: CalibratedClassifierCV | None = None
         self.threshold: float | None = None
 
-    def fit(self, bundle: FeatureBundle, y_train: np.ndarray, y_val: np.ndarray) -> XGBoostTrainingResult:
+    def fit(
+        self, bundle: FeatureBundle, y_train: np.ndarray, y_val: np.ndarray
+    ) -> XGBoostTrainingResult:
         # Build combined sparse matrices (TF-IDF + tabular) identical to other classical models.
         X_train = sparse.hstack([bundle.tfidf_train, bundle.tabular_train]).tocsr()
         X_val = sparse.hstack([bundle.tfidf_val, bundle.tabular_val]).tocsr()
 
-        self.logger.info("Starting XGBoost fit: n=%d depth=%d lr=%.3f", self.base_estimator.n_estimators, self.base_estimator.max_depth, self.base_estimator.learning_rate)
+        self.logger.info(
+            "Starting XGBoost fit: n=%d depth=%d lr=%.3f",
+            self.base_estimator.n_estimators,
+            self.base_estimator.max_depth,
+            self.base_estimator.learning_rate,
+        )
         fit_kwargs: Dict = {"verbose": False}
         if self.early_stopping_rounds and self.early_stopping_rounds > 0:
             eval_set = [(X_val, y_val)]
@@ -67,23 +74,44 @@ class XGBoostModel:
             if "callbacks" in fit_params:
                 try:
                     from xgboost.callback import EarlyStopping as _EarlyStopping
-                    fit_kwargs.update({
-                        "eval_set": eval_set,
-                        "callbacks": [_EarlyStopping(rounds=self.early_stopping_rounds, save_best=True)],
-                    })
+
+                    fit_kwargs.update(
+                        {
+                            "eval_set": eval_set,
+                            "callbacks": [
+                                _EarlyStopping(rounds=self.early_stopping_rounds, save_best=True)
+                            ],
+                        }
+                    )
                 except Exception as exc:  # pragma: no cover - defensive
-                    self.logger.warning("XGBoost callbacks unavailable (%s); falling back to early_stopping_rounds.", exc)
+                    self.logger.warning(
+                        "XGBoost callbacks unavailable (%s); falling back to early_stopping_rounds.",
+                        exc,
+                    )
                     if "early_stopping_rounds" in fit_params:
-                        fit_kwargs.update({"eval_set": eval_set, "early_stopping_rounds": self.early_stopping_rounds})
+                        fit_kwargs.update(
+                            {
+                                "eval_set": eval_set,
+                                "early_stopping_rounds": self.early_stopping_rounds,
+                            }
+                        )
             elif "early_stopping_rounds" in fit_params:
-                fit_kwargs.update({"eval_set": eval_set, "early_stopping_rounds": self.early_stopping_rounds})
+                fit_kwargs.update(
+                    {"eval_set": eval_set, "early_stopping_rounds": self.early_stopping_rounds}
+                )
             else:  # pragma: no cover - very old versions
-                self.logger.warning("Early stopping requested but this xgboost version does not expose callbacks or early_stopping_rounds; continuing without it.")
+                self.logger.warning(
+                    "Early stopping requested but this xgboost version does not expose callbacks or early_stopping_rounds; continuing without it."
+                )
         self.base_estimator.fit(X_train, y_train, **fit_kwargs)
         self.logger.info("Completed XGBoost fit")
 
         # Calibrate using validation set (prefit mode). Method can be 'sigmoid' (Platt) or 'isotonic'.
-        method = self.calibration_method if self.calibration_method in {"sigmoid", "isotonic"} else "sigmoid"
+        method = (
+            self.calibration_method
+            if self.calibration_method in {"sigmoid", "isotonic"}
+            else "sigmoid"
+        )
         calibrator = CalibratedClassifierCV(self.base_estimator, cv="prefit", method=method)
         calibrator.fit(X_val, y_val)
         self.calibrated_estimator = calibrator
