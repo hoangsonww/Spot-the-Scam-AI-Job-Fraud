@@ -26,7 +26,7 @@ Spot The Scam protects job-seekers from fraudulent postings using an ensemble ML
 
 ## Technology Stack
 
-- **Backend**: Python, FastAPI, scikit-learn, MLflow, Optuna, XGBoost, LightGBM, Transformers
+- **Backend**: Python, FastAPI, scikit-learn, MLflow, ONNX, Optuna, XGBoost, LightGBM, Transformers
 - **Frontend**: Next.js, TypeScript, Tailwind CSS
 - **Deployment**: Docker, Vercel
 
