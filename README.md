@@ -2,7 +2,7 @@
 
 ## Overview
 
-Spot The Scam protects job seekers from fraudulent postings using an ensemble ML pipeline. The system achieves 85.4% precision and 77.2% F1 score on test data, effectively identifying scams while minimizing false alarms. Well-calibrated probabilities (ECE: 0.0066) ensure reliable confidence estimates for decision-making.
+Spot The Scam protects job-seekers from fraudulent postings using an ensemble ML pipeline. The system achieves 85.4% precision and 77.2% F1 score on test data, effectively identifying scams while minimizing false alarms. Well-calibrated probabilities (ECE: 0.0066) ensure reliable confidence estimates for decision-making.
 
 ## Key Features
 
@@ -27,7 +27,7 @@ Spot The Scam protects job seekers from fraudulent postings using an ensemble ML
 ## Technology Stack
 
 - **Backend**: Python, FastAPI, scikit-learn, MLflow, Optuna, XGBoost, LightGBM, Transformers
-- **Frontend**: Next.js, TypeScript, Tailwind CSS, shadcn/ui
+- **Frontend**: Next.js, TypeScript, Tailwind CSS
 - **Deployment**: Docker, Vercel
 
 ## Documentation
@@ -38,4 +38,3 @@ Spot The Scam protects job seekers from fraudulent postings using an ensemble ML
 - [TRAINING_ANALYSIS.md](docs/TRAINING_ANALYSIS.md) - Training pipeline and data analysis
 - [RESULTS.md](docs/RESULTS.md) - Detailed performance metrics and visualizations
 - [ADD_MODELS.md](docs/ADD_MODELS.md) - Instructions for adding new models
-- [docs/](docs/) - More documentation
