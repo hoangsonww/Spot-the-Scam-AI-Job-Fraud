@@ -37,7 +37,7 @@ from spot_scam.models.classical import ModelRun, ProbabilityEnsemble, train_clas
 from spot_scam.models.xgboost_model import XGBoostModel
 from sklearn.calibration import CalibratedClassifierCV
 
-if TYPE_CHECKING:  # avoid heavy imports unless actually training transformer
+if TYPE_CHECKING:
     from spot_scam.models.transformer import TransformerRun  # type: ignore
 from spot_scam.tracking.logger import append_run_record
 from spot_scam.tracking.feedback import load_feedback_dataframe
@@ -177,15 +177,12 @@ def run(
 
     classical_runs = train_classical_models(bundle, y_train, y_val, config)
 
-    # ------------------------------------------------------------------
-    # Train multiple XGBoost variants to seek higher validation/test F1.
-    # Grid can be constrained via config for quicker experimentation.
     xgb_grid: List[Dict] = []
     xgb_conf = config["models"].get("xgboost", {})
     if xgb_conf.get("enabled", True):
         pos = int((y_train == 1).sum())
         neg = int((y_train == 0).sum())
-        spw_default = max(int(neg / max(pos, 1)), 1)  # scale_pos_weight heuristic
+        spw_default = max(int(neg / max(pos, 1)), 1)
 
         def _values_from_conf(key: str, fallback: List):
             values = xgb_conf.get(key)
@@ -227,10 +224,8 @@ def run(
     else:
         logger.info("Skipping XGBoost variants (disabled via config).")
 
-    # Limit total variants to avoid excessive runtime if grid explodes
     MAX_XGB_VARIANTS = int(xgb_conf.get("max_variants", 12))
     if len(xgb_grid) > MAX_XGB_VARIANTS and MAX_XGB_VARIANTS > 0:
-        # Simple down-select: keep first MAX_XGB_VARIANTS evenly spread
         step = len(xgb_grid) / MAX_XGB_VARIANTS
         xgb_grid = [xgb_grid[int(i * step)] for i in range(MAX_XGB_VARIANTS)]
 
@@ -238,9 +233,7 @@ def run(
     for params in xgb_grid:
         try:
             start_xgb = time.time()
-            # Construct model instance on-the-fly overriding base estimator hyperparams
             xgb_model = XGBoostModel(config)
-            # Override internal base_estimator parameters
             xgb_model.base_estimator.set_params(**params, eval_metric="logloss", tree_method="hist", use_label_encoder=False)
             xgb_result = xgb_model.fit(bundle, y_train, y_val)
             xgb_train_time = time.time() - start_xgb
@@ -269,7 +262,6 @@ def run(
                     feature_type="tfidf+tabular",
                 )
             )
-            # Persist each variant artifacts in its own subdirectory for potential analysis
             try:
                 variant_dir = ARTIFACTS_DIR / "xgboost_variants" / variant_name
                 variant_dir.mkdir(parents=True, exist_ok=True)
@@ -280,7 +272,6 @@ def run(
         except Exception as exc:  # pragma: no cover - continue other variants
             logger.warning("XGBoost variant %s failed: %s", params, exc)
 
-    # Persist XGBoost artifacts regardless of selection outcome
     try:
         if xgb_result is not None:
             xgb_dir = ARTIFACTS_DIR / "xgboost"
@@ -296,7 +287,6 @@ def run(
 
     transformer_artifact: Optional[BestModelArtifacts] = None
     if not skip_transformer:
-        # Lazy import to avoid pulling heavy deps during classical-only runs
         from spot_scam.models.transformer import train_transformer_model
         transformer_run = train_transformer_model(
             splits.train,
@@ -309,8 +299,6 @@ def run(
 
     candidate_artifacts: List[BestModelArtifacts] = list(classical_artifacts)
 
-    # ------------------------------------------------------------------
-    # Probabilistic ensemble of top K tfidf+tabular classical models.
     try:
         TOP_K = 3
         tfidf_artifacts = [a for a in classical_artifacts if a.feature_type == "tfidf+tabular"]
@@ -322,7 +310,6 @@ def run(
         ensemble_components = tfidf_sorted[:TOP_K]
         component_estimators = [c.estimator for c in ensemble_components if c.estimator is not None]
         if len(ensemble_components) >= 2 and len(component_estimators) == len(ensemble_components):
-            # Average calibrated probabilities
             val_stack = np.vstack([c.val_probabilities for c in ensemble_components])
             test_stack = np.vstack([c.test_probabilities for c in ensemble_components])
             ensemble_val = val_stack.mean(axis=0)
@@ -349,7 +336,7 @@ def run(
             ensemble_model = ProbabilityEnsemble(component_estimators)
             ensemble_artifact = BestModelArtifacts(
                 name="ensemble_top3",
-                model_type="classical",  # treat as classical for inference compatibility
+                model_type="classical",
                 estimator=ensemble_model,
                 base_estimator=None,
                 threshold=ensemble_threshold,
@@ -374,7 +361,6 @@ def run(
                 ensemble_val_metrics.values.get("recall", np.nan),
             )
 
-            # Weighted ensemble via simple grid search on validation
             weights = None
             best_w_val = ensemble_val
             best_w_test = ensemble_test
@@ -532,7 +518,7 @@ def _evaluate_classical_on_test(
     X_val, X_test = _prepare_features_for_run(run, bundle, splits)
 
     calibration_methods = config["calibration"]["methods"]
-    # Skip second calibration for any pre-calibrated estimator
+
     if isinstance(run.estimator, CalibratedClassifierCV):
         calibration_results = []
     else:
@@ -545,7 +531,7 @@ def _evaluate_classical_on_test(
         chosen_method = best_calibration.method
     else:
         estimator = run.estimator
-        # Attempt to record calibration method if estimator is already calibrated
+
         if isinstance(estimator, CalibratedClassifierCV):
             chosen_method = _infer_calibration_method(estimator)
             val_probs = estimator.predict_proba(X_val)[:, 1]
@@ -744,7 +730,7 @@ def _run_benchmarks(artifacts: BestModelArtifacts, config: Dict, splits: SplitRe
         return
 
     predictor = FraudPredictor()
-    predictor.predict(payload[: min(32, len(payload))])  # warm-up
+    predictor.predict(payload[: min(32, len(payload))])
 
     records: List[Dict[str, float]] = []
     for batch_size in batch_sizes:

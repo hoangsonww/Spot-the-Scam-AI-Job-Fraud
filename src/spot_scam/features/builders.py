@@ -24,7 +24,6 @@ class FeatureBundle:
 
 
 def build_feature_bundle(train_df, val_df, test_df, config: Dict) -> FeatureBundle:
-    """Construct TF-IDF and tabular feature matrices for classical models."""
     vectorizer, _ = build_tfidf_vectorizer(config)
     tfidf_train = vectorizer.fit_transform(train_df["text_all"])
     tfidf_val = vectorizer.transform(val_df["text_all"])

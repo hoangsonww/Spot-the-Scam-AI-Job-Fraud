@@ -47,7 +47,6 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
       try {
         const parsed = JSON.parse(saved);
         setMessages(parsed);
-        // Scroll to bottom after loading messages
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "nearest" });
         }, 100);
@@ -64,11 +63,9 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
   }, [messages]);
 
   useEffect(() => {
-    // Always scroll to bottom when messages change or streaming
-    // Use requestAnimationFrame to ensure DOM has updated
     requestAnimationFrame(() => {
       messagesEndRef.current?.scrollIntoView({
-        behavior: streamingMessage ? "auto" : "smooth", // Instant scroll while streaming
+        behavior: streamingMessage ? "auto" : "smooth",
         block: "nearest",
       });
     });
@@ -88,7 +85,6 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
     setIsLoading(true);
     setStreamingMessage("");
 
-    // Scroll to bottom after sending message
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }, 100);
@@ -510,7 +506,6 @@ export default function ChatAssistant({ initialContext }: ChatAssistantProps) {
                 </div>
               )}
 
-              {/* Scroll anchor - always at the bottom */}
               <div ref={messagesEndRef} />
             </div>
 

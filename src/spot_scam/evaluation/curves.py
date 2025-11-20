@@ -91,7 +91,6 @@ def plot_score_distribution(
     path: Path,
     bins: int = 30,
 ) -> None:
-    """Histogram of predicted probabilities split by class."""
     plt.figure(figsize=(6, 4))
     negatives = y_scores[y_true == 0]
     positives = y_scores[y_true == 1]

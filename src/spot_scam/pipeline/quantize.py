@@ -23,7 +23,6 @@ def main(
         "qint8", "--dtype", help="Target dtype (currently only qint8 supported)."
     ),
 ) -> None:
-    """Quantize the fine-tuned transformer checkpoint using dynamic quantization."""
     best_dir = ARTIFACTS_DIR / "transformer" / "best"
     if not best_dir.exists():
         raise typer.Exit(f"Base checkpoint not found at {best_dir}. Run training first.")

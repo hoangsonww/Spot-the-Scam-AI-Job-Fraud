@@ -692,6 +692,10 @@ The project integrates Optuna for intelligent Bayesian hyperparameter optimizati
   <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
 </p>
 
+<p align="center">
+  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
+</p>
+
 **Search Spaces:**
 
 Logistic Regression:

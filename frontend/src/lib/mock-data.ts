@@ -13,12 +13,9 @@ import type {
   ChatStreamChunk,
 } from "./api";
 
-// Simulated delay for realistic API behavior
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Generate realistic prediction based on job posting content
 function generateRealisticPrediction(input: JobPostingInput): PredictionResponse {
-  // Analyze input for fraud indicators
   const fraudIndicators: string[] = [];
   const legitIndicators: string[] = [];
 
@@ -26,7 +23,6 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
     .join(" ")
     .toLowerCase();
 
-  // Check for fraud signals
   if (text.includes("earn") && text.includes("from home")) fraudIndicators.push("work from home");
   if (text.includes("no experience")) fraudIndicators.push("no experience required");
   if (text.includes("urgent") || text.includes("immediate")) fraudIndicators.push("urgency");
@@ -36,7 +32,6 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
   if (!input.requirements || input.requirements.length < 30)
     fraudIndicators.push("vague requirements");
 
-  // Check for legit signals
   if (input.company_profile && input.company_profile.length > 100)
     legitIndicators.push("detailed company info");
   if (input.requirements && input.requirements.length > 100)
@@ -46,12 +41,10 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
   if (input.required_experience) legitIndicators.push("experience requirements");
   if (input.industry) legitIndicators.push("industry specified");
 
-  // Calculate probability based on indicators
   const fraudScore = fraudIndicators.length * 0.15;
   const legitScore = legitIndicators.length * 0.1;
   let probability_fraud = Math.max(0.1, Math.min(0.9, 0.5 + fraudScore - legitScore));
 
-  // Add some randomness for variety
   probability_fraud += (Math.random() - 0.5) * 0.1;
   probability_fraud = Math.max(0.05, Math.min(0.95, probability_fraud));
 
@@ -69,7 +62,6 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
     decision = "review";
   }
 
-  // Generate feature contributions
   const topPositive = [
     { feature: "no_company_logo", source: "has_company_logo", contribution: 0.23 },
     { feature: "work from home", source: "description", contribution: 0.19 },
@@ -116,7 +108,7 @@ function generateRealisticPrediction(input: JobPostingInput): PredictionResponse
 export async function mockPredictBatch(
   instances: JobPostingInput[]
 ): Promise<PredictionBatchResponse> {
-  await delay(300 + Math.random() * 200); // Simulate network delay
+  await delay(300 + Math.random() * 200);
 
   return {
     predictions: instances.map(generateRealisticPrediction),
@@ -402,7 +394,6 @@ export async function mockFetchReviewCases(
 ): Promise<CasesResponse> {
   await delay(250);
 
-  // Get user-submitted cases from the demo queue
   let userCases: any[] = [];
   if (typeof window !== "undefined") {
     try {
@@ -484,7 +475,6 @@ export async function mockFetchReviewCases(
     },
   ];
 
-  // Combine user-submitted cases with sample cases (user cases first)
   const allCases = [...userCases, ...sampleCases];
   const total = allCases.length;
   const items = allCases.slice(offset, offset + limit);
@@ -505,7 +495,6 @@ export async function mockFetchHealth() {
   };
 }
 
-// Mock chat streaming
 export async function mockStreamChat(
   message: string,
   onChunk: (chunk: string) => void,
@@ -513,7 +502,6 @@ export async function mockStreamChat(
   onError: (error: Error) => void
 ): Promise<void> {
   try {
-    // Generate contextual response based on message
     let response = "";
 
     const lowerMessage = message.toLowerCase();
@@ -619,7 +607,6 @@ The actual backend with the full AI model is not connected, but this demo showca
 What specific aspect would you like to learn more about?`;
     }
 
-    // Stream the response word by word for realistic effect
     const words = response.split(" ");
     for (let i = 0; i < words.length; i++) {
       const chunk = (i === 0 ? "" : " ") + words[i];

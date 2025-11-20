@@ -10,9 +10,6 @@ from spot_scam.utils.paths import TRACKING_DIR
 
 
 def append_run_record(artifacts: Any, config: Dict) -> None:
-    """
-    Append a run summary to the tracking CSV file for lightweight experiment management.
-    """
     TRACKING_DIR.mkdir(parents=True, exist_ok=True)
     path = TRACKING_DIR / "runs.csv"
     is_new = not path.exists()

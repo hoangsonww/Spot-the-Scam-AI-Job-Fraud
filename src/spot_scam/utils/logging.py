@@ -4,16 +4,6 @@ from typing import Optional
 
 
 def configure_logging(level: int = logging.INFO, name: Optional[str] = None) -> logging.Logger:
-    """
-    Configure a standard project logger with uniform formatting.
-
-    Parameters
-    ----------
-    level:
-        Logging level to use (defaults to INFO).
-    name:
-        Optional logger name. Defaults to the root project logger.
-    """
     if isinstance(level, str):
         name = level
         level = logging.INFO

@@ -38,10 +38,6 @@ def log_predictions(
     predictions: Sequence[Dict[str, object]],
     model_name: str,
 ) -> List[Dict[str, object]]:
-    """
-    Persist per-request prediction metadata for active learning and review workflows.
-    Returns the immutable records that were written (useful for downstream feedback).
-    """
     ensure_directories()
     timestamp = datetime.utcnow().isoformat()
     records: List[Dict[str, object]] = []

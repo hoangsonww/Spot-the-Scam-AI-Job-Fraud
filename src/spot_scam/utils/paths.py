@@ -15,7 +15,6 @@ TRACKING_CASES_DIR = TRACKING_DIR / "cases"
 
 
 def ensure_directories() -> None:
-    """Create commonly used directories if they do not yet exist."""
     for directory in [
         CONFIG_DIR,
         DATA_DIR,

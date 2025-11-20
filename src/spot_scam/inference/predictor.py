@@ -23,10 +23,6 @@ logger = configure_logging(__name__)
 
 
 class FraudPredictor:
-    """
-    Wrapper around the trained model artifacts to provide batch prediction utilities.
-    """
-
     def __init__(self, artifacts_dir: Path = ARTIFACTS_DIR):
         self.artifacts_dir = artifacts_dir
         self.metadata = self._load_metadata()
@@ -445,7 +441,7 @@ class FraudPredictor:
             outputs = self.model(**encodings, output_attentions=True, return_dict=True)
         logits = outputs.logits
         probabilities = torch.softmax(logits, dim=1)[:, 1]
-        attentions = outputs.attentions[-1].mean(dim=1)  # average heads on last layer
+        attentions = outputs.attentions[-1].mean(dim=1)
         cls_attention = attentions[:, 0, :]
         centered_scores = cls_attention - cls_attention.mean(dim=1, keepdim=True)
         return (

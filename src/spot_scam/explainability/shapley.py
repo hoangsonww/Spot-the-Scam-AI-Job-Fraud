@@ -20,9 +20,6 @@ def compute_tabular_shap(
     sample_size: int = 1024,
     output_path: Optional[Path] = None,
 ) -> pd.DataFrame:
-    """
-    Compute SHAP values for tabular features using Tree or Linear explainers depending on the estimator.
-    """
     feature_names = list(feature_names)
     background = data
     if data.shape[0] > sample_size:

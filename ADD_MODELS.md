@@ -74,7 +74,7 @@ If you need to fine-tune multiple transformers in a single run, extend `train_tr
 
 ## 5. Keeping Winner Selection
 
-`src/spot_scam/pipeline/train.py` collects all classical + transformer candidates, evaluates them on the validation set, and feeds them into `_select_best_artifact`, which picks the highest F1. As long as your new model ends up in `candidate_artifacts`, the “winner takes all” logic and downstream artifacts (`artifacts/metadata.json`, MLflow export, gray-zone policy) remain unchanged.
+`src/spot_scam/pipeline/train.py` automatically collects all classical + transformer candidates, evaluates them on the validation set, and feeds them into `_select_best_artifact`, which picks the highest F1. As long as your new model ends up in `candidate_artifacts`, the “winner takes all” logic and downstream artifacts (`artifacts/metadata.json`, MLflow export, gray-zone policy) should remain unchanged.
 
 ---
 
@@ -94,6 +94,6 @@ After training, check:
 - `experiments/report.md` and figures/tables for comparisons.
 - `tracking/runs.csv` (if enabled) for a chronological record.
 
-Need to compare multiple winners? Repeat with different configs and diff the resulting artifacts.
+Once satisfied, create a PR to merge your changes to the `master` branch so others can benefit from your new model!
 
 ---

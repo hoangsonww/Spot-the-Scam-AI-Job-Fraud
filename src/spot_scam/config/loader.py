@@ -11,18 +11,13 @@ from spot_scam.utils.paths import CONFIG_DIR, ensure_directories
 
 
 class ConfigError(Exception):
-    """Raised when configuration loading fails."""
+    """Raised when configuration loading fails"""
 
 
 def _deep_merge(
     base: MutableMapping[str, Any], updates: Mapping[str, Any]
 ) -> MutableMapping[str, Any]:
-    """
-    Recursively merge two dictionaries.
-
-    Arrays/lists are replaced wholesale to avoid accidental concatenation; scalar values are
-    overwritten. Returns the mutated base dictionary for convenience.
-    """
+    """Recursively merge two dictionaries"""
     for key, value in updates.items():
         if isinstance(value, Mapping) and isinstance(base.get(key), Mapping):
             base[key] = _deep_merge(dict(base[key]), value)  # type: ignore[arg-type]
@@ -37,7 +32,7 @@ def _read_yaml(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         try:
             return yaml.safe_load(handle) or {}
-        except yaml.YAMLError as exc:  # pragma: no cover - handled explicitly
+        except yaml.YAMLError as exc:  # pragma: no cover
             raise ConfigError(f"Failed to parse YAML at {path}: {exc}") from exc
 
 
@@ -46,18 +41,6 @@ def load_config(
     overrides: Optional[Mapping[str, Any]] = None,
     default_name: str = "defaults.yaml",
 ) -> Dict[str, Any]:
-    """
-    Load a project configuration by merging defaults with user-specified overrides.
-
-    Parameters
-    ----------
-    config_path:
-        Optional path to a configuration file that overrides the defaults.
-    overrides:
-        Dictionary of key/value overrides applied last (use dot-notation keys).
-    default_name:
-        Name of the default config file located under CONFIG_DIR.
-    """
     ensure_directories()
     default_path = CONFIG_DIR / default_name
     config: Dict[str, Any] = _read_yaml(default_path)
@@ -90,18 +73,14 @@ def _expand_dot_keys(mapping: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 def dump_config(config: Mapping[str, Any], path: Path) -> None:
-    """Persist configuration to disk in YAML format."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(dict(config), handle, sort_keys=False)
 
 
 def config_hash(config: Mapping[str, Any]) -> str:
-    """
-    Create a deterministic hash of a configuration mapping to aid experiment tracking.
-    """
     serialized = json.dumps(config, sort_keys=True, separators=(",", ":"))
-    # Fowler–Noll–Vo (FNV-1a) 64-bit hash
+
     hash_val = 0xCBF29CE484222325
     fnv_prime = 0x100000001B3
     for char in serialized:

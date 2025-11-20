@@ -1,1 +1,1 @@
-"""Hyperparameter tuning with Optuna."""
+"""Hyperparameter tuning with Optuna"""
