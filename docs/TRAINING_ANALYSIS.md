@@ -685,15 +685,15 @@ The project integrates Optuna for intelligent Bayesian hyperparameter optimizati
 | Computational Cost | O(n^k) for k parameters | O(n) trials, focused search |
 
 <p align="center">
-  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
+  <img src="images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
+  <img src="images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
+  <img src="images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
 </p>
 
 **Search Spaces:**
@@ -801,8 +801,8 @@ OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db \
 ```
 
 **Documentation References:**
-- Comprehensive Guide: [docs/optuna_tuning.md](docs/optuna_tuning.md)
-- Quick Start: [docs/optuna_quickstart.md](docs/optuna_quickstart.md)
+- Comprehensive Guide: [docs/optuna_tuning.md](optuna_tuning.md)
+- Quick Start: [docs/optuna_quickstart.md](optuna_quickstart.md)
 - Optuna Official Docs: https://optuna.readthedocs.io/
 - TPE Algorithm Paper: https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization
 

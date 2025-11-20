@@ -5,11 +5,11 @@ This document summarizes the results of the text classification experiment condu
 ## Performance Snapshot
 | split |       f1 | precision | recall | roc_auc | pr_auc |    brier |
 |:------|--------:|----------:|-------:|--------:|-------:|---------:|
-| validation | 0.8541 | 0.9160 | 0.8000 | 0.9867 | 0.8929 | 0.0108 |
-| test | 0.7664 | 0.8400 | 0.7047 | 0.9833 | 0.8576 | 0.0149 |
+| validation | 0.8561 | 0.9297 | 0.7933 | 0.9890 | 0.9053 | 0.0103 |
+| test | 0.7721 | 0.8537 | 0.7047 | 0.9863 | 0.8659 | 0.0143 |
 
-- Expected calibration error (test): `0.0087`
-- Decision threshold: `0.4137`
+- Expected calibration error (test): `0.0066`
+- Decision threshold: `0.5802`
 - Gray-zone width: `0.10`
 
 ## Model Diagnostics
