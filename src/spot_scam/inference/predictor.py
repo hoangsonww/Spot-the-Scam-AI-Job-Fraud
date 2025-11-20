@@ -194,6 +194,7 @@ class FraudPredictor:
         base_path = self.artifacts_dir / "base_model.joblib"
         self.base_model = joblib.load(base_path) if base_path.exists() else None
         self.tfidf_feature_names = self.vectorizer.get_feature_names_out()
+        self._validate_classical_artifacts()
 
     def _load_transformer_artifacts(self) -> None:
         extra = self.metadata.get("extra", {})
@@ -228,6 +229,36 @@ class FraudPredictor:
         self.model.to(self.device)
         self.model.eval()
         self.transformer_max_length = self.config["models"]["transformer"]["max_length"]
+
+    def _validate_classical_artifacts(self) -> None:
+        def _model_feature_dim(model: Optional[object]) -> Optional[int]:
+            if model is None:
+                return None
+            return getattr(model, "n_features_in_", None)
+
+        include_tfidf = self.feature_type in {"tfidf", "tfidf+tabular"}
+        include_tabular = self.feature_type in {"tabular", "tfidf+tabular"}
+        expected_dim = 0
+        if include_tfidf:
+            expected_dim += len(self.tfidf_feature_names)
+        if include_tabular:
+            expected_dim += len(self.feature_names)
+
+        model_dim = _model_feature_dim(self.model)
+        if model_dim is None:
+            model_dim = _model_feature_dim(self.base_model)
+        if model_dim is None or expected_dim == 0:
+            return
+
+        if model_dim != expected_dim:
+            message = (
+                f"Loaded classical estimator expects {model_dim} features, "
+                f"but bundled artifacts describe {expected_dim}. "
+                "The artifacts directory appears out of sync (likely leftover from an older run). "
+                "Please retrain to regenerate artifacts or remove the existing files in "
+                f"'{self.artifacts_dir}' before retrying inference."
+            )
+            raise RuntimeError(message)
 
     def predict(
         self,

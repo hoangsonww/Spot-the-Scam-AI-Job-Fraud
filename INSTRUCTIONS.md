@@ -181,7 +181,7 @@ See [docs/optuna_tuning.md](docs/optuna_tuning.md) for detailed documentation an
 
 Quick visualization of tuning results (after a run):
 ```bash
-OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8081
 ```
 Then choose the study (e.g., `logistic_regression_tuning` or `linear_svm_tuning`) from the dashboard dropdown.
 

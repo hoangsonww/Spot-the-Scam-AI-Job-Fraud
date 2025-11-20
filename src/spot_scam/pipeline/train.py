@@ -31,14 +31,9 @@ from spot_scam.evaluation.curves import (
     plot_probability_vs_feature,
     plot_latency_curve,
 )
-from spot_scam.evaluation.metrics import (
-    MetricResults,
-    compute_metrics,
-    expected_calibration_error,
-    optimal_threshold,
-)
+from spot_scam.evaluation.metrics import MetricResults, compute_metrics, expected_calibration_error, optimal_threshold
 from spot_scam.features.builders import FeatureBundle, build_feature_bundle
-from spot_scam.models.classical import ModelRun, train_classical_models
+from spot_scam.models.classical import ModelRun, ProbabilityEnsemble, train_classical_models
 from spot_scam.models.xgboost_model import XGBoostModel
 from sklearn.calibration import CalibratedClassifierCV
 
@@ -238,9 +233,7 @@ def run(
         try:
             start_xgb = time.time()
             xgb_model = XGBoostModel(config)
-            xgb_model.base_estimator.set_params(
-                **params, eval_metric="logloss", tree_method="hist", use_label_encoder=False
-            )
+            xgb_model.base_estimator.set_params(**params, eval_metric="logloss", tree_method="hist", use_label_encoder=False)
             xgb_result = xgb_model.fit(bundle, y_train, y_val)
             xgb_train_time = time.time() - start_xgb
             variant_name = (
@@ -251,10 +244,10 @@ def run(
                 "%s trained (%.1fs) F1=%.3f P=%.3f R=%.3f Thr=%.3f",
                 variant_name,
                 xgb_train_time,
-                xgb_result.val_metrics.values.get("f1", float("nan")),
-                xgb_result.val_metrics.values.get("precision", float("nan")),
-                xgb_result.val_metrics.values.get("recall", float("nan")),
-                xgb_result.threshold if xgb_result.threshold is not None else float("nan"),
+                xgb_result.val_metrics.values.get("f1", float('nan')),
+                xgb_result.val_metrics.values.get("precision", float('nan')),
+                xgb_result.val_metrics.values.get("recall", float('nan')),
+                xgb_result.threshold if xgb_result.threshold is not None else float('nan'),
             )
             classical_runs.append(
                 ModelRun(
@@ -268,7 +261,6 @@ def run(
                     feature_type="tfidf+tabular",
                 )
             )
-
             try:
                 variant_dir = ARTIFACTS_DIR / "xgboost_variants" / variant_name
                 variant_dir.mkdir(parents=True, exist_ok=True)
@@ -279,7 +271,6 @@ def run(
         except Exception as exc:  # pragma: no cover - continue other variants
             logger.warning("XGBoost variant %s failed: %s", params, exc)
 
-    # Persist XGBoost artifacts regardless of selection outcome
     try:
         if xgb_result is not None:
             xgb_dir = ARTIFACTS_DIR / "xgboost"
@@ -296,7 +287,6 @@ def run(
     transformer_artifact: Optional[BestModelArtifacts] = None
     if not skip_transformer:
         from spot_scam.models.transformer import train_transformer_model
-
         transformer_run = train_transformer_model(
             splits.train,
             splits.val,
@@ -317,7 +307,8 @@ def run(
             reverse=True,
         )
         ensemble_components = tfidf_sorted[:TOP_K]
-        if len(ensemble_components) >= 2:
+        component_estimators = [c.estimator for c in ensemble_components if c.estimator is not None]
+        if len(ensemble_components) >= 2 and len(component_estimators) == len(ensemble_components):
             val_stack = np.vstack([c.val_probabilities for c in ensemble_components])
             test_stack = np.vstack([c.test_probabilities for c in ensemble_components])
             ensemble_val = val_stack.mean(axis=0)
@@ -341,10 +332,11 @@ def run(
                 threshold=ensemble_threshold,
                 positive_label=1,
             )
+            ensemble_model = ProbabilityEnsemble(component_estimators)
             ensemble_artifact = BestModelArtifacts(
                 name="ensemble_top3",
                 model_type="classical",
-                estimator=None,
+                estimator=ensemble_model,
                 base_estimator=None,
                 threshold=ensemble_threshold,
                 calibration_method=None,
@@ -376,30 +368,20 @@ def run(
             K = len(ensemble_components)
             if K == 2:
                 import numpy as _np
-
-                for w in [i / 10.0 for i in range(1, 10)]:
-                    w_vec = _np.array([w, 1 - w])[:, None]
+                for w in [i/10.0 for i in range(1, 10)]:
+                    w_vec = _np.array([w, 1-w])[:, None]
                     val_mix = (val_stack[:2] * w_vec).sum(axis=0)
-                    thr = optimal_threshold(
-                        y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"]
-                    )
-                    m = compute_metrics(
-                        y_val,
-                        val_mix,
-                        metrics_list=config["evaluation"]["metrics"],
-                        threshold=thr,
-                        positive_label=1,
-                    )
+                    thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+                    m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
                     if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
-                        weights = [w, 1 - w]
+                        weights = [w, 1-w]
                         best_w_metrics = m
                         best_w_threshold = thr
                         best_w_val = val_mix
                         best_w_test = (test_stack[:2] * w_vec).sum(axis=0)
             elif K >= 3:
                 import numpy as _np
-
-                grid = [i / 10.0 for i in range(0, 11)]
+                grid = [i/10.0 for i in range(0, 11)]
                 for w1 in grid:
                     for w2 in grid:
                         if w1 + w2 > 1.0:
@@ -407,18 +389,8 @@ def run(
                         w3 = 1.0 - w1 - w2
                         w_vec = _np.array([w1, w2, w3])[:, None]
                         val_mix = (val_stack[:3] * w_vec).sum(axis=0)
-                        thr = optimal_threshold(
-                            y_val,
-                            val_mix,
-                            metric=config["evaluation"]["thresholds"]["optimize_metric"],
-                        )
-                        m = compute_metrics(
-                            y_val,
-                            val_mix,
-                            metrics_list=config["evaluation"]["metrics"],
-                            threshold=thr,
-                            positive_label=1,
-                        )
+                        thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+                        m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
                         if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
                             weights = [w1, w2, w3]
                             best_w_metrics = m
@@ -426,6 +398,8 @@ def run(
                             best_w_val = val_mix
                             best_w_test = (test_stack[:3] * w_vec).sum(axis=0)
             if weights is not None:
+                weighted_estimators = component_estimators[: len(weights)]
+                weighted_model = ProbabilityEnsemble(weighted_estimators, weights=weights)
                 w_test_metrics = compute_metrics(
                     y_test,
                     best_w_test,
@@ -436,7 +410,7 @@ def run(
                 w_artifact = BestModelArtifacts(
                     name="ensemble_weighted_top3",
                     model_type="classical",
-                    estimator=None,
+                    estimator=weighted_model,
                     base_estimator=None,
                     threshold=best_w_threshold,
                     calibration_method=None,
@@ -543,9 +517,7 @@ def _evaluate_classical_on_test(
     if isinstance(run.estimator, CalibratedClassifierCV):
         calibration_results = []
     else:
-        calibration_results = calibrate_prefit_model(
-            run.estimator, X_val, y_val, calibration_methods
-        )
+        calibration_results = calibrate_prefit_model(run.estimator, X_val, y_val, calibration_methods)
     best_calibration = calibration_results[0] if calibration_results else None
 
     if best_calibration:
@@ -911,7 +883,6 @@ def _generate_report_assets(
     if artifacts.feature_type == "tabular" and artifacts.base_estimator is not None:
         try:
             from spot_scam.explainability.shapley import compute_tabular_shap
-
             compute_tabular_shap(
                 artifacts.base_estimator,
                 bundle.tabular_test.toarray(),

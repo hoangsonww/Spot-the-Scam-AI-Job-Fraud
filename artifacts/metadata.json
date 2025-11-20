@@ -3,7 +3,7 @@
   "model_type": "classical",
   "feature_type": "tfidf+tabular",
   "calibration_method": null,
-  "threshold": 0.4136752136752137,
+  "threshold": 0.5802197802197803,
   "gray_zone": {
     "width": 0.1,
     "positive_label": "fraud",
@@ -11,27 +11,27 @@
     "review_label": "review"
   },
   "val_metrics": {
-    "f1": 0.8540925266903915,
-    "precision": 0.916030534351145,
-    "recall": 0.8,
-    "roc_auc": 0.9867254963756698,
-    "pr_auc": 0.8928815894622958,
-    "brier": 0.010780068341526035
+    "f1": 0.8561151079136691,
+    "precision": 0.9296875,
+    "recall": 0.7933333333333333,
+    "roc_auc": 0.9889830864586616,
+    "pr_auc": 0.9052531280653772,
+    "brier": 0.010259039526684194
   },
   "test_metrics": {
-    "f1": 0.7664233576642335,
-    "precision": 0.84,
+    "f1": 0.7720588235294118,
+    "precision": 0.8536585365853658,
     "recall": 0.7046979865771812,
-    "roc_auc": 0.9833261440479061,
-    "pr_auc": 0.8576358152326706,
-    "brier": 0.014868545438859975
+    "roc_auc": 0.9863424721838089,
+    "pr_auc": 0.8658719345449246,
+    "brier": 0.014331959373934559
   },
-  "test_ece": 0.008717674227778369,
+  "test_ece": 0.006562720847060344,
   "extra": {
     "components": [
       "linear_svm_C3.0",
       "linear_svm_C5.0",
-      "linear_svm_C10.0"
+      "linear_svm_C1.0"
     ],
     "is_ensemble": true
   }
