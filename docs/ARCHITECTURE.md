@@ -303,19 +303,19 @@ flowchart LR
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="docs/images/ui.png" alt="UI Screenshot" width="100%"/>
+    <img src="images/ui.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="docs/images/ui1.png" alt="UI Screenshot" width="100%"/>
+    <img src="images/ui1.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
 <p align="center">
   <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank">
-    <img src="docs/images/ui2.png" alt="UI Screenshot" width="100%"/>
+    <img src="images/ui2.png" alt="UI Screenshot" width="100%"/>
   </a>
 </p>
 
@@ -337,15 +337,15 @@ flowchart LR
 Optuna's visualization tools help analyze hyperparameter optimization results. Below are sample plots generated from an Optuna study optimizing Logistic Regression hyperparameters.
 
 <p align="center">
-  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
+  <img src="images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
+  <img src="images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
+  <img src="images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
 </p>
 
 ---

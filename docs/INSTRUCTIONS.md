@@ -177,7 +177,7 @@ Optuna uses Bayesian optimization (TPE sampler) to find optimal hyperparameters.
 2. Update `configs/defaults.yaml` with the discovered values
 3. Re-run full training: `PYTHONPATH=src python -m spot_scam.pipeline.train`
 
-See [docs/optuna_tuning.md](docs/optuna_tuning.md) for detailed documentation and [docs/optuna_quickstart.md](docs/optuna_quickstart.md) for quick examples.
+See [docs/optuna_tuning.md](optuna_tuning.md) for detailed documentation and [docs/optuna_quickstart.md](optuna_quickstart.md) for quick examples.
 
 Quick visualization of tuning results (after a run):
 ```bash
@@ -185,7 +185,7 @@ OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --
 ```
 Then choose the study (e.g., `logistic_regression_tuning` or `linear_svm_tuning`) from the dashboard dropdown.
 
-<table> <tr> <td><img src="docs/images/optuna1.png" alt="Optuna Dashboard 1"/></td> <td><img src="docs/images/optuna2.png" alt="Optuna Dashboard 2"/></td> <td><img src="docs/images/optuna3.png" alt="Optuna Dashboard 3"/></td> </tr> </table>
+<table> <tr> <td><img src="images/optuna1.png" alt="Optuna Dashboard 1"/></td> <td><img src="images/optuna2.png" alt="Optuna Dashboard 2"/></td> <td><img src="images/optuna3.png" alt="Optuna Dashboard 3"/></td> </tr> </table>
 
 ### 5.5 Automatic ONNX + MLflow Export (OPTIONAL)
 

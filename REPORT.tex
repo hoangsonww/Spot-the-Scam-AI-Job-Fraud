@@ -1,0 +1,165 @@
+\documentclass{article}
+
+\usepackage[final]{neurips_2024}
+\makeatletter
+\renewcommand{\@noticestring}{}
+\makeatother
+
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{xcolor}         % colors
+\usepackage{float}          % for [H] float specifier
+\usepackage{subcaption}     % for subfigures
+\usepackage{graphicx}
+
+
+\title{Spot the Scam: AI Job Fraud Detection System}
+
+\author{
+    David Nguyen \\
+    University of North Carolina at Chapel Hill \\
+    \texttt{snghoang@unc.edu}
+    \And
+    David Pu \\
+    University of North Carolina at Chapel Hill \\
+    \texttt{davidpu@unc.edu}
+    \And
+    Alice Nicole Karakachian \\
+    University of North Carolina at Chapel Hill \\
+    \texttt{akaraka@unc.edu}
+    \And
+    Sai Ananya Channamsetti \\
+    University of North Carolina at Chapel Hill \\
+    \texttt{csaiana@unc.edu}
+    \And
+    Lakshmi Gayathri Divakaruni \\
+    University of North Carolina at Chapel Hill \\
+    \texttt{dlakshmi@unc.edu}
+}
+
+
+
+\begin{document}
+
+
+\maketitle
+
+
+\begin{abstract}
+  In our interconnected world, job seekers can find more opportunities online. While this increases the efficiency with which workers and employers can find each other, online platforms also increase the risk of fraud and monetary exploitation. Numerous algorithms have been designed to mitigate the impact of fraudulent job postings on vulnerable job seekers. Our approach combines classical machine learning pipeline with modern transformer-deep learning pipeline. Our strategy allows us to leverage the strengths of both paradigms and select the best-performing model for product deployment. 
+
+\end{abstract}
+
+
+\section{Introduction}
+
+In the digital age, employers and job seekers have increased opportunities to interface on various popular online platforms. While technology has increased the ease with which information about employment opportunities can be circulated, there has also been an increased risk of fraud. Fraudulent online job postings are often circulated with ill-intent: to exploit the vulnerabilities of desperate job-seekers and steal personal information or money through illegitimate up-front charges {\cite{habiba2021comparative}. Neural networks, NLP, SVM, random forest, decision trees, N-Gram and TF-IDF feature extraction methods have previously been employed to analyze job descriptions and recruiting company information to accurately flag fake job ads {\cite{reddy2025fake, suparna2024fakejob, malaichamy2024online}. These approaches have shown promising results, achieving high accuracy, but certain ambiguous or poorly formatted job descriptions still present a challenge {\cite{reddy2025fake}}.
+
+To improve the accuracy of the identification of fraudulent job postings, and to enhance the user experience, we developed \textbf{\textit{Spot The Scam}}, a full-stack application that applies both classical and transformer models to this modern problem.
+
+
+\section{Methods}
+The Spot the Scam system uses a dual-track architecture that trains a classical machine learning pipeline alongside a transformer-based deep learning pipeline. Specifically, logistic regression, linear SVM, LightGBM with config-driven grids, and DistilBERT fine-tuned with HF Trainer (AMP and early stopping) are used. 
+
+Logistic regression is a common supervised machine learning algorithm used in various classification tasks. This approach is particularly preferred for binary classification tasks, as a fraudulent job detector requires. Previous research has shown the promise of using logistic regression for this specific task, yielding high accuracy results of more than 98\% \cite{madaan2024fraudulent}. Our project builds on this previous work, and logistic regression is used as the baseline model to compare with the performance of other classical and transformer models. 
+
+ We used the two Kaggle CSV datasets “Real/Fake Job Posting Prediction” and “Fraudulent Job Posting”. Links to the datasets are provided in the Appendix A. First, the datasets were ingested, de-duplicated with text hashing that removes roughly 32\% of unique samples, cleaned by stripping HTML and URL artifacts, normalized for whitespace, and imputed with a “<missing>” token for absent fields. All textual attributes are concatenated into a unified “text\_all” field. The corpus was then partitioned with a stratified split into training (70\%, \textasciitilde 12,516 samples), validation (15\%, \textasciitilde 2,682 samples), and testing (15\%, \textasciitilde 2,682 samples). The test partition remains untouched until final model selection to preserve an unbiased performance estimate.
+
+In the classical modeling track, feature vectors combine TF-IDF text representations with normalized tabular signals, including message length, uppercase ratio, currency and URL counts, scam-term indicators, and metadata such as company-logo presence and telecommuting flags. The LightGBM variants would consume only the tabular block, while other classical models use TF-IDF plus tabular. Training follows an exhaustive grid, with L2-regularized logistic regression with class-balanced weights over \( C \in \{0.1,\, 1.0,\, 10.0\} \), class-balanced linear SVM over the same C grid with decision scores mapped to probabilities via sigmoid calibration when needed, and a 32-combination LightGBM sweep over num\_leaves, learning\_rate, n\_estimators, subsample, and colsample\_bytree. An additional XGBoost sweep runs a capped set of calibrated variants over depth, learning rate, estimators, regularization, and scale\_pos\_weight to capture the nonlinear structures. Altogether, 38 classical configurations would complete in roughly two to three hours. Each candidate is evaluated on the validation split, paired with both Platt (sigmoid) and isotonic calibration, and retains the calibration variant with the lowest validation Brier or expected calibration error. Decision thresholds are then tuned on the validation set to maximize the F1, which helps address class imbalance without touching the test set.
+
+The transformer track fine-tunes a DistilBERT sequence classifier on the concatenated text\_all field. Specifically, sequences are limited to 128 tokens, with batch size being 16, learning rate being \( 3 \times 10^{-5} \), weight decay being 0.01, warmup ratio being 0.1, and gradient accumulation of 1. Training runs for up to three epochs with early stopping on validation loss, using mixed precision when the platform supports it and falling back to full precision otherwise. This configuration adapts the pre-trained language model to fraud detection while controlling overfitting through short runs and validation-based stopping.
+
+After both tracks are complete, all calibrated candidates are ranked by their validation F1. The top model, whether classical, XGBoost-based, or transformer, is evaluated once on the held-out test set to obtain an unbiased performance estimate. The selected model’s artifacts, including weights, calibration method, and the validation-optimized threshold, are exported for production deployment so the live system reflects the best-performing configuration observed during validation and confirmed on the test partition.
+
+The system provides a chatbot experience via an external large language model rather than training an LLM in-house. It invokes the Gemini API with a structured prompt that includes a fixed system role (explaining how it should act as a fraud-detection assistant), the running conversation history, the user’s submitted job posting fields, and the trained model’s outputs (probability, decision label, threshold and gray-zone policy, and the top explanatory features). This context-engineering and prompt-engineering strategy keeps the fraud-detection models purpose-built and lightweight while offloading open-ended, conversational explanation and summarization to the managed LLM service, which ensures that the chatbot produces high-quality and accurate responses. 
+
+\section{Results}
+\label{sec:results}
+
+The final model is a classical ensemble (\texttt{ensemble\_top3}) using TF--IDF and tabular features, selected over transformer-based baselines by its superior validation F1. Overall, the model exhibits strong discrimination and ranking on both validation and test splits, with only modest degradation on the held-out test set consistent with expected generalization.
+
+\begin{table}[H]
+\centering
+\caption{Performance of \texttt{ensemble\_top3} on validation and test splits.}
+\label{tab:results}
+\begin{tabular}{lcccccc}
+\toprule
+Split      & F1     & Precision & Recall & ROC AUC & PR AUC & Brier  \\
+\midrule
+Validation & 0.8561 & 0.9297    & 0.7933 & 0.9890  & 0.9053 & 0.0103 \\
+Test       & 0.7721 & 0.8537    & 0.7047 & 0.9863  & 0.8659 & 0.0143 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As summarized in Table~\ref{tab:results}, the ensemble delivers strong performance on the validation split and maintains robust metrics on the unseen test split, with Brier scores indicating probabilistic predictions that are suitable for downstream decision-making.
+
+Validation-time threshold optimization selected an operating point at a decision threshold of approximately $0.5802$ with a gray-zone width of $0.10$, improving F1 relative to the default threshold of $0.5$ while preserving a balanced precision--recall trade-off. Decision quality on the test set is illustrated by the confusion matrix and precision--recall curve in Figures~\ref{fig:confusion} and~\ref{fig:prcurve}, which together show effective fraud recall at tolerable false-positive rates for the intended application.
+
+Calibration diagnostics in Figure~\ref{fig:calibration} show that predicted probabilities closely track observed frequencies, with a low expected calibration error on the test set (ECE $\approx 0.0066$). The probability-versus-text-length plot in Figure~\ref{fig:prob_length} shows no systematic dependence of fraud scores on document length, indicating that the TF--IDF plus tabular stack remains stable across typical posting sizes. The latency and throughput benchmark in Figure~\ref{fig:latency} demonstrates end-to-end latency in the tens of milliseconds at small batch sizes, while throughput scales to the hundreds of requests per second at larger batches before tail latency becomes the primary constraint, satisfying interactive inference requirements and supporting higher-throughput batch scoring when needed.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.45\linewidth]{confusion_matrix_test}
+  \caption{Confusion matrix on the test split at the selected decision threshold.}
+  \label{fig:confusion}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.51\linewidth]{pr_curve_test}
+  \caption{Precision--recall curve for \texttt{ensemble\_top3} on the test split.}
+  \label{fig:prcurve}
+\end{figure}
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\linewidth]{calibration_curve_test}
+  \caption{Calibration curve on the test split.}
+  \label{fig:calibration}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\linewidth]{probability_vs_length}
+  \caption{Predicted fraud probability as a function of text length on the test split.}
+  \label{fig:prob_length}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.5\linewidth]{latency_throughput}
+  \caption{Inference latency and throughput as a function of batch size.}
+  \label{fig:latency}
+\end{figure}
+
+\section{Conclusion}
+
+Our application, \textbf{\textit{Spot The Scam}} aims to reduce the impact of fraudulent job postings on job seekers by implementing a traditional machine learning pipeline using transformer-based deep learning techniques. Our results showed an F1 score of 85.4\% and precision of 91.6\%. To further improve the model, it could be useful to add continuous data-quality and drift monitoring for text/tabular features and predicted probabilities. Additionally, one could add a "lightweight watchdog" that continuously measures input drift, score drift, and calibration error from recent traffic, raises alerts when thresholds are breached, and produces a small “what to retrain with” bundle. It is important to continue to improve applications to ensure robust fraud detection systems to protect job seekers online. 
+
+
+\bibliographystyle{plain}
+\bibliography{ref.bib}
+
+
+\section{Appendix}
+
+\noindent \textbf{Dataset 1: Real / Fake Job Posting Prediction} \url{https://www.kaggle.com/datasets/shivamb/real-or-fake-fake-jobposting-prediction}
+
+\noindent \textbf{Dataset 2: Fraudulent Job Posting} \url{https://www.kaggle.com/datasets/subhajournal/fraudulent-job-posting}
+
+\noindent \textbf{Github Repository} \url{https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud.git}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\end{document}
+
+
