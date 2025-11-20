@@ -18,9 +18,6 @@ def render_markdown_report(
     token_table: pd.DataFrame,
     output_path: Path,
 ) -> None:
-    """
-    Produce a concise markdown report enumerating core metrics, calibration, and slice analysis.
-    """
     lines = []
     lines.append(f"# Spot the Scam Report - {metadata.get('model_name', 'Unknown Model')}")
     lines.append("")

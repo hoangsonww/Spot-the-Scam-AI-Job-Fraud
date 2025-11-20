@@ -14,7 +14,6 @@ logger = configure_logging(__name__)
 
 
 def load_raw_dataset(config: Dict, raw_dir: Optional[Path] = None) -> pd.DataFrame:
-    """Load and merge one or more CSV snapshots listed in the configuration."""
     data_conf = config["data"]
     directory = raw_dir or Path(data_conf["raw_dir"])
     filenames = data_conf.get("raw_filenames") or []
@@ -53,7 +52,7 @@ def load_raw_dataset(config: Dict, raw_dir: Optional[Path] = None) -> pd.DataFra
         df.loc[mapped.notna(), "fraudulent"] = mapped[mapped.notna()]
 
     df["fraudulent"] = pd.to_numeric(df["fraudulent"], errors="coerce")
-    if df["fraudulent"].isna().any():  # pragma: no cover - defensive fallback
+    if df["fraudulent"].isna().any():  # pragma: no cover
         missing = df[df["fraudulent"].isna()].shape[0]
         logger.warning("Detected %d rows with unknown fraudulent label; dropping them.", missing)
         df = df.dropna(subset=["fraudulent"])
@@ -84,9 +83,6 @@ def load_raw_dataset(config: Dict, raw_dir: Optional[Path] = None) -> pd.DataFra
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Standardize column names to snake_case and strip whitespace.
-    """
     df = df.copy()
     df.columns = [
         re.sub(r"[^0-9a-zA-Z]+", "_", col.strip().lower()).strip("_") for col in df.columns
@@ -95,7 +91,6 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def strip_html(text: str) -> str:
-    """Remove HTML content using BeautifulSoup."""
     if not isinstance(text, str):
         return ""
     soup = BeautifulSoup(text, "html.parser")
@@ -103,7 +98,6 @@ def strip_html(text: str) -> str:
 
 
 def strip_urls(text: str) -> str:
-    """Replace URLs with a placeholder token."""
     if not isinstance(text, str):
         return ""
     return re.sub(r"http[s]?://\S+", " ", text)
@@ -118,9 +112,6 @@ def clean_text(
     normalize_whitespace: bool = True,
     max_length: Optional[int] = None,
 ) -> str:
-    """
-    Apply basic cleaning (HTML stripping, URL removal, lowercasing).
-    """
     if not isinstance(text, str):
         text = ""
     original = text
@@ -140,7 +131,6 @@ def clean_text(
 
 
 def concatenate_text_fields(row: pd.Series, fields: Iterable[str]) -> str:
-    """Concatenate specified text fields into a single blob."""
     values = []
     for field in fields:
         value = row.get(field, "")
@@ -150,13 +140,11 @@ def concatenate_text_fields(row: pd.Series, fields: Iterable[str]) -> str:
 
 
 def compute_row_checksum(row: pd.Series, text_fields: Iterable[str]) -> str:
-    """Create a checksum based on text fields to detect duplicates across splits."""
     text = concatenate_text_fields(row, text_fields)
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def fill_missing_values(df: pd.DataFrame, fill_value: str) -> pd.DataFrame:
-    """Fill NA values in object columns with a sentinel."""
     df = df.copy()
     object_cols = df.select_dtypes(include=["object"]).columns
     df[object_cols] = df[object_cols].fillna(fill_value)

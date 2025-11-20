@@ -58,7 +58,7 @@ pip install -e '.[dev]'
 The script downloads and extracts `fake_job_postings.csv` (and the alternate `Fake_Real_Job_Posting.csv`) into `data/`. Raw files remain Git-ignored.
 
 > [!TIP]
-> We have included the full datasets in `data/` for convenience. If you re-download, existing files will be overwritten.
+> We have included the full datasets in `data/` for convenience so you do NOT need to run this command. If you choose to re-download the datasets, existing files will be overwritten.
 
 ---
 
@@ -185,9 +185,7 @@ OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --
 ```
 Then choose the study (e.g., `logistic_regression_tuning` or `linear_svm_tuning`) from the dashboard dropdown.
 
-<p align="center">
-  <img src="docs/images/optuna1.png" alt="Optuna Dashboard" width="100%"/>
-</p>
+<table> <tr> <td><img src="docs/images/optuna1.png" alt="Optuna Dashboard 1"/></td> <td><img src="docs/images/optuna2.png" alt="Optuna Dashboard 2"/></td> <td><img src="docs/images/optuna3.png" alt="Optuna Dashboard 3"/></td> </tr> </table>
 
 ### 5.5 Automatic ONNX + MLflow Export (OPTIONAL)
 

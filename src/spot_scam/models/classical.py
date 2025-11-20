@@ -42,9 +42,6 @@ def train_classical_models(
     y_val: np.ndarray,
     config: Dict,
 ) -> List[ModelRun]:
-    """
-    Train logistic regression, linear SVM, and LightGBM models with simple grid search.
-    """
     runs: List[ModelRun] = []
     classical_conf = config["models"]["classical"]
 
@@ -98,10 +95,11 @@ def train_classical_models(
             metric_results.values.get("recall", np.nan),
         )
 
-    # Logistic Regression L1 (saga)
     if "logistic_regression_l1" in classical_conf:
         l1_conf = classical_conf["logistic_regression_l1"]
-        logger.info("Training %d Logistic Regression L1 variants", len(l1_conf.get("Cs", [0.1, 1.0, 10.0])))
+        logger.info(
+            "Training %d Logistic Regression L1 variants", len(l1_conf.get("Cs", [0.1, 1.0, 10.0]))
+        )
         for C in l1_conf.get("Cs", [0.1, 1.0, 10.0]):
             params = dict(l1_conf)
             params["C"] = C
@@ -118,7 +116,9 @@ def train_classical_models(
             clf.fit(X_train_linear, y_train)
             train_time = time.time() - start
             val_scores = clf.predict_proba(X_val_linear)[:, 1]
-            threshold = optimal_threshold(y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"])
+            threshold = optimal_threshold(
+                y_val, val_scores, metric=config["evaluation"]["thresholds"]["optimize_metric"]
+            )
             metric_results = compute_metrics(
                 y_val,
                 val_scores,
@@ -138,13 +138,14 @@ def train_classical_models(
                     feature_type="tfidf+tabular",
                 )
             )
-            logger.info("Logistic Regression L1 (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
-                        C,
-                        metric_results.values.get("f1", np.nan),
-                        metric_results.values.get("precision", np.nan),
-                        metric_results.values.get("recall", np.nan))
+            logger.info(
+                "Logistic Regression L1 (C=%s) F1=%.3f Precision=%.3f Recall=%.3f",
+                C,
+                metric_results.values.get("f1", np.nan),
+                metric_results.values.get("precision", np.nan),
+                metric_results.values.get("recall", np.nan),
+            )
 
-    # Linear SVM
     logger.info("Training %d Linear SVM variants", len(classical_conf["linear_svm"]["Cs"]))
     for C in classical_conf["linear_svm"]["Cs"]:
         params = dict(classical_conf["linear_svm"])
@@ -190,7 +191,6 @@ def train_classical_models(
             metric_results.values.get("recall", np.nan),
         )
 
-    # LightGBM (tabular only)
     tab_train = bundle.tabular_train
     tab_val = bundle.tabular_val
     lightgbm_conf = classical_conf["lightgbm"]

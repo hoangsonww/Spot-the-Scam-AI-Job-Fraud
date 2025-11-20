@@ -31,13 +31,18 @@ from spot_scam.evaluation.curves import (
     plot_probability_vs_feature,
     plot_latency_curve,
 )
-from spot_scam.evaluation.metrics import MetricResults, compute_metrics, expected_calibration_error, optimal_threshold
+from spot_scam.evaluation.metrics import (
+    MetricResults,
+    compute_metrics,
+    expected_calibration_error,
+    optimal_threshold,
+)
 from spot_scam.features.builders import FeatureBundle, build_feature_bundle
 from spot_scam.models.classical import ModelRun, train_classical_models
 from spot_scam.models.xgboost_model import XGBoostModel
 from sklearn.calibration import CalibratedClassifierCV
 
-if TYPE_CHECKING:  # avoid heavy imports unless actually training transformer
+if TYPE_CHECKING:
     from spot_scam.models.transformer import TransformerRun  # type: ignore
 from spot_scam.tracking.logger import append_run_record
 from spot_scam.tracking.feedback import load_feedback_dataframe
@@ -119,7 +124,6 @@ def run(
         help="Incorporate reviewer feedback when available (overridden by USE_FEEDBACK env).",
     ),
 ) -> None:
-    """Execute the end-to-end training pipeline."""
     print("RUN FUNCTION ENTERED")
     config = load_config(config_path=config_path)
     use_feedback_env = os.getenv("USE_FEEDBACK", "").lower() in {"1", "true", "yes"}
@@ -177,15 +181,12 @@ def run(
 
     classical_runs = train_classical_models(bundle, y_train, y_val, config)
 
-    # ------------------------------------------------------------------
-    # Train multiple XGBoost variants to seek higher validation/test F1.
-    # Grid can be constrained via config for quicker experimentation.
     xgb_grid: List[Dict] = []
     xgb_conf = config["models"].get("xgboost", {})
     if xgb_conf.get("enabled", True):
         pos = int((y_train == 1).sum())
         neg = int((y_train == 0).sum())
-        spw_default = max(int(neg / max(pos, 1)), 1)  # scale_pos_weight heuristic
+        spw_default = max(int(neg / max(pos, 1)), 1)
 
         def _values_from_conf(key: str, fallback: List):
             values = xgb_conf.get(key)
@@ -227,10 +228,8 @@ def run(
     else:
         logger.info("Skipping XGBoost variants (disabled via config).")
 
-    # Limit total variants to avoid excessive runtime if grid explodes
     MAX_XGB_VARIANTS = int(xgb_conf.get("max_variants", 12))
     if len(xgb_grid) > MAX_XGB_VARIANTS and MAX_XGB_VARIANTS > 0:
-        # Simple down-select: keep first MAX_XGB_VARIANTS evenly spread
         step = len(xgb_grid) / MAX_XGB_VARIANTS
         xgb_grid = [xgb_grid[int(i * step)] for i in range(MAX_XGB_VARIANTS)]
 
@@ -238,10 +237,10 @@ def run(
     for params in xgb_grid:
         try:
             start_xgb = time.time()
-            # Construct model instance on-the-fly overriding base estimator hyperparams
             xgb_model = XGBoostModel(config)
-            # Override internal base_estimator parameters
-            xgb_model.base_estimator.set_params(**params, eval_metric="logloss", tree_method="hist", use_label_encoder=False)
+            xgb_model.base_estimator.set_params(
+                **params, eval_metric="logloss", tree_method="hist", use_label_encoder=False
+            )
             xgb_result = xgb_model.fit(bundle, y_train, y_val)
             xgb_train_time = time.time() - start_xgb
             variant_name = (
@@ -252,10 +251,10 @@ def run(
                 "%s trained (%.1fs) F1=%.3f P=%.3f R=%.3f Thr=%.3f",
                 variant_name,
                 xgb_train_time,
-                xgb_result.val_metrics.values.get("f1", float('nan')),
-                xgb_result.val_metrics.values.get("precision", float('nan')),
-                xgb_result.val_metrics.values.get("recall", float('nan')),
-                xgb_result.threshold if xgb_result.threshold is not None else float('nan'),
+                xgb_result.val_metrics.values.get("f1", float("nan")),
+                xgb_result.val_metrics.values.get("precision", float("nan")),
+                xgb_result.val_metrics.values.get("recall", float("nan")),
+                xgb_result.threshold if xgb_result.threshold is not None else float("nan"),
             )
             classical_runs.append(
                 ModelRun(
@@ -269,7 +268,7 @@ def run(
                     feature_type="tfidf+tabular",
                 )
             )
-            # Persist each variant artifacts in its own subdirectory for potential analysis
+
             try:
                 variant_dir = ARTIFACTS_DIR / "xgboost_variants" / variant_name
                 variant_dir.mkdir(parents=True, exist_ok=True)
@@ -296,8 +295,8 @@ def run(
 
     transformer_artifact: Optional[BestModelArtifacts] = None
     if not skip_transformer:
-        # Lazy import to avoid pulling heavy deps during classical-only runs
         from spot_scam.models.transformer import train_transformer_model
+
         transformer_run = train_transformer_model(
             splits.train,
             splits.val,
@@ -309,8 +308,6 @@ def run(
 
     candidate_artifacts: List[BestModelArtifacts] = list(classical_artifacts)
 
-    # ------------------------------------------------------------------
-    # Probabilistic ensemble of top K tfidf+tabular classical models.
     try:
         TOP_K = 3
         tfidf_artifacts = [a for a in classical_artifacts if a.feature_type == "tfidf+tabular"]
@@ -321,7 +318,6 @@ def run(
         )
         ensemble_components = tfidf_sorted[:TOP_K]
         if len(ensemble_components) >= 2:
-            # Average calibrated probabilities
             val_stack = np.vstack([c.val_probabilities for c in ensemble_components])
             test_stack = np.vstack([c.test_probabilities for c in ensemble_components])
             ensemble_val = val_stack.mean(axis=0)
@@ -347,7 +343,7 @@ def run(
             )
             ensemble_artifact = BestModelArtifacts(
                 name="ensemble_top3",
-                model_type="classical",  # treat as classical for inference compatibility
+                model_type="classical",
                 estimator=None,
                 base_estimator=None,
                 threshold=ensemble_threshold,
@@ -372,7 +368,6 @@ def run(
                 ensemble_val_metrics.values.get("recall", np.nan),
             )
 
-            # Weighted ensemble via simple grid search on validation
             weights = None
             best_w_val = ensemble_val
             best_w_test = ensemble_test
@@ -381,20 +376,30 @@ def run(
             K = len(ensemble_components)
             if K == 2:
                 import numpy as _np
-                for w in [i/10.0 for i in range(1, 10)]:
-                    w_vec = _np.array([w, 1-w])[:, None]
+
+                for w in [i / 10.0 for i in range(1, 10)]:
+                    w_vec = _np.array([w, 1 - w])[:, None]
                     val_mix = (val_stack[:2] * w_vec).sum(axis=0)
-                    thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
-                    m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
+                    thr = optimal_threshold(
+                        y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"]
+                    )
+                    m = compute_metrics(
+                        y_val,
+                        val_mix,
+                        metrics_list=config["evaluation"]["metrics"],
+                        threshold=thr,
+                        positive_label=1,
+                    )
                     if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
-                        weights = [w, 1-w]
+                        weights = [w, 1 - w]
                         best_w_metrics = m
                         best_w_threshold = thr
                         best_w_val = val_mix
                         best_w_test = (test_stack[:2] * w_vec).sum(axis=0)
             elif K >= 3:
                 import numpy as _np
-                grid = [i/10.0 for i in range(0, 11)]
+
+                grid = [i / 10.0 for i in range(0, 11)]
                 for w1 in grid:
                     for w2 in grid:
                         if w1 + w2 > 1.0:
@@ -402,8 +407,18 @@ def run(
                         w3 = 1.0 - w1 - w2
                         w_vec = _np.array([w1, w2, w3])[:, None]
                         val_mix = (val_stack[:3] * w_vec).sum(axis=0)
-                        thr = optimal_threshold(y_val, val_mix, metric=config["evaluation"]["thresholds"]["optimize_metric"])
-                        m = compute_metrics(y_val, val_mix, metrics_list=config["evaluation"]["metrics"], threshold=thr, positive_label=1)
+                        thr = optimal_threshold(
+                            y_val,
+                            val_mix,
+                            metric=config["evaluation"]["thresholds"]["optimize_metric"],
+                        )
+                        m = compute_metrics(
+                            y_val,
+                            val_mix,
+                            metrics_list=config["evaluation"]["metrics"],
+                            threshold=thr,
+                            positive_label=1,
+                        )
                         if m.values.get("f1", -_np.inf) > best_w_metrics.values.get("f1", -_np.inf):
                             weights = [w1, w2, w3]
                             best_w_metrics = m
@@ -500,10 +515,6 @@ def _select_best_artifact(artifacts: List[BestModelArtifacts]) -> BestModelArtif
 
 
 def _infer_calibration_method(estimator: CalibratedClassifierCV) -> str:
-    """
-    Sklearn 1.4+ renamed the attribute on _CalibratedClassifier from `calibrator`
-    to `calibrators`. Inspect both for compatibility.
-    """
     if not estimator.calibrated_classifiers_:
         return "isotonic"
     calibrated = estimator.calibrated_classifiers_[0]
@@ -528,11 +539,13 @@ def _evaluate_classical_on_test(
     X_val, X_test = _prepare_features_for_run(run, bundle, splits)
 
     calibration_methods = config["calibration"]["methods"]
-    # Skip second calibration for any pre-calibrated estimator
+
     if isinstance(run.estimator, CalibratedClassifierCV):
         calibration_results = []
     else:
-        calibration_results = calibrate_prefit_model(run.estimator, X_val, y_val, calibration_methods)
+        calibration_results = calibrate_prefit_model(
+            run.estimator, X_val, y_val, calibration_methods
+        )
     best_calibration = calibration_results[0] if calibration_results else None
 
     if best_calibration:
@@ -541,7 +554,7 @@ def _evaluate_classical_on_test(
         chosen_method = best_calibration.method
     else:
         estimator = run.estimator
-        # Attempt to record calibration method if estimator is already calibrated
+
         if isinstance(estimator, CalibratedClassifierCV):
             chosen_method = _infer_calibration_method(estimator)
             val_probs = estimator.predict_proba(X_val)[:, 1]
@@ -740,7 +753,7 @@ def _run_benchmarks(artifacts: BestModelArtifacts, config: Dict, splits: SplitRe
         return
 
     predictor = FraudPredictor()
-    predictor.predict(payload[: min(32, len(payload))])  # warm-up
+    predictor.predict(payload[: min(32, len(payload))])
 
     records: List[Dict[str, float]] = []
     for batch_size in batch_sizes:
@@ -898,6 +911,7 @@ def _generate_report_assets(
     if artifacts.feature_type == "tabular" and artifacts.base_estimator is not None:
         try:
             from spot_scam.explainability.shapley import compute_tabular_shap
+
             compute_tabular_shap(
                 artifacts.base_estimator,
                 bundle.tabular_test.toarray(),

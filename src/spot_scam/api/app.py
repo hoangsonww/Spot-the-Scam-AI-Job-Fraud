@@ -13,7 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-# Load environment variables from .env file
+# Load env vars from .env file
 env_path = Path(__file__).parent.parent.parent.parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
@@ -535,10 +535,10 @@ async def chat_stream(request: ChatRequest):
                 logger.warning(f"Failed to auto-detect job posting: {str(e)}")
                 auto_prediction = None
 
-        # Build conversation history for context
         chat_history = []
         if request.history:
-            for msg in request.history[-10:]:  # Keep last 10 messages for context
+            # keep last 10 messages for bot context
+            for msg in request.history[-10:]:
                 role = "user" if msg.role == "user" else "model"
                 chat_history.append({"role": role, "parts": [msg.content]})
 
@@ -564,7 +564,6 @@ async def chat_stream(request: ChatRequest):
             context_info.append("=== MESSAGE CLASSIFICATION ===")
             context_info.append("Heuristic Assessment: Potential job posting based on keywords.")
 
-        # Add auto-detected fraud results if available
         if auto_prediction:
             fraud_pct = auto_prediction["probability_fraud"] * 100
             context_info.append("=== FRAUD DETECTION ANALYSIS ===")
@@ -597,7 +596,6 @@ async def chat_stream(request: ChatRequest):
             context_info.append("2. The main red flags or positive signals")
             context_info.append("3. Actionable advice for the job seeker")
 
-        # Add prediction context if available (from Score page)
         elif request.context and request.context.prediction:
             pred = request.context.prediction
             fraud_pct = pred.probability_fraud * 100
@@ -608,7 +606,6 @@ async def chat_stream(request: ChatRequest):
                 f"- Binary Label: {'Fraudulent' if pred.binary_label == 1 else 'Legitimate'}"
             )
 
-            # Add explanation/rationale if available
             if pred.explanation:
                 if pred.explanation.top_positive:
                     context_info.append("\nTop Fraud Indicators:")
@@ -620,7 +617,6 @@ async def chat_stream(request: ChatRequest):
                     for contrib in pred.explanation.top_negative[:3]:
                         context_info.append(f"  - {contrib.feature}: {contrib.contribution:.3f}")
 
-        # Add job posting context if available
         if request.context and request.context.job_posting:
             job = request.context.job_posting
             context_info.append("\nJob Posting Details:")
@@ -646,7 +642,6 @@ async def chat_stream(request: ChatRequest):
         else:
             combined_user_message = request.message
 
-        # Stream response from Gemini
         def generate():
             try:
                 logger.info(
@@ -654,7 +649,6 @@ async def chat_stream(request: ChatRequest):
                     request.message[:50].replace("\n", " "),
                 )
 
-                # If we have chat history, use chat mode
                 if chat_history:
                     chat = assistant_model.start_chat(history=chat_history)
                     response = chat.send_message(combined_user_message, stream=True)
@@ -663,11 +657,9 @@ async def chat_stream(request: ChatRequest):
 
                 has_content = False
                 for chunk in response:
-                    # Check for safety ratings or blocked content
                     if hasattr(chunk, "prompt_feedback"):
                         logger.warning(f"Prompt feedback: {chunk.prompt_feedback}")
 
-                    # Handle different ways Gemini returns text
                     text = None
                     try:
                         if hasattr(chunk, "text") and chunk.text:
@@ -678,7 +670,6 @@ async def chat_stream(request: ChatRequest):
                             )
                     except Exception as chunk_error:
                         logger.warning(f"Error extracting text from chunk: {chunk_error}")
-                        # Try to get text from candidates
                         if hasattr(chunk, "candidates") and chunk.candidates:
                             for candidate in chunk.candidates:
                                 if hasattr(candidate, "content") and hasattr(
@@ -698,12 +689,10 @@ async def chat_stream(request: ChatRequest):
 
                 if not has_content:
                     logger.warning("No content generated from Gemini")
-                    # Send a helpful message if nothing was generated
                     error_msg = "I apologize, but I couldn't generate a response. This might be due to content safety filters or an API issue. Please try rephrasing your question."
                     chunk_json = ChatStreamChunk(chunk=error_msg, done=False).model_dump_json()
                     yield f"data: {chunk_json}\n\n"
 
-                # Send final done message
                 final_json = ChatStreamChunk(chunk="", done=True).model_dump_json()
                 yield f"data: {final_json}\n\n"
                 logger.info("Response generation completed")

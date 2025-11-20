@@ -59,6 +59,3 @@
 - `experiments/figs/threshold_sweep_val.png`: precision/recall/F1 trade-offs across thresholds.
 - `experiments/figs/probability_vs_length.png`: regression view of text length vs fraud probability.
 - `experiments/figs/latency_throughput.png`: latency vs throughput benchmark; see `experiments/tables/benchmark_summary.csv`.
-
-## Notes
-All metrics computed on the frozen test split. Gray-zone policy maps probabilities within the band to human review.

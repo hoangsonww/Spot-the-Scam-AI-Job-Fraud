@@ -22,9 +22,6 @@ class SplitResult:
 
 
 def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> SplitResult:
-    """
-    Produce stratified train/validation/test splits and persist the indices for reproducibility.
-    """
     splits_conf = config["splits"]
     data_conf = config["data"]
     target_col = data_conf["target_column"]
@@ -41,7 +38,6 @@ def create_splits(df: pd.DataFrame, config: Dict, *, persist: bool = True) -> Sp
         splits_conf["test"] * 100,
     )
 
-    # Compute deterministic checksums to avoid duplicates across splits
     checksum_col = "_checksum"
     df[checksum_col] = df.apply(
         compute_row_checksum,

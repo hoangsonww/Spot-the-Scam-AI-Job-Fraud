@@ -4,9 +4,8 @@ import { API_BASE_URL, getApiBaseUrl } from "./config";
 
 // Function to check if we should use mock data
 function shouldUseMockData(): boolean {
-  if (typeof window === "undefined") return false; // Server-side, try real API
+  if (typeof window === "undefined") return false;
 
-  // Check if backend status store indicates disconnection
   try {
     const status = useBackendStatus.getState();
     return !status.isConnected;
@@ -290,10 +289,8 @@ export async function fetchReviewCount(): Promise<number> {
 
 export async function submitFeedback(records: FeedbackPayload[]): Promise<void> {
   if (shouldUseMockData()) {
-    // Simulate successful feedback submission in demo mode
     await new Promise((resolve) => setTimeout(resolve, 300));
 
-    // Remove cases from demo queue
     if (typeof window !== "undefined") {
       try {
         const demoQueue = useDemoReviewQueue.getState();
@@ -331,7 +328,6 @@ export async function predictSingle(instance: JobPostingInput): Promise<Predicti
 
   const prediction = predictions[0];
 
-  // In demo mode, add gray-zone cases to the review queue
   if (shouldUseMockData() && prediction.decision === "review") {
     if (typeof window !== "undefined") {
       try {
@@ -353,10 +349,8 @@ export async function fetchHealth() {
   return request<{ status: string; model_type: string; threshold: number }>("/health");
 }
 
-// Re-export getApiBaseUrl for backward compatibility
 export { getApiBaseUrl };
 
-// Chat API types
 export type ChatContext = {
   request_id?: string | null;
   job_posting?: JobPostingInput | null;
@@ -381,14 +375,12 @@ export type ChatStreamChunk = {
   done: boolean;
 };
 
-// Chat streaming function
 export async function streamChat(
   request: ChatRequest,
   onChunk: (chunk: string) => void,
   onComplete: () => void,
   onError: (error: Error) => void
 ): Promise<void> {
-  // Use mock chat in demo mode
   if (shouldUseMockData()) {
     return MockData.mockStreamChat(request.message, onChunk, onComplete, onError);
   }

@@ -15,9 +15,6 @@ from spot_scam.utils.paths import ensure_directories
 
 
 def append_feedback(records: Iterable[Mapping[str, object]]) -> List[Mapping[str, object]]:
-    """
-    Persist reviewer feedback records in an append-only Parquet dataset.
-    """
     ensure_directories()
     now = datetime.utcnow().isoformat()
     rows: List[Mapping[str, object]] = []

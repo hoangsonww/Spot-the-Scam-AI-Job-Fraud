@@ -22,9 +22,6 @@ def compute_metrics(
     threshold: float,
     positive_label: int = 1,
 ) -> MetricResults:
-    """
-    Compute a suite of classification metrics given continuous scores and a decision threshold.
-    """
     y_pred = (y_scores >= threshold).astype(int)
     results: Dict[str, float] = {}
 
@@ -62,9 +59,6 @@ def compute_metrics(
 
 
 def optimal_threshold(y_true: np.ndarray, y_scores: np.ndarray, metric: str = "f1") -> float:
-    """
-    Determine the optimal threshold on validation data for a specified metric.
-    """
     if len(np.unique(y_true)) < 2:
         return 0.5
 

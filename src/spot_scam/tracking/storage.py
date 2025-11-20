@@ -35,9 +35,6 @@ def _partition_dir(root: Path, *, prefix: str = "date") -> Path:
 
 
 def write_partitioned_parquet(root: Path, records: Iterable[Mapping[str, object]]) -> Path:
-    """
-    Append records to a partitioned parquet dataset under the provided root.
-    """
     records = list(records)
     if not records:
         raise ValueError("No records supplied for parquet write.")
@@ -58,9 +55,6 @@ def mask_pii(text: Optional[str]) -> Optional[str]:
 
 
 def sanitize_payload(payload: Mapping[str, object], *, truncate: int = 800) -> Mapping[str, object]:
-    """
-    Apply PII masking and truncation to a request payload dictionary.
-    """
     clean: dict[str, object] = {}
     for key, value in payload.items():
         if isinstance(value, str):

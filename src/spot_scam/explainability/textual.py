@@ -11,9 +11,6 @@ logger = configure_logging(__name__)
 
 
 def top_tfidf_terms(vectorizer, classifier, *, top_n: int = 25) -> Dict[str, pd.DataFrame]:
-    """
-    Extract the top positive and negative TF-IDF terms based on linear model coefficients.
-    """
     if not hasattr(classifier, "coef_"):
         raise AttributeError("Classifier does not expose coefficients for interpretability.")
 

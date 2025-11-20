@@ -17,7 +17,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import LinearSVC
 
-try:  # pragma: no cover - optional LightGBM dependency
+try:  # pragma: no cover
     from lightgbm import LGBMClassifier
 except Exception:  # pragma: no cover
     LGBMClassifier = None  # type: ignore[assignment]
@@ -70,12 +70,12 @@ DEFAULT_NUMERIC_VALUES = {
     "has_questions": 0,
 }
 
-try:  # pragma: no cover - heavy dependency import guarded
+try:  # pragma: no cover
     import mlflow
     from mlflow import pyfunc
     from mlflow.models.signature import ModelSignature
     from mlflow.types.schema import ColSpec, Schema
-except Exception:  # pragma: no cover - mlflow optional during import
+except Exception:  # pragma: no cover
     mlflow = None  # type: ignore[assignment]
     pyfunc = None  # type: ignore[assignment]
     ModelSignature = None  # type: ignore[assignment]
@@ -85,10 +85,10 @@ except Exception:  # pragma: no cover - mlflow optional during import
 
 if mlflow:
     from mlflow.exceptions import MlflowException  # pragma: no cover
-else:  # pragma: no cover - fallback placeholder
+else:  # pragma: no cover
     MlflowException = RuntimeError
 
-try:  # pragma: no cover - heavy dependency import guarded
+try:  # pragma: no cover
     from skl2onnx import convert_sklearn
     from skl2onnx.common.data_types import FloatTensorType
 except Exception:  # pragma: no cover
@@ -144,10 +144,6 @@ class ExportedModelArtifacts:
 if pyfunc is not None:  # pragma: no branch
 
     class SpotScamPyfuncModel(pyfunc.PythonModel):  # type: ignore[misc]
-        """
-        MLflow pyfunc wrapper that restores preprocessing artifacts and executes ONNX Runtime.
-        """
-
         def __init__(self, variant: str, prefer_quantized: bool = True):
             self.variant = variant
             self.prefer_quantized = prefer_quantized
@@ -169,7 +165,6 @@ if pyfunc is not None:  # pragma: no branch
             self._calibration_model = None
             self._max_length: Optional[int] = None
 
-        # ------------------------------------------------------------------ #
         def load_context(self, context: pyfunc.PythonModelContext) -> None:  # type: ignore[override]
             if "metadata" in context.artifacts:
                 with open(context.artifacts["metadata"], "r", encoding="utf-8") as handle:
@@ -247,7 +242,6 @@ if pyfunc is not None:  # pragma: no branch
             else:  # pragma: no cover - guarded earlier
                 raise MLFlowExportError(f"Unsupported variant: {self.variant}")
 
-        # ------------------------------------------------------------------ #
         def __getstate__(self) -> Dict[str, Any]:  # pragma: no cover - pickling helper
             state = self.__dict__.copy()
             state["_session"] = None
@@ -319,7 +313,6 @@ if pyfunc is not None:  # pragma: no branch
                 for idx in range(len(probabilities))
             ]
 
-        # ------------------------------------------------------------------ #
         def _ensure_columns(self, df: pd.DataFrame) -> pd.DataFrame:
             for column, dtype in API_INPUT_COLUMNS:
                 if column not in df.columns:
@@ -328,7 +321,6 @@ if pyfunc is not None:  # pragma: no branch
                 df[col] = df[col].fillna(default).astype(int, errors="ignore")
             return df
 
-        # ------------------------------------------------------------------ #
         def _predict_classical(self, df: pd.DataFrame) -> np.ndarray:
             if self._vectorizer is None or self._scaler is None or self._session is None:
                 raise MLFlowExportError("Classical predictor state not fully initialised.")
@@ -357,7 +349,6 @@ if pyfunc is not None:  # pragma: no branch
             calibrated = self._apply_calibration(probs, raw_scores)
             return calibrated
 
-        # ------------------------------------------------------------------ #
         def _predict_transformer(self, df: pd.DataFrame) -> np.ndarray:
             if self._tokenizer is None or self._session is None:
                 raise MLFlowExportError("Transformer predictor state not fully initialised.")
@@ -389,7 +380,6 @@ if pyfunc is not None:  # pragma: no branch
             probabilities = _softmax(logits)[:, 1]
             return probabilities
 
-        # ------------------------------------------------------------------ #
         def _apply_calibration(
             self, probabilities: np.ndarray, raw_scores: np.ndarray
         ) -> np.ndarray:
@@ -411,7 +401,6 @@ if pyfunc is not None:  # pragma: no branch
             )
             return probabilities
 
-        # ------------------------------------------------------------------ #
         def _choose_session(self):
             if self._use_quantized and self._quantized_session is not None:
                 return self._quantized_session
@@ -432,20 +421,6 @@ def log_model_to_mlflow(
     config: Dict[str, Any],
     splits: "SplitResult",
 ) -> None:
-    """
-    Export the selected model to ONNX, package it as an MLflow pyfunc model, and log run metadata.
-
-    Parameters
-    ----------
-    best_model:
-        The winning model artifacts from the training pipeline.
-    bundle:
-        Feature bundle containing vectorizer/scaler for classical pipelines.
-    config:
-        Project configuration dictionary.
-    splits:
-        Processed dataset splits used during training (for signature/input examples).
-    """
     mlflow_conf = config.get("mlflow", {})
     if not mlflow_conf.get("enabled", False):
         logger.info("MLflow export disabled in configuration; skipping model registry step.")
@@ -546,9 +521,6 @@ def _prepare_export_bundle(
     mlflow_conf: Dict[str, Any],
     splits: "SplitResult",
 ) -> ExportedModelArtifacts:
-    """
-    Prepare ONNX artifacts and pyfunc model depending on the chosen pipeline.
-    """
     if best_model.model_type == "classical":
         return _prepare_classical_export(
             best_model, bundle, config, export_root, mlflow_conf, splits
@@ -589,7 +561,6 @@ def _extract_raw_scores(
     if "scores" in output_names:
         scores = np.asarray(outputs[output_names.index("scores")]).ravel()
         return scores
-    # Fallback to logit transformation
     eps = 1e-6
     probs = np.clip(probabilities, eps, 1 - eps)
     return np.log(probs / (1 - probs))
@@ -645,7 +616,7 @@ def _serialize_calibration(
                     "score_source": "raw",
                 }
             )
-        else:  # isotonic via CalibratedClassifierCV
+        else:
             calibrator_path = export_root / "calibrator_model.joblib"
             joblib.dump(cal, calibrator_path)
             calibration.update(
