@@ -119,7 +119,6 @@ def run(
         help="Incorporate reviewer feedback when available (overridden by USE_FEEDBACK env).",
     ),
 ) -> None:
-    """Execute the end-to-end training pipeline."""
     print("RUN FUNCTION ENTERED")
     config = load_config(config_path=config_path)
     use_feedback_env = os.getenv("USE_FEEDBACK", "").lower() in {"1", "true", "yes"}
@@ -490,10 +489,6 @@ def _select_best_artifact(artifacts: List[BestModelArtifacts]) -> BestModelArtif
 
 
 def _infer_calibration_method(estimator: CalibratedClassifierCV) -> str:
-    """
-    Sklearn 1.4+ renamed the attribute on _CalibratedClassifier from `calibrator`
-    to `calibrators`. Inspect both for compatibility.
-    """
     if not estimator.calibrated_classifiers_:
         return "isotonic"
     calibrated = estimator.calibrated_classifiers_[0]
