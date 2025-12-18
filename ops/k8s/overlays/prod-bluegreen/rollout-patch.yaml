@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: spot-scam-api
+spec:
+  replicas: 4
+  minReadySeconds: 15
+  strategy:
+    blueGreen:
+      autoPromotionEnabled: false
+      autoPromotionSeconds: 300
+      scaleDownDelaySeconds: 300
+      previewReplicaCount: 2
+  template:
+    spec:
+      containers:
+        - name: api
+          resources:
+            requests:
+              cpu: 300m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi

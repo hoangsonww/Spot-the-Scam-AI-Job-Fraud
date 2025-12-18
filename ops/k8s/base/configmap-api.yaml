@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spot-scam-api-config
+  labels:
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+data:
+  SPOT_SCAM_ALLOWED_ORIGINS: "https://app.spot-scam.example.com,https://staging.spot-scam.example.com"
+  SPOT_SCAM_USE_QUANTIZED: "1"
+  MLFLOW_TRACKING_URI: "file:///app/mlruns"
+  PYTHONUNBUFFERED: "1"
+  UVICORN_WORKERS: "4"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector.monitoring.svc.cluster.local:4317"

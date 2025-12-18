@@ -1,0 +1,44 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: spot-scam-api-slo
+  labels:
+    release: prometheus
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+spec:
+  groups:
+    - name: spot-scam-api-slo
+      rules:
+        - alert: SpotScamHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job="spot-scam-api",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="spot-scam-api"}[5m])) > 0.02
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Spot the Scam API high error rate"
+            description: "5xx ratio exceeded 2% over the last 5 minutes."
+        - alert: SpotScamHighLatencyP95
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="spot-scam-api"}[5m])) by (le)
+            ) > 0.8
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Spot the Scam API p95 latency high"
+            description: "p95 latency above 800ms over the last 5 minutes."
+        - alert: SpotScamPodUnavailable
+          expr: |
+            kube_deployment_status_replicas_unavailable{deployment="spot-scam-api"} > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Spot the Scam API has unavailable pods"
+            description: "Deployment has unavailable replicas for more than 5 minutes."

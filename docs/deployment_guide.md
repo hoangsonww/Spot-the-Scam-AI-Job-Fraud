@@ -65,24 +65,44 @@ Notes:
   ```
 - Compose file includes API + frontend, mounts `configs/`, `data/`, `artifacts/`, `experiments/`, and `mlruns/`, and sets `MLFLOW_TRACKING_URI=file:///app/mlruns` so containerised jobs log to the shared volume. Update `SPOT_SCAM_ALLOWED_ORIGINS` in the compose file if you expose the API beyond the bundled frontend.
 
-## 6. Observability Checklist
+## 6. Kubernetes progressive delivery (blue/green + canary)
+- Manifests live in `ops/k8s/` (base + overlays). Staging defaults to canary (`ops/k8s/overlays/staging-canary`), production defaults to blue/green (`ops/k8s/overlays/prod-bluegreen`).
+- Prereqs: Argo Rollouts CRD + CLI, NGINX Ingress, Prometheus for analysis templates, RWX storage class for PVCs, and cert-manager (for TLS secret `spot-scam-api-tls`).
+- Deploy:
+  ```bash
+  ./scripts/apply_k8s_overlay.sh ops/k8s/overlays/staging-canary spot-scam
+  # or production
+  ./scripts/apply_k8s_overlay.sh ops/k8s/overlays/prod-bluegreen spot-scam
+  ```
+- Promotion and health checks:
+  ```bash
+  argo-rollouts get rollout spot-scam-api -n spot-scam
+  argo-rollouts promote spot-scam-api -n spot-scam        # after preview validation
+  argo-rollouts terminate spot-scam-api -n spot-scam      # fast rollback
+  ```
+- Base resources include HPA (cpu+mem), PDB, NetworkPolicy, PVCs for artifacts/tracking/mlruns, ingress TLS, and Prometheus-based AnalysisTemplates for p95 latency + error budget.
+- Swap strategy by pointing the overlay to `rollout-canary.yaml` or `rollout-bluegreen.yaml` in `ops/k8s/base` and updating the image tag via `kustomize edit set image ghcr.io/your-org/spot-scam-api=<tag>`.
+- Optional smoke/load test before promotion: `API_BASE=https://staging-api.yourdomain ./scripts/loadtest_k6.sh` (uses `ops/observability/k6-smoke.js`).
+
+## 7. Observability Checklist
 - **Logging:** FastAPI uses standard logging; extend with structured logs (JSON) for production.
-- **Metrics:** integrate Prometheus or OpenTelemetry for inference latency, error counts, drift metrics.
+- **Metrics:** expose `/metrics` (e.g., `prometheus-fastapi-instrumentator`) and scrape via ServiceMonitor (`ops/k8s/base/servicemonitor.yaml`). Alerts in `ops/k8s/base/prometheus-rules.yaml`.
+- **Tracing:** set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to your collector (already wired in ConfigMap).
 - **Alerts:** monitor F1 drop or distribution shift by comparing new predictions vs baseline token frequencies.
 
-## 7. Security Considerations
+## 8. Security Considerations
 - Sanitize incoming JSON (FastAPI already enforces schema but consider additional checks).
 - Rate-limit `/predict` if exposed to public networks.
 - Store secrets (API keys, database connections) in environment variables or a secret manager.
 
-## 8. Promoting to Production
+## 9. Promoting to Production
 1. Run full training with transformer (time-intensive) and verify metrics.
 2. Review MLflow run; tag the best run as `Production`.
 3. Deploy FastAPI or MLflow server behind load balancer (ASGI app for Uvicorn/Gunicorn).
 4. Point Next.js app at the deployed API (update `.env`).
 5. Re-run sanity checks (score curated samples, run inference smoke tests).
 
-## 9. Rollback Plan
+## 10. Rollback Plan
 - Keep previous model version in MLflow; revert by serving the earlier run ID.
 - Maintain last stable Docker image (tagged release).
 - If using feature flags, enable/disable new model features without redeploying code.

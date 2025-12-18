@@ -1,0 +1,218 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: spot-scam-ci
+spec:
+  description: |
+    CI/CD pipeline for Spot the Scam with progressive delivery hooks.
+    Uses Kaniko for image builds, Trivy for scans, and Argo Rollouts for promotion.
+  params:
+    - name: git-revision
+      type: string
+    - name: repo-url
+      type: string
+      default: https://example.com/your-group/spot-the-scam.git
+    - name: image-tag
+      type: string
+    - name: registry
+      type: string
+      default: ghcr.io/your-org
+    - name: overlay
+      type: string
+      default: ops/k8s/overlays/staging-canary
+    - name: smoke-url
+      type: string
+      default: http://spot-scam-api.spot-scam.svc.cluster.local
+  workspaces:
+    - name: shared-workspace
+  tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+        kind: ClusterTask
+      params:
+        - name: url
+          value: $(params.repo-url)
+        - name: revision
+          value: $(params.git-revision)
+        - name: deleteExisting
+          value: "true"
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+    - name: backend-quality-gate
+      runAfter: [clone-repo]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: install-and-check
+            image: python:3.12
+            workingDir: /workspace/source
+            script: |
+              python -m pip install --upgrade pip
+              python -m pip install -e '.[dev]'
+              PYTHONPATH=src pytest
+              ruff check src tests scripts
+              mypy src
+    - name: frontend-quality-gate
+      runAfter: [backend-quality-gate]
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        workspaces:
+          - name: source
+        steps:
+          - name: install
+            image: node:20
+            workingDir: /workspace/source/frontend
+            script: |
+              npm ci
+          - name: lint-and-build
+            image: node:20
+            workingDir: /workspace/source/frontend
+            script: |
+              npm run lint
+              npm run build
+    - name: build-api-image
+      runAfter: [frontend-quality-gate]
+      params:
+        - name: registry
+          value: $(params.registry)
+        - name: image-tag
+          value: $(params.image-tag)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        params:
+          - name: registry
+            type: string
+          - name: image-tag
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: build-and-push
+            image: gcr.io/kaniko-project/executor:latest
+            workingDir: /workspace/source
+            args:
+              - --context=.
+              - --dockerfile=Dockerfile
+              - --destination=$(params.registry)/spot-scam-api:$(params.image-tag)
+              - --cache=true
+              - --cache-ttl=168h
+    - name: build-frontend-image
+      runAfter: [build-api-image]
+      params:
+        - name: registry
+          value: $(params.registry)
+        - name: image-tag
+          value: $(params.image-tag)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        params:
+          - name: registry
+            type: string
+          - name: image-tag
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: build-and-push
+            image: gcr.io/kaniko-project/executor:latest
+            workingDir: /workspace/source/frontend
+            args:
+              - --context=.
+              - --dockerfile=frontend/Dockerfile
+              - --destination=$(params.registry)/spot-scam-frontend:$(params.image-tag)
+              - --cache=true
+              - --cache-ttl=168h
+    - name: trivy-scan
+      runAfter: [build-frontend-image]
+      params:
+        - name: registry
+          value: $(params.registry)
+        - name: image-tag
+          value: $(params.image-tag)
+      taskSpec:
+        params:
+          - name: registry
+            type: string
+          - name: image-tag
+            type: string
+        steps:
+          - name: scan-api
+            image: aquasec/trivy:latest
+            script: |
+              trivy image --exit-code 1 --severity HIGH,CRITICAL $(params.registry)/spot-scam-api:$(params.image-tag)
+          - name: scan-frontend
+            image: aquasec/trivy:latest
+            script: |
+              trivy image --exit-code 1 --severity HIGH,CRITICAL $(params.registry)/spot-scam-frontend:$(params.image-tag)
+    - name: deploy
+      runAfter: [trivy-scan]
+      params:
+        - name: overlay
+          value: $(params.overlay)
+        - name: image-tag
+          value: $(params.image-tag)
+        - name: registry
+          value: $(params.registry)
+      taskSpec:
+        params:
+          - name: overlay
+            type: string
+          - name: image-tag
+            type: string
+          - name: registry
+            type: string
+        steps:
+          - name: apply
+            image: bitnami/kubectl:1.30
+            workingDir: /workspace/source
+            script: |
+              kubectl kustomize $(params.overlay) | kubectl apply -f -
+    - name: post-deploy-smoke
+      runAfter: [deploy]
+      params:
+        - name: smoke-url
+          value: $(params.smoke-url)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+      taskSpec:
+        params:
+          - name: smoke-url
+            type: string
+        workspaces:
+          - name: source
+        steps:
+          - name: smoke
+            image: grafana/k6:0.50.0
+            workingDir: /workspace/source
+            env:
+              - name: API_BASE
+                value: $(params.smoke-url)
+            script: |
+              k6 run ops/observability/k6-smoke.js
+    - name: promote-rollout
+      runAfter: [post-deploy-smoke]
+      params:
+        - name: namespace
+          value: spot-scam
+      taskSpec:
+        params:
+          - name: namespace
+            type: string
+        steps:
+          - name: promote
+            image: quay.io/argoproj/argo-rollouts:v1.6.2
+            script: |
+              argo-rollouts promote spot-scam-api -n $(params.namespace)

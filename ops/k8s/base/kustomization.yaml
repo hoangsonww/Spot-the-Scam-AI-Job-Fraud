@@ -1,0 +1,18 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: spot-scam
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap-api.yaml
+  - secret-api.yaml
+  - service.yaml
+  - preview-service.yaml
+  - ingress.yaml
+  - pdb.yaml
+  - hpa.yaml
+  - networkpolicy.yaml
+  - pvc.yaml
+  - analysis-template.yaml
+  - servicemonitor.yaml
+  - prometheus-rules.yaml
