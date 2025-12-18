@@ -8,6 +8,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  CHECKOUT_REF: ${{ secrets.COMMIT_HASH || github.sha }}
+
 jobs:
   model:
     name: "🤖 Train classical model artifacts"
@@ -18,6 +21,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -55,6 +60,7 @@ jobs:
             echo "## Training Summary"
             echo ""
             echo "- Command: \`python -m spot_scam.pipeline.train --skip-transformer\`"
+            echo "- Checked out commit: \`${{ env.CHECKOUT_REF }}\`"
             echo "- Uploaded artifact: \`training-artifacts\` (artifacts/, experiments/, mlruns/)"
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -64,6 +70,8 @@ jobs:
     needs: model
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Download training artifacts
         uses: actions/download-artifact@v4
@@ -89,7 +97,7 @@ jobs:
           file: docker/model/Dockerfile
           push: false
           load: false
-          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ env.CHECKOUT_REF }}
           cache-from: type=gha,scope=model
           cache-to: type=gha,mode=max,scope=model,compression=zstd
           outputs: type=cacheonly
@@ -100,6 +108,8 @@ jobs:
     needs: model
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -114,7 +124,7 @@ jobs:
           file: Dockerfile
           push: false
           load: false
-          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ env.CHECKOUT_REF }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api,compression=zstd
           outputs: type=cacheonly
@@ -125,6 +135,8 @@ jobs:
     needs: model
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -139,7 +151,7 @@ jobs:
           file: frontend/Dockerfile
           push: false
           load: false
-          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ github.sha }}
+          tags: ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ env.CHECKOUT_REF }}
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend,compression=zstd
           outputs: type=cacheonly
@@ -154,6 +166,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Download training artifacts
         uses: actions/download-artifact@v4
@@ -187,7 +201,7 @@ jobs:
           file: docker/model/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:${{ env.CHECKOUT_REF }}
             ghcr.io/${{ github.repository_owner }}/spot-the-scam-model:latest
           cache-from: type=gha,scope=model
           cache-to: type=gha,mode=max,scope=model
@@ -209,6 +223,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -231,7 +247,7 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:${{ env.CHECKOUT_REF }}
             ghcr.io/${{ github.repository_owner }}/spot-the-scam-api:latest
           cache-from: type=gha,scope=api
           cache-to: type=gha,mode=max,scope=api
@@ -253,6 +269,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -275,7 +293,7 @@ jobs:
           file: frontend/Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:${{ env.CHECKOUT_REF }}
             ghcr.io/${{ github.repository_owner }}/spot-the-scam-frontend:latest
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
