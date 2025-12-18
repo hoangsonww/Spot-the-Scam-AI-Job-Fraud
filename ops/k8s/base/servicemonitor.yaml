@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: spot-scam-api
+  labels:
+    release: prometheus
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+spec:
+  namespaceSelector:
+    matchNames:
+      - spot-scam
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: spot-scam-api
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scrapeTimeout: 10s

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spot-scam-api-config
+data:
+  SPOT_SCAM_ALLOWED_ORIGINS: "https://staging.spot-scam.example.com"
+  SPOT_SCAM_USE_QUANTIZED: "0"
+  MLFLOW_TRACKING_URI: "http://mlflow.staging.svc.cluster.local"

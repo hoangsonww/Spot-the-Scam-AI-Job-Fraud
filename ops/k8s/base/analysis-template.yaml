@@ -1,0 +1,50 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: latency-error-budget
+  labels:
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+spec:
+  args:
+    - name: service-name
+  metrics:
+    - name: error-rate
+      interval: 1m
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 0.02
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            sum(rate(http_requests_total{service="{{args.service-name}}",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{service="{{args.service-name}}"}[5m]))
+    - name: p95-latency
+      interval: 1m
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 0.8
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket{service="{{args.service-name}}"}[5m])) by (le)
+            )
+    - name: saturation
+      interval: 1m
+      count: 3
+      failureLimit: 1
+      successCondition: result[0] < 0.7
+      provider:
+        prometheus:
+          address: http://prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            avg by (service) (
+              sum(rate(container_cpu_usage_seconds_total{service="{{args.service-name}}"}[5m]))
+              /
+              sum(kube_pod_container_resource_limits_cpu_cores{service="{{args.service-name}}"})
+            )

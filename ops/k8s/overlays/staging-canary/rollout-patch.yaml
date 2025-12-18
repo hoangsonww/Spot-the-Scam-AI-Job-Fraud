@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: spot-scam-api
+spec:
+  replicas: 2
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: {duration: 2m}
+        - analysis:
+            templates:
+              - templateName: latency-error-budget
+            args:
+              - name: service-name
+                value: spot-scam-api
+        - setWeight: 60
+        - pause: {duration: 5m}
+        - analysis:
+            templates:
+              - templateName: latency-error-budget
+            args:
+              - name: service-name
+                value: spot-scam-api
+        - setWeight: 100
+  template:
+    spec:
+      containers:
+        - name: api
+          resources:
+            requests:
+              cpu: 150m
+              memory: 384Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

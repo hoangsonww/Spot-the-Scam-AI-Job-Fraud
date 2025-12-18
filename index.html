@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Spot the Scam - AI-powered job fraud detection using ensemble ML models, achieving 85.4% precision with explainable predictions.">
+  <meta name="keywords" content="fraud detection, machine learning, AI, job scams, explainable AI, MLOps, ensemble models">
+  <meta name="author" content="Son Nguyen">
+  <meta property="og:title" content="Spot the Scam - AI Job Fraud Detection">
+  <meta property="og:description" content="Protect job-seekers from fraudulent postings using ensemble ML pipeline with 85.4% precision.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="docs/images/favicon.ico" type="image/x-icon">
+  
+  <title>Spot the Scam - AI Job Fraud Detection</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="packages/styles.css">
+  
+  <!-- Mermaid -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <!-- Animated Background -->
+  <div class="animated-background"></div>
+  
+  <!-- Scroll Progress Bar -->
+  <div id="scroll-progress"></div>
+  
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="navbar-brand">
+        🛡️ Spot the Scam
+      </div>
+      
+      <!-- Hamburger Menu Button -->
+      <button class="navbar-toggle" aria-label="Toggle navigation menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      
+      <ul class="navbar-links">
+        <li><a href="#home">Home</a></li>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#performance">Performance</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#technology">Technology</a></li>
+        <li><a href="#documentation">Docs</a></li>
+        <li><a href="https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud" target="_blank" class="github-link" aria-label="View on GitHub">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+        </a></li>
+      </ul>
+    </div>
+  </nav>
+  
+  <!-- Hero Section -->
+  <section id="home" class="hero">
+    <div class="hero-content">
+      <h1>Spot the Scam</h1>
+      <p class="subtitle">AI-Powered Job Fraud Detection with Ensemble Machine Learning</p>
+      <p class="section-subtitle">Protecting job-seekers from fraudulent postings using calibrated ML models achieving 85.4% precision and 77.2% F1 score with explainable predictions.</p>
+      
+      <div class="hero-badges">
+        <span class="badge">
+          <span class="badge-icon">🎯</span>
+          85.4% Precision
+        </span>
+        <span class="badge">
+          <span class="badge-icon">📊</span>
+          98.6% ROC-AUC
+        </span>
+        <span class="badge">
+          <span class="badge-icon">🔬</span>
+          Explainable AI
+        </span>
+        <span class="badge">
+          <span class="badge-icon">🚀</span>
+          Production Ready
+        </span>
+      </div>
+      
+      <div class="cta-buttons">
+        <a href="https://spot-the-scam-job-fraud.vercel.app/" target="_blank" class="btn btn-primary">
+          🌐 Live Demo
+        </a>
+        <a href="https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud" target="_blank" class="btn btn-secondary">
+          📦 View on GitHub
+        </a>
+        <a href="#architecture" class="btn btn-secondary">
+          📖 Documentation
+        </a>
+      </div>
+    </div>
+  </section>
+  
+  <!-- Main Content -->
+  <div class="container">
+    
+    <!-- Overview Section -->
+    <section id="overview" class="section">
+      <h2 class="section-title">🎯 Project Overview</h2>
+      <p class="section-subtitle">
+        Spot The Scam is a comprehensive machine learning system designed to protect job-seekers from fraudulent job postings. 
+        The system combines classical ML models with deep learning transformers, featuring ensemble architectures, 
+        calibrated probability estimates, and explainable AI capabilities.
+      </p>
+      
+      <div class="card-grid">
+        <div class="card">
+          <span class="card-icon">🤖</span>
+          <h3>Intelligent Detection</h3>
+          <p>Leverages ensemble ML pipeline combining Linear SVMs, Logistic Regression, XGBoost, LightGBM, and DistilBERT for robust fraud detection across diverse posting styles.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">📈</span>
+          <h3>High Performance</h3>
+          <p>Achieves 85.4% precision on test data with excellent calibration (ECE: 0.0066), ensuring reliable confidence estimates for critical decision-making.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🔍</span>
+          <h3>Explainable Predictions</h3>
+          <p>Token-level importance analysis with SHAP-style contribution rankings provides transparency and trust in model decisions.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">⚙️</span>
+          <h3>Smart Policy</h3>
+          <p>Gray-zone policy routes low-confidence predictions to human review, optimizing the balance between automation and accuracy.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🎨</span>
+          <h3>Interactive Dashboard</h3>
+          <p>Real-time prediction interface with AI-powered chat assistant for fraud analysis, built with Next.js and modern UI components.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🐳</span>
+          <h3>Production Ready</h3>
+          <p>FastAPI REST API with Docker containerization, MLflow experiment tracking, and ONNX model export for scalable deployment.</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Key Features Section -->
+    <section id="features" class="section">
+      <h2 class="section-title">✨ Key Features</h2>
+      
+      <div class="card">
+        <h3>🏗️ Ensemble Architecture</h3>
+        <ul>
+          <li>Calibrated Linear SVMs and Logistic Regression models</li>
+          <li>TF-IDF vectorization for text features</li>
+          <li>Engineered tabular features for job posting metadata</li>
+          <li>Weighted ensemble combining top-performing models</li>
+          <li>Isotonic calibration for reliable probability estimates</li>
+        </ul>
+      </div>
+      
+      <div class="card">
+        <h3>🤖 Machine Learning Models</h3>
+        <ul>
+          <li>Classical Models: Logistic Regression, Linear SVM, XGBoost, LightGBM</li>
+          <li>Deep Learning: DistilBERT fine-tuning for transformer-based classification</li>
+          <li>Bayesian Hyperparameter Optimization via Optuna with TPE sampler</li>
+          <li>Automated tuning workflows with YAML configuration overrides</li>
+          <li>Model versioning and experiment tracking with MLflow</li>
+        </ul>
+      </div>
+      
+      <div class="card">
+        <h3>📊 Evaluation & Explainability</h3>
+        <ul>
+          <li>Comprehensive metrics: F1, Precision, Recall, ROC-AUC, PR-AUC, Brier Score</li>
+          <li>Calibration curves and Expected Calibration Error (ECE)</li>
+          <li>Token-level contribution analysis with SHAP-style explanations</li>
+          <li>Slice-based bias detection across job categories</li>
+          <li>Automated report generation with visualizations</li>
+        </ul>
+      </div>
+      
+      <div class="card">
+        <h3>🚀 Deployment & API</h3>
+        <ul>
+          <li>FastAPI REST endpoints for single and batch predictions</li>
+          <li>Server-Sent Events (SSE) for streaming chat responses</li>
+          <li>AI chatbot with Gemini integration for natural language queries</li>
+          <li>Docker containerization for reproducible environments</li>
+          <li>ONNX model export for cross-platform compatibility</li>
+        </ul>
+      </div>
+    </section>
+    
+    <!-- Performance Metrics Section -->
+    <section id="performance" class="section">
+      <h2 class="section-title">📊 Performance Metrics</h2>
+      <p class="section-subtitle">
+        Our ensemble model achieves state-of-the-art performance on job fraud detection, with well-calibrated probability estimates.
+      </p>
+      
+      <h3 style="color: var(--text-primary); margin: 2rem 0 1rem;">Validation Set</h3>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.856">0.000</span>
+          <span class="metric-label">F1 Score</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.930">0.000</span>
+          <span class="metric-label">Precision</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.793">0.000</span>
+          <span class="metric-label">Recall</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.989">0.000</span>
+          <span class="metric-label">ROC-AUC</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.905">0.000</span>
+          <span class="metric-label">PR-AUC</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.010">0.000</span>
+          <span class="metric-label">Brier Score</span>
+        </div>
+      </div>
+      
+      <h3 style="color: var(--text-primary); margin: 2rem 0 1rem;">Test Set</h3>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.772">0.000</span>
+          <span class="metric-label">F1 Score</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.854">0.000</span>
+          <span class="metric-label">Precision</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.705">0.000</span>
+          <span class="metric-label">Recall</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.986">0.000</span>
+          <span class="metric-label">ROC-AUC</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.866">0.000</span>
+          <span class="metric-label">PR-AUC</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-value" data-target="0.014">0.000</span>
+          <span class="metric-label">Brier Score</span>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top: 3rem;">
+        <h3>📈 Model Calibration</h3>
+        <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+          Our model demonstrates excellent calibration with an Expected Calibration Error (ECE) of only <strong style="color: var(--secondary-color);">0.0066</strong> 
+          on the test set, ensuring that predicted probabilities accurately reflect true confidence levels.
+        </p>
+        <ul>
+          <li><strong>Decision Threshold:</strong> 0.5802 (optimized on validation F1)</li>
+          <li><strong>Gray-Zone Width:</strong> 0.10 (for uncertain predictions)</li>
+          <li><strong>Calibration Method:</strong> Isotonic Regression</li>
+          <li><strong>Expected Calibration Error (Test):</strong> 0.0066</li>
+        </ul>
+      </div>
+      
+      <div class="screenshot-grid" style="margin-top: 3rem;">
+        <div class="screenshot">
+          <img src="experiments/figs/pr_curve_test.png" alt="Precision-Recall Curve" />
+        </div>
+        <div class="screenshot">
+          <img src="experiments/figs/calibration_curve_test.png" alt="Calibration Curve" />
+        </div>
+        <div class="screenshot">
+          <img src="experiments/figs/confusion_matrix_test.png" alt="Confusion Matrix" />
+        </div>
+        <div class="screenshot">
+          <img src="experiments/figs/score_distribution_test.png" alt="Score Distribution" />
+        </div>
+      </div>
+    </section>
+    
+    <!-- Architecture Section -->
+    <section id="architecture" class="section">
+      <h2 class="section-title">🏗️ System Architecture</h2>
+      <p class="section-subtitle">
+        A comprehensive end-to-end pipeline from data ingestion to production deployment, with modular components for training, 
+        evaluation, and inference.
+      </p>
+      
+      <h3 style="color: var(--text-primary); margin: 2rem 0 1.5rem;">High-Level System Overview</h3>
+      <div class="mermaid-container">
+        <div class="mermaid">
+flowchart TD
+    subgraph Offline["🔄 Offline Training Pipeline"]
+        A1[📦 Raw Kaggle CSV] -->|Download| A2[📥 Data Ingestion]
+        A2 --> A3[🔧 Preprocessing & Feature Engineering]
+        A3 --> A4[🤖 Classical Models & Ensembles]
+        A3 --> A5[🧠 DistilBERT Fine-tuning]
+        A4 --> A6[📊 Calibration & Model Selection]
+        A5 --> A6
+        A6 -->|Persist| A7[💾 Artifacts & Reports]
+    end
+
+    subgraph Online["🌐 Online Serving"]
+        B1[🚀 FastAPI Service<br/>/predict, /chat, /insights]
+        B2[🔮 FraudPredictor]
+        B3[📁 Model Artifacts<br/>Features & Pipelines]
+        B4[🤖 Gemini AI API]
+        B5[🧭 Chat Routing Layer]
+    end
+    
+    A7 -->|Load Models| B3
+    B3 --> B2 --> B1
+    B1 -->|Invoke| B5
+    B5 -->|Detect Job Posts| B2
+    B5 -->|LLM Responses| B4
+
+    subgraph Frontend["💻 Frontend & Registry"]
+        C1[⚛️ Next.js Dashboard<br/>& Chat Assistant]
+        C2[📊 MLflow Model Registry]
+    end
+    
+    B1 <-->|REST + SSE| C1
+    A6 -->|Register| C2
+    C2 -->|pyfunc / ONNX| B1
+
+    style Offline fill:#1e293b,stroke:#2563eb,stroke-width:2px
+    style Online fill:#1e293b,stroke:#10b981,stroke-width:2px
+    style Frontend fill:#1e293b,stroke:#f59e0b,stroke-width:2px
+        </div>
+      </div>
+      
+      <h3 style="color: var(--text-primary); margin: 3rem 0 1.5rem;">Training Flow Sequence</h3>
+      <div class="mermaid-container">
+        <div class="mermaid">
+sequenceDiagram
+    participant CLI as 🖥️ CLI (Typer)
+    participant Config as ⚙️ Config Loader
+    participant Data as 📊 Data Pipeline
+    participant Features as 🔧 Feature Builder
+    participant Models as 🤖 Model Trainers
+    participant Eval as 📈 Evaluation Suite
+    participant Persist as 💾 Artifact Writer
+
+    CLI->>Config: load_config()
+    CLI->>Data: load_raw_dataset()
+    Data->>Data: preprocess_dataframe()
+    Data->>Data: create_splits()
+    Data->>Features: build_feature_bundle()
+    Features->>Models: train_classical_models()
+    Features->>Models: train_transformer_model()
+    Models->>Eval: compute_metrics()
+    Eval->>Persist: save artifacts + plots
+    Persist->>CLI: append_run_record()
+        </div>
+      </div>
+      
+      <h3 style="color: var(--text-primary); margin: 3rem 0 1.5rem;">Chat & Inference Pipeline</h3>
+      <div class="mermaid-container">
+        <div class="mermaid">
+sequenceDiagram
+    participant UI as 💬 Next.js Chat UI
+    participant API as 🚀 FastAPI /chat
+    participant Cls as 🔍 Gemini Classifier
+    participant Pred as 🔮 FraudPredictor
+    participant LLM as 🤖 Gemini Assistant
+
+    UI->>API: POST /chat (message, context, history)
+    API->>Cls: classify message
+    Cls-->>API: {is_job_posting, confidence, reason}
+    
+    alt Is Job Posting
+        API->>Pred: predict(job_data)
+        Pred-->>API: {proba, decision, explanations}
+    end
+    
+    API->>LLM: stream response with context
+    LLM-->>API: text chunks
+    API-->>UI: SSE chunks (ChatStreamChunk)
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top: 3rem;">
+        <h3>📂 Repository Structure</h3>
+        <pre><code>spot-the-scam/
+├── 📦 src/spot_scam/       # Core Python package
+│   ├── data/                # Data ingestion & preprocessing
+│   ├── features/            # Feature engineering (TF-IDF, tabular)
+│   ├── models/              # Classical, XGBoost, Transformer models
+│   ├── tuning/              # Optuna hyperparameter optimization
+│   ├── evaluation/          # Metrics, curves, calibration, reporting
+│   ├── inference/           # FraudPredictor, gray-zone policy
+│   └── api/                 # FastAPI endpoints & schemas
+├── 🎨 frontend/             # Next.js dashboard + chat UI
+├── 🔧 configs/              # YAML configuration files
+├── 📜 scripts/              # CLI utilities (train, tune, API)
+├── 💾 artifacts/            # Trained models, vectorizers, metadata
+├── 📊 experiments/          # Generated reports, figures, tables
+├── 🧪 tests/                # Unit tests
+├── 🐳 docker/               # Dockerfiles & compose configs
+└── 📖 docs/                 # Comprehensive documentation</code></pre>
+      </div>
+    </section>
+    
+    <!-- Technology Stack Section -->
+    <section id="technology" class="section">
+      <h2 class="section-title">🛠️ Technology Stack</h2>
+      
+      <div class="card">
+        <h3>🐍 Backend & ML</h3>
+        <div class="tech-stack">
+          <span class="tech-badge">🐍 Python 3.9+</span>
+          <span class="tech-badge">⚡ FastAPI</span>
+          <span class="tech-badge">🔬 scikit-learn</span>
+          <span class="tech-badge">📊 XGBoost</span>
+          <span class="tech-badge">⚡ LightGBM</span>
+          <span class="tech-badge">🤗 Transformers</span>
+          <span class="tech-badge">🔥 PyTorch</span>
+          <span class="tech-badge">📈 MLflow</span>
+          <span class="tech-badge">🎯 Optuna</span>
+          <span class="tech-badge">🔄 ONNX</span>
+          <span class="tech-badge">🧮 NumPy</span>
+          <span class="tech-badge">🐼 Pandas</span>
+          <span class="tech-badge">📉 Matplotlib</span>
+          <span class="tech-badge">🎨 Seaborn</span>
+          <span class="tech-badge">📊 Plotly</span>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>⚛️ Frontend</h3>
+        <div class="tech-stack">
+          <span class="tech-badge">⚛️ Next.js 14</span>
+          <span class="tech-badge">📘 TypeScript</span>
+          <span class="tech-badge">🎨 Tailwind CSS</span>
+          <span class="tech-badge">🧩 shadcn/ui</span>
+          <span class="tech-badge">🔄 SWR</span>
+          <span class="tech-badge">📝 ReactMarkdown</span>
+          <span class="tech-badge">🧮 KaTeX</span>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>🚀 DevOps & Infrastructure</h3>
+        <div class="tech-stack">
+          <span class="tech-badge">🐳 Docker</span>
+          <span class="tech-badge">🔧 Docker Compose</span>
+          <span class="tech-badge">☁️ Vercel</span>
+          <span class="tech-badge">🔄 GitHub Actions</span>
+          <span class="tech-badge">🧪 pytest</span>
+          <span class="tech-badge">🎯 pre-commit</span>
+          <span class="tech-badge">📝 Black</span>
+          <span class="tech-badge">🔍 Ruff</span>
+          <span class="tech-badge">📊 Coverage</span>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>🤖 AI & LLM Integration</h3>
+        <div class="tech-stack">
+          <span class="tech-badge">🧠 Google Gemini</span>
+          <span class="tech-badge">🤗 DistilBERT</span>
+          <span class="tech-badge">🔮 SHAP</span>
+          <span class="tech-badge">🍋 LIME</span>
+          <span class="tech-badge">📊 Imbalanced-learn</span>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Documentation Section -->
+    <section id="documentation" class="section">
+      <h2 class="section-title">📚 Documentation</h2>
+      <p class="section-subtitle">
+        Comprehensive guides and resources for understanding, deploying, and extending the system.
+      </p>
+      
+      <div class="card-grid">
+        <div class="card">
+          <span class="card-icon">📖</span>
+          <h3><a href="docs/INFO.md" style="color: inherit; text-decoration: none;">INFO.md</a></h3>
+          <p>Project overview, feature summary, and quick start guide for getting up and running.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🏗️</span>
+          <h3><a href="docs/ARCHITECTURE.md" style="color: inherit; text-decoration: none;">ARCHITECTURE.md</a></h3>
+          <p>Detailed system design, component breakdown, and architecture diagrams.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">📋</span>
+          <h3><a href="docs/INSTRUCTIONS.md" style="color: inherit; text-decoration: none;">INSTRUCTIONS.md</a></h3>
+          <p>Setup instructions, environment configuration, and usage guidelines.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🔬</span>
+          <h3><a href="docs/TRAINING_ANALYSIS.md" style="color: inherit; text-decoration: none;">TRAINING_ANALYSIS.md</a></h3>
+          <p>Training pipeline walkthrough, data analysis, and model development process.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">📊</span>
+          <h3><a href="docs/RESULTS.md" style="color: inherit; text-decoration: none;">RESULTS.md</a></h3>
+          <p>Performance metrics, evaluation results, and model comparison analysis.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">➕</span>
+          <h3><a href="docs/ADD_MODELS.md" style="color: inherit; text-decoration: none;">ADD_MODELS.md</a></h3>
+          <p>Guide for integrating new models and extending the ensemble architecture.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🚀</span>
+          <h3><a href="docs/DEVOPS_READINESS.md" style="color: inherit; text-decoration: none;">DEVOPS_READINESS.md</a></h3>
+          <p>Progressive delivery, CI/CD pipelines, and production operations guide.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🎯</span>
+          <h3><a href="docs/optuna_tuning.md" style="color: inherit; text-decoration: none;">Optuna Tuning</a></h3>
+          <p>Hyperparameter optimization with Optuna, including TPE sampler and study analysis.</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Getting Started Section -->
+    <section id="getting-started" class="section">
+      <h2 class="section-title">🚀 Getting Started</h2>
+      
+      <div class="timeline">
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>1. Clone the Repository</h3>
+            <pre><code>git clone https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud.git
+cd Spot-the-Scam-AI-Job-Fraud</code></pre>
+          </div>
+        </div>
+        
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>2. Set Up Environment</h3>
+            <pre><code>python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e .</code></pre>
+          </div>
+        </div>
+        
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>3. Download Data</h3>
+            <pre><code>python scripts/download_data.py</code></pre>
+          </div>
+        </div>
+        
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>4. Train Models</h3>
+            <pre><code>python -m spot_scam.pipeline.train</code></pre>
+          </div>
+        </div>
+        
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>5. Run API Server</h3>
+            <pre><code>python scripts/run_api.py</code></pre>
+          </div>
+        </div>
+        
+        <div class="timeline-item">
+          <div class="timeline-content">
+            <h3>6. Launch Dashboard</h3>
+            <pre><code>cd frontend
+npm install
+npm run dev</code></pre>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top: 3rem;">
+        <h3>🐳 Docker Quick Start</h3>
+        <pre><code># Build and run with Docker Compose
+docker-compose up --build
+
+# Access the services
+# API: http://localhost:8000
+# Frontend: http://localhost:3000
+# MLflow: http://localhost:5000</code></pre>
+      </div>
+    </section>
+    
+    <!-- Demo Section -->
+    <section id="demo" class="section">
+      <h2 class="section-title">🌐 Live Demo & Screenshots</h2>
+      <p class="section-subtitle">
+        Explore the interactive dashboard and see the system in action. Note: The demo uses sample data for exploration purposes.
+      </p>
+      
+      <div class="cta-buttons" style="justify-content: center; margin: 2rem 0;">
+        <a href="https://spot-the-scam-job-fraud.vercel.app/" target="_blank" class="btn btn-primary">
+          🌐 Try Live Demo
+        </a>
+        <a href="https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing" target="_blank" class="btn btn-secondary">
+          🎥 Watch Demo Video
+        </a>
+      </div>
+      
+      <div class="card">
+        <p style="padding: 1rem; background: rgba(37, 99, 235, 0.1); border-radius: 0.5rem; border-left: 4px solid var(--primary-color);">
+          <strong>⚠️ Important:</strong> The hosted demo at Vercel runs with fake data and a demo model for exploration. 
+          For a fully functional version with real predictions, please follow the Docker setup instructions to run locally.
+        </p>
+      </div>
+      
+      <h3 style="color: var(--text-primary); margin: 3rem 0 1.5rem;">Dashboard Screenshots</h3>
+      <div class="screenshot-grid">
+        <div class="screenshot">
+          <img src="docs/images/ui.png" alt="Main Dashboard" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">Main Dashboard Interface</p>
+        </div>
+        <div class="screenshot">
+          <img src="docs/images/ui1.png" alt="Prediction Analysis" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">Prediction Analysis View</p>
+        </div>
+        <div class="screenshot">
+          <img src="docs/images/ui2.png" alt="Chat Assistant" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">AI Chat Assistant</p>
+        </div>
+      </div>
+      
+      <h3 style="color: var(--text-primary); margin: 3rem 0 1.5rem;">Optuna Dashboard</h3>
+      <div class="screenshot-grid">
+        <div class="screenshot">
+          <img src="docs/images/optuna1.png" alt="Optuna Optimization History" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">Optimization History</p>
+        </div>
+        <div class="screenshot">
+          <img src="docs/images/optuna2.png" alt="Parameter Importance" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">Parameter Importance</p>
+        </div>
+        <div class="screenshot">
+          <img src="docs/images/optuna3.png" alt="Parallel Coordinate Plot" />
+          <p style="text-align: center; margin-top: 1rem; color: var(--text-secondary);">Parallel Coordinate Analysis</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Citation Section -->
+    <section id="citation" class="section">
+      <h2 class="section-title">📝 Citation</h2>
+      <div class="card">
+        <h3>BibTeX</h3>
+        <pre><code>@software{spot_the_scam_2025,
+  title = {Spot the Scam: Calibrated Job-Posting Fraud Detection},
+  author = {Nguyen, Son},
+  year = {2025},
+  version = {0.1.0},
+  url = {https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud},
+  note = {End-to-end ML pipeline for detecting fraudulent job postings with 
+          classical and transformer models, calibrated policies, and 
+          explainability tooling.}
+}</code></pre>
+      </div>
+      
+      <div class="card">
+        <h3>APA</h3>
+        <p style="padding: 1.5rem; background: var(--dark-bg); border-radius: 0.5rem; font-family: 'Georgia', serif; line-height: 1.8;">
+          Nguyen, S. (2025). <em>Spot the Scam: Calibrated Job-Posting Fraud Detection</em> (Version 0.1.0) [Computer software]. 
+          https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud
+        </p>
+      </div>
+    </section>
+    
+    <!-- Contributing Section -->
+    <section id="contributing" class="section">
+      <h2 class="section-title">🤝 Contributing</h2>
+      <p class="section-subtitle">
+        We welcome contributions! Whether it's bug fixes, new features, documentation improvements, or model enhancements.
+      </p>
+      
+      <div class="card-grid">
+        <div class="card">
+          <span class="card-icon">🐛</span>
+          <h3>Report Issues</h3>
+          <p>Found a bug or have a feature request? Open an issue on GitHub with detailed information.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🔧</span>
+          <h3>Submit Pull Requests</h3>
+          <p>Fork the repository, make your changes, and submit a PR with a clear description of improvements.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">📖</span>
+          <h3>Improve Documentation</h3>
+          <p>Help us make the docs better by fixing typos, adding examples, or clarifying explanations.</p>
+        </div>
+        
+        <div class="card">
+          <span class="card-icon">🧪</span>
+          <h3>Add Tests</h3>
+          <p>Increase code coverage by writing unit tests for existing features or new functionality.</p>
+        </div>
+      </div>
+    </section>
+    
+    <!-- License Section -->
+    <section id="license" class="section">
+      <h2 class="section-title">⚖️ License</h2>
+      <div class="card">
+        <h3>MIT License</h3>
+        <p>
+          This project is licensed under the MIT License. You are free to use, modify, and distribute this software 
+          for both commercial and non-commercial purposes. See the 
+          <a href="LICENSE" style="color: var(--primary-color); text-decoration: underline;">LICENSE</a> file for details.
+        </p>
+      </div>
+    </section>
+    
+  </div>
+  
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>🛡️ Spot the Scam</h3>
+        <p style="color: var(--text-secondary); margin-top: 0.5rem;">
+          AI-powered job fraud detection protecting job-seekers worldwide.
+        </p>
+      </div>
+      
+      <div class="footer-section">
+        <h3>Quick Links</h3>
+        <ul>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#performance">Performance</a></li>
+          <li><a href="#documentation">Documentation</a></li>
+        </ul>
+      </div>
+      
+      <div class="footer-section">
+        <h3>Resources</h3>
+        <ul>
+          <li><a href="https://github.com/hoangsonww/Spot-the-Scam-AI-Job-Fraud" target="_blank">GitHub Repository</a></li>
+          <li><a href="https://spot-the-scam-job-fraud.vercel.app/" target="_blank">Live Demo</a></li>
+          <li><a href="REPORT.pdf" target="_blank">Technical Report</a></li>
+          <li><a href="PRESENTATION.pdf" target="_blank">Presentation</a></li>
+        </ul>
+      </div>
+      
+      <div class="footer-section">
+        <h3>Connect</h3>
+        <ul>
+          <li><a href="https://github.com/hoangsonww" target="_blank">GitHub Profile</a></li>
+          <li><a href="https://orcid.org/0009-0002-7806-068X" target="_blank">ORCID</a></li>
+          <li><a href="mailto:hoangson091104@gmail.com">Email Contact</a></li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="footer-bottom">
+      <p>© 2025 Spot the Scam. Built with ❤️ by Son Nguyen. Licensed under MIT.</p>
+      <p style="margin-top: 0.5rem; font-size: 0.85rem;">
+        Powered by FastAPI • Next.js • scikit-learn • Transformers • MLflow • Optuna
+      </p>
+    </div>
+  </footer>
+  
+  <!-- Scripts -->
+  <script src="packages/script.js"></script>
+</body>
+</html>

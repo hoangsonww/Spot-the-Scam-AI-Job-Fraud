@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: spot-scam-api
+  labels:
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: spot-scam-api

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: spot-scam
+  labels:
+    app.kubernetes.io/name: spot-scam
+    app.kubernetes.io/part-of: spot-scam

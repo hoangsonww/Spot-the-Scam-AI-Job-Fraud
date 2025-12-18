@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: spot-scam-api
+  labels:
+    app.kubernetes.io/name: spot-scam-api
+    app.kubernetes.io/part-of: spot-scam
+spec:
+  type: ClusterIP
+  selector:
+    app: spot-scam-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000

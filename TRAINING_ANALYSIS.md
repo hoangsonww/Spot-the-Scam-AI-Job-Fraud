@@ -685,15 +685,15 @@ The project integrates Optuna for intelligent Bayesian hyperparameter optimizati
 | Computational Cost | O(n^k) for k parameters | O(n) trials, focused search |
 
 <p align="center">
-  <img src="images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
+  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
+  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
 </p>
 
 <p align="center">
-  <img src="images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
+  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
 </p>
 
 **Search Spaces:**
