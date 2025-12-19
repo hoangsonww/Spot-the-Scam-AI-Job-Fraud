@@ -29,7 +29,9 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: "pyproject.toml"
+          cache-dependency-path: |
+            pyproject.toml
+            ci-constraints.txt
 
       - name: Install system dependencies
         run: |
@@ -39,7 +41,7 @@ jobs:
       - name: Install project dependencies
         run: |
           pip install --upgrade pip setuptools wheel
-          pip install -e '.[dev]'
+          pip install -c ci-constraints.txt -e '.[dev]'
 
       - name: Run training pipeline (skip transformer)
         run: python -m spot_scam.pipeline.train --skip-transformer
