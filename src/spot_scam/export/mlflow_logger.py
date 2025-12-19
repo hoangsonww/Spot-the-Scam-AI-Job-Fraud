@@ -485,7 +485,7 @@ def log_model_to_mlflow(
                 "onnx>=1.15.0",
                 "numpy>=1.23.0",
                 "pandas>=2.0.0",
-                "scikit-learn>=1.2.0",
+                "scikit-learn>=1.7.2,<1.8.0",
                 "transformers>=4.38.0",
                 "optimum[onnxruntime]>=1.17.0",
             ]
