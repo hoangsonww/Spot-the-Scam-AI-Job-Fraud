@@ -29,4 +29,3 @@ mlruns/*
 /tracking/feedback/
 /tracking/cases/
 full_train.log
-*.egg-info/
