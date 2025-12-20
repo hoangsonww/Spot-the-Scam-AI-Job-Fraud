@@ -37,6 +37,8 @@ jobs:
           sudo apt-get install -y build-essential libgomp1
 
       - name: Install project dependencies
+        env:
+          PIP_NO_CACHE_DIR: "1"
         run: |
           pip install --upgrade pip setuptools wheel
           pip install -e '.[dev]'

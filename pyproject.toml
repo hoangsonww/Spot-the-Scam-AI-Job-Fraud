@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spot-the-scam"
-version = "0.1.0"
+version = "0.1.1"
+version = "0.1.1"
 description = "Uncertainty-aware classifier for fraudulent job postings."
 authors = [
   {name = "Spot the Scam Team"}
