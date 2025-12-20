@@ -4,7 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spot-the-scam"
-version = "0.1.0"
+version = "0.1.1"
+version = "0.1.1"
 description = "Uncertainty-aware classifier for fraudulent job postings."
 authors = [
   {name = "Spot the Scam Team"}
@@ -16,7 +17,7 @@ dependencies = [
   "scipy>=1.10.0",
   "joblib>=1.3.0",
   "beautifulsoup4>=4.12.0",
-  "scikit-learn>=1.2.0",
+  "scikit-learn==1.7.2",
   "lightgbm>=4.0.0",
   "xgboost>=2.0.0",
   "matplotlib>=3.7.0",
