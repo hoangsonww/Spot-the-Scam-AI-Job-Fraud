@@ -41,6 +41,7 @@ jobs:
           PIP_NO_CACHE_DIR: "1"
         run: |
           pip install --upgrade pip setuptools wheel
+          pip install "scikit-learn==1.7.2" --upgrade-strategy only-if-needed
           pip install -e '.[dev]'
 
       - name: Run training pipeline (skip transformer)
