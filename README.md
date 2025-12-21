@@ -2,7 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.121-009688?logo=fastapi&logoColor=white)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4-F7931E?logo=scikit-learn&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.7.2-F7931E?logo=scikit-learn&logoColor=white)
 ![Transformers](https://img.shields.io/badge/Transformers-4.57-FF6F61?logo=huggingface&logoColor=white)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.2-EE4C2C?logo=pytorch&logoColor=white)
 ![XGBoost](https://img.shields.io/badge/XGBoost-1.7-FF9900?logo=xgboost&logoColor=white)
@@ -33,15 +33,17 @@ Spot the Scam is an uncertainty-aware fraud detector for job postings. It combin
   <img src="docs/images/ui.png" alt="Spot the Scam dashboard screenshot" width="100%"/>
 </p>
 
-This README provides an end-to-end overview, from model training and calibration through deployment and review workflows. For deeper dives, the Documentation map section links to detailed guides and architecture diagrams.
-
 ## Why it matters
 
-Job seekers face increasingly sophisticated scams. This project focuses on high-precision detection, calibrated confidence scores, and a human-in-the-loop workflow that keeps false alarms low while catching real threats.
+Job seekers nowadays face increasingly sophisticated scams. This project focuses on high-precision detection, calibrated confidence scores, and a human-in-the-loop workflow that keeps false alarms low while catching real threats.
+
+The system can be deployed by recruiting teams, trust and safety groups, fraud analysts, and educators to screen job postings on boards and marketplaces. An interactive dashboard supports scoring, review, and AI-assisted analysis with Google Generative AI.
 
 ## Design principles
 
 The system prioritizes precision so that reviewers can act on alerts without drowning in false positives. It emphasizes calibration so probability thresholds can be trusted for triage. It also favors transparency, which is why every prediction includes interpretable feature contributions.
+
+Technically, the pipeline balances fast classical models with optional transformer fine-tuning for richer semantics. The architecture is modular and configuration-driven, making it easy to extend the model suite and adapt to new domains.
 
 ## Use cases
 
@@ -303,6 +305,8 @@ The Makefile provides convenient entry points for common tasks. You can use `mak
 ## Reproducibility and versioning
 
 The pipeline persists dataset splits, configurations, and training artifacts so that runs can be reproduced and compared. This structure makes it easier to track performance changes across experiments, and it supports auditing when you need to explain why a decision was made.
+
+For instructions on running and reproducing experiments, see [INSTRUCTIONS.md](INSTRUCTIONS.md) and [TRAINING_ANALYSIS.md](TRAINING_ANALYSIS.md).
 
 ## Extending the model suite
 

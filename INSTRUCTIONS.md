@@ -13,8 +13,12 @@ This guide walks through end-to-end setup, training, and serving of the Spot the
 | **CUDA-capable GPU** | Optional but recommended for transformer training. |
 | **Kaggle CLI** | Needed to download the Kaggle dataset (set up API token). |
 | **Google Gemini API Key** | Optional; required for AI chatbot feature. Get from [Google AI Studio](https://makersuite.google.com/app/apikey). |
+| **scikit-learn 1.7.2+** | Ensure compatible version for model training. |
 
 Ensure `python3`, `pip`, `node`, and `npm` are on your `PATH`.
+
+> [!CAUTION]
+> Be sure that `scikit-learn` version is EXACTLY **1.7.2** to avoid compatibility issues with the training pipeline. Other versions may lead to unexpected errors.
 
 ---
 
