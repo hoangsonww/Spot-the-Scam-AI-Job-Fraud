@@ -363,12 +363,12 @@ async def chat_stream(request: ChatRequest):
         assistant_instruction = "\n".join(system_parts)
 
         assistant_model = genai.GenerativeModel(
-            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
             system_instruction=assistant_instruction,
         )
 
         classifier_model = genai.GenerativeModel(
-            "gemini-2.0-flash-lite",
+            "gemini-2.5-flash",
             system_instruction=(
                 "You determine whether a message contains information about a job posting. "
                 "Respond ONLY with JSON using this schema: "
