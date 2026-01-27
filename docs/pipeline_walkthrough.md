@@ -1,92 +1,227 @@
 # Spot the Scam Pipeline Walkthrough
 
-This document supplements `INSTRUCTIONS.md` and `ARCHITECTURE.md` with an end-to-end narrative of the training pipeline. Use it when onboarding engineers or prepping a design review.
+This document supplements `INSTRUCTIONS.md` and `ARCHITECTURE.md` with an end-to-end narrative of the training pipeline and the artifact contract it produces.
 
-## 1. Data Sources & Versioning
-- **Primary raw files:** `data/fake_job_postings.csv`, `data/Fake_Real_Job_Posting.csv`
-- **Download script:** `scripts/download_data.py`
-- **Dedup strategy:** combine datasets → compute SHA256 checksum of normalized `text_all` → drop duplicates (~32 %).
-- **Versioning tips:**
-  - Store Kaggle download date in git tag or `tracking/runs.csv`
-  - Keep raw archives in object storage (S3/GCS) if the repo size must stay small.
+## Table of Contents
 
-## 2. Preprocessing Stages
-| Stage | Key operations | Code |
-|-------|----------------|------|
-| Fill missing | Replace NaNs with `<missing>` | `data/preprocess.py::fill_missing_values` |
-| Clean text | Strip HTML/URLs, normalize whitespace, enforce lower-case | `data/preprocess.py::clean_text` |
-| Combine text | Build `text_all` from title + body fields | `data/preprocess.py::concatenate_text_fields` |
-| Drop leaks | Remove `job_id`, `salary_range`, `department`, etc. | `configs/defaults.yaml[data.drop_columns]` |
-| Type coercion | Cast binary columns to `int` after masking `<missing>` | `features/tabular.py` |
+- [Training Entrypoint and Orchestration](#training-entrypoint-and-orchestration)
+- [Data Sources and Ingestion](#data-sources-and-ingestion)
+- [Preprocessing Stages](#preprocessing-stages)
+- [Splitting and Persistence](#splitting-and-persistence)
+- [Feature Bundle Construction](#feature-bundle-construction)
+- [Model Training Tracks](#model-training-tracks)
+- [Calibration, Thresholding, and Gray Zone](#calibration-thresholding-and-gray-zone)
+- [Ensembles and Winner Selection](#ensembles-and-winner-selection)
+- [Artifacts, Reports, and Benchmarks](#artifacts-reports-and-benchmarks)
+- [Automation Hooks and Practical Checks](#automation-hooks-and-practical-checks)
+- [Related Documentation](#related-documentation)
 
-## 3. Feature Bundle
-- **Text:** TF-IDF `(1,2)` grams, 50k vocab, `sublinear_tf`.
-- **Tabular:** text length, uppercase ratio, digit count, currency count, scam term counts, binary metadata, missing flags.
-- **Scaler:** `StandardScaler` fitted on train tabular features.
-- **Artifacts:**
-  - `artifacts/features/tfidf_vectorizer.joblib`
-  - `artifacts/features/tabular_scaler.joblib`
-  - `artifacts/features/tabular_feature_names.joblib`
+## Training Entrypoint and Orchestration
 
-## 4. Modeling
-### Classical
-- Logistic Regression (C ∈ {0.1, 1.0, 10.0})
-- Linear SVM (same C grid; pass through sigmoid to estimate probabilities)
-- LightGBM small grid (`num_leaves`, `learning_rate`, `n_estimators`, etc.)
+- Entrypoint: `src/spot_scam/pipeline/train.py`
+- CLI:
 
-### Transformer
-- DistilBERT (max length 128, 3 epochs, AdamW, FP16 optional)
-- Early stopping (patience 2), gradient accumulation configurable.
+```bash
+PYTHONPATH=src python -m spot_scam.pipeline.train
+```
+
+The orchestrator coordinates the entire pipeline, including data prep, feature engineering, model candidates, calibration, selection, reporting, benchmarking, tracking, and export.
+
+## Data Sources and Ingestion
+
+### Data files
+
+- `data/fake_job_postings.csv`
+- `data/Fake_Real_Job_Posting.csv`
+
+### Ingestion behavior
+
+Ingestion happens in `src/spot_scam/data/ingest.py`:
+
+- Normalize column names to lowercase snake-case.
+- Merge multiple CSVs.
+- Coerce the `fraudulent` label to numeric.
+- Drop duplicates using configured key columns.
+
+Optional download helper:
+
+- `scripts/download_data.py`
+
+## Preprocessing Stages
+
+Preprocessing lives in `src/spot_scam/data/preprocess.py` and uses defaults from `configs/defaults.yaml`.
+
+Key behaviors:
+
+- Fill missing values with `<missing>`.
+- Clean text via HTML stripping, URL stripping, lowercasing, and whitespace normalization.
+- Construct `text_all` by concatenating configured text fields.
+- Drop configured columns (including known leakage risks).
+- Cast configured categorical fields to category dtype.
+
+## Splitting and Persistence
+
+Splitting happens in `src/spot_scam/data/split.py`:
+
+- Stratified train/validation/test splits.
+- A checksum column helps detect near-duplicates before splitting.
+- Split indices are persisted to `data/processed/split_indices.npz`.
+
+In addition, the training pipeline persists full split snapshots:
+
+- `data/processed/train.parquet`
+- `data/processed/val.parquet`
+- `data/processed/test.parquet`
+
+This enables notebooks and downstream analysis to consume the exact rows used in training.
+
+## Feature Bundle Construction
+
+Feature construction happens in `src/spot_scam/features/builders.py` and returns a `FeatureBundle`.
+
+### Text features (TF-IDF)
+
+- Builder: `src/spot_scam/features/text.py`
+- Defaults (from `configs/defaults.yaml`):
+  - N-grams: 1-2
+  - `min_df`: 3
+  - `max_df`: 0.9
+  - Sublinear term frequency: enabled
+  - Max vocabulary size: driven by `preprocessing.max_vocabulary_size` (default 100,000)
+
+### Tabular features
+
+- Builder: `src/spot_scam/features/tabular.py`
+- Examples of signals:
+  - Text length, uppercase ratio, digit and punctuation counts
+  - Currency and URL counts
+  - Scam-term counters from `features.scamming_terms`
+  - Binary metadata fields such as `telecommuting`, `has_company_logo`, `has_questions`
+  - Missingness flags for key categorical fields
+
+### Persisted feature artifacts
+
+Training persists the feature contract under `artifacts/features/`:
+
+- `tfidf_vectorizer.joblib`
+- `tabular_scaler.joblib`
+- `tabular_feature_names.joblib`
+
+## Model Training Tracks
+
+The pipeline trains multiple model families under a shared evaluation and selection framework.
+
+### Classical track
+
+Implemented in `src/spot_scam/models/classical.py`:
+
+- Logistic Regression (L2 and optional L1)
+- Linear SVM
+- LightGBM (tabular-only)
+
+### XGBoost variants
+
+Implemented in `src/spot_scam/models/xgboost_model.py` and orchestrated in `pipeline/train.py`:
+
+- Generates multiple XGBoost variants
+- Caps the number of variants via configuration
+- Persists per-variant artifacts under `artifacts/xgboost_variants/`
+
+### Transformer track (optional)
+
+Implemented in `src/spot_scam/models/transformer.py`:
+
+- Fine-tunes `distilbert-base-uncased` by default
+- Early stopping and FP16 are supported when available
+
+## Calibration, Thresholding, and Gray Zone
+
+These are core parts of the system, not optional extras.
 
 ### Calibration
-- For classical: Platt + Isotonic; pick lowest Brier then ECE.
-- Transformer uses native probability head (no extra calibration by default).
 
-## 5. Selection & Artifacts
-1. Compare candidates on validation F1.
-2. Evaluate winning model on hold-out test set.
-3. Persist:
-   - `artifacts/model.joblib` (calibrated)
-   - `artifacts/base_model.joblib` (pre-calibration)
-   - `artifacts/metadata.json`
-   - `artifacts/test_predictions.csv`
-   - `experiments/figs/*`, `experiments/tables/*`, `experiments/report.md`
+Implemented in `src/spot_scam/evaluation/calibration.py`:
 
-## 6. Explainability
-- Classical: multiply vectorizer/scaler outputs by logistic coefficients to produce top positive/negative contributions. Summaries are natural-language sentence(s).
-- Transformer: gradient × input token attributions (attention-based fallback when gradients unavailable) feed the same “signals toward fraud/legit” UI as classical models.
-- Outputs attached to every `/predict` response under `explanation`.
-- Performance note: all training/latency numbers in this doc were collected on a local box with an NVIDIA RTX 3070 Ti (8 GB). Runs on CPU-only hardware or smaller GPUs will take proportionally longer, especially for transformer fine-tuning.
+- Platt scaling (`sigmoid`)
+- Isotonic regression
 
-## 7. MLflow + ONNX (Optional)
-1. Convert winner to ONNX (captures vectorizer/scaler or transformer graph).
-2. Save MLflow pyfunc bundle under `mlruns/<exp>/<run_id>/model`.
-3. Serve locally:
-   ```bash
-   mlflow models serve --env-manager local -m runs:/<RUN_ID>/model -p 8080
-   ```
-4. Tracking metadata includes threshold, gray-zone widths, calibration method.
+The pipeline evaluates methods on validation data and chooses the best calibration outcome.
 
-## 8. Automation Hooks
-- `make train` → full run (classical + transformer).
-- `make train-fast` → classical only (useful in CI).
-- Add `make export-onnx` (if desired) to force regeneration.
-- `tracking/runs.csv` logs metrics + config hash; use it to audit experiments.
+### Threshold optimization
 
-## 9. Recommended Checks Before Deployment
-- Confirm latest metrics in `artifacts/metadata.json`.
+Implemented in `src/spot_scam/evaluation/metrics.py` via `optimal_threshold(...)`:
+
+- Thresholds are optimized to maximize validation F1.
+
+### Gray-zone policy
+
+Implemented in `src/spot_scam/policy/gray_zone.py`:
+
+- A band around the threshold routes uncertain cases to `review`.
+
+## Ensembles and Winner Selection
+
+After candidate training, the pipeline can build ensemble candidates over top TF-IDF+tabular models.
+
+- Uniform averaging produces `ensemble_top3`.
+- Coarse grid-searched weights can produce `ensemble_weighted_top3` when beneficial.
+
+Selection is then straightforward:
+
+- Winner = highest validation F1 across all candidates.
+
+## Artifacts, Reports, and Benchmarks
+
+The pipeline produces artifacts that power serving and documentation.
+
+### Artifacts (serving contract)
+
+- `artifacts/model.joblib`
+- `artifacts/base_model.joblib` (when available)
+- `artifacts/metadata.json`
+- `artifacts/config_used.yaml`
+- `artifacts/test_predictions.csv`
+
+### Reports and diagnostics
+
+- Figures: `experiments/figs/*`
+- Tables: `experiments/tables/*`
+- Markdown report: `experiments/report.md`
+
+### Latency benchmarks
+
+The pipeline benchmarks the actual inference runtime (`FraudPredictor.predict`) and writes:
+
+- `experiments/tables/benchmark_latency.csv`
+- `experiments/tables/benchmark_summary.csv`
+- `experiments/figs/latency_throughput.png`
+
+## Automation Hooks and Practical Checks
+
+### Useful Make targets
+
+- `make train`
+- `make train-fast`
+- `make retrain-with-feedback`
+- `make review-sample`
+
+### Recommended checks before serving
+
+- Confirm `artifacts/metadata.json` matches expectations.
 - Inspect `experiments/figs/calibration_curve_test.png`.
-- Manually score known-good/known-bad postings via UI or `curl`.
-- Run notebook `notebooks/spot_the_scam_overview.ipynb` to recreate the pipeline.
+- Start the API and run a quick health check:
 
-## 10. Next Enhancements
-- Upgrade transformer attributions to Integrated Gradients / Captum once the current gradient × input approach bottlenecks or drifts.
-- Implement pipeline caching (TF-IDF reuse) to shorten train time.
-- Integrate automated alerts when MLflow metrics regress beyond threshold.
+```bash
+PYTHONPATH=src uvicorn spot_scam.api.app:app --reload
+curl http://localhost:8000/health
+```
 
----
+## Related Documentation
 
-**See also:**
-- `docs/explainability.md`
-- `docs/deployment_guide.md`
-- `docs/architecture_diagrams/` (create as needed)
+- MLOps lifecycle: [MLOPS.md](../MLOPS.md)
+- System design: [ARCHITECTURE.md](../ARCHITECTURE.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Setup and operations: [INSTRUCTIONS.md](../INSTRUCTIONS.md)
+- Metrics and diagnostics: [RESULTS.md](../RESULTS.md)
+- Explainability details: [docs/explainability.md](explainability.md)
+- Deployment checklist: [docs/deployment_guide.md](deployment_guide.md)

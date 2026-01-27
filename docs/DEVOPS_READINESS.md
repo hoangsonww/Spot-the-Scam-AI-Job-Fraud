@@ -1,43 +1,106 @@
-# DevOps & Delivery Readiness
+# DevOps and Delivery Readiness
 
-This repository now includes production-grade deployment assets (progressive delivery, hardening, CI/CD). No Docker or GitHub configuration was changed.
+This repository includes production-oriented deployment scaffolding (progressive delivery, hardening, and CI/CD examples) under `ops/`.
 
-## Progressive delivery on Kubernetes
-- **Location:** `ops/k8s/` (base resources + overlays for staging canary and prod blue/green).
-- **Workloads:** Argo Rollouts with health probes, HPA (CPU+memory), PDB, NetworkPolicy, TLS Ingress, PVCs for `artifacts/`, `tracking/`, and `mlruns/`.
-- **Strategies:**  
-  - Staging defaults to **canary** (weighted 20% → 60% → 100% with Prometheus analysis).  
-  - Production defaults to **blue/green** (manual promotion, preview replicas, post-promotion analysis).  
-- **Promotion controls:** `argo-rollouts promote spot-scam-api -n spot-scam` after validation. Abort with `argo-rollouts terminate`.
-- **Health checks:** Prometheus AnalysisTemplate (`latency-error-budget`) enforces <2% errors and p95 latency <800ms before promotion.
+This document summarizes what is already present and how to use it as a starting point.
 
-## How to deploy
+## Table of Contents
+
+- [What Is Included](#what-is-included)
+- [Kubernetes Progressive Delivery](#kubernetes-progressive-delivery)
+- [How to Deploy with Overlays](#how-to-deploy-with-overlays)
+- [CI/CD Pipeline Example (Tekton)](#cicd-pipeline-example-tekton)
+- [Operational Guardrails Present in Repo](#operational-guardrails-present-in-repo)
+- [Runbook Snippets](#runbook-snippets)
+- [Related Documentation](#related-documentation)
+
+## What Is Included
+
+Key locations:
+
+- Kubernetes manifests: `ops/k8s/`
+- CI/CD example: `ops/ci/tekton-pipeline.yaml`
+- Load testing: `ops/observability/` and `scripts/loadtest_k6.sh`
+
+These assets are intended as scaffolding you can adapt to your environment.
+
+## Kubernetes Progressive Delivery
+
+Kubernetes assets are organized as base resources plus overlays:
+
+- Base: `ops/k8s/base/`
+- Staging canary: `ops/k8s/overlays/staging-canary/`
+- Production blue/green: `ops/k8s/overlays/prod-bluegreen/`
+
+Highlights include:
+
+- Argo Rollouts strategies
+- HPA, PDB, and NetworkPolicy
+- TLS ingress scaffolding
+- PVCs for artifacts, tracking, and MLflow
+- Analysis templates and Prometheus rule scaffolding
+
+## How to Deploy with Overlays
+
+Apply an overlay using the helper script:
+
 ```bash
 # staging canary
-./scripts/apply_k8s_overlay.sh ops/k8s/overlays/staging-canary
+./scripts/apply_k8s_overlay.sh ops/k8s/overlays/staging-canary spot-scam
 
 # production blue/green
-./scripts/apply_k8s_overlay.sh ops/k8s/overlays/prod-bluegreen
+./scripts/apply_k8s_overlay.sh ops/k8s/overlays/prod-bluegreen spot-scam
 ```
-Set image tags via `kustomize edit set image ghcr.io/your-org/spot-scam-api=<tag>` inside the chosen overlay.
 
-## CI/CD pipeline (Tekton)
-- **Definition:** `ops/ci/tekton-pipeline.yaml`
-- **Stages:** git clone → backend lint/type-check/tests → frontend lint/build → Kaniko image builds (API + frontend) → Trivy scans → `kubectl kustomize` apply → k6 smoke → optional Argo Rollouts promotion.
-- **Parameters:** `repo-url`, `git-revision`, `image-tag`, `registry`, `overlay`. Defaults point to staging canary overlay and `ghcr.io/your-org`.
-- **Promotion hook:** pipeline ends with `argo-rollouts promote` so blue/green can be gated manually (keep `autoPromotionEnabled: false`).
+Set image tags via kustomize inside the overlay directory:
 
-## Operational guardrails
-- **NetworkPolicy:** ingress limited to namespace + ingress controller; egress restricted to DNS, monitoring, and TLS.
-- **Storage:** RWX PVCs for artifacts and tracking; adjust storage class/size as needed.
-- **Security:** secrets pulled from `spot-scam-api-secrets` (e.g., `GEMINI_API_KEY`). Avoid embedding credentials in ConfigMaps.
-- **Reliability:** PDB keeps at least one pod running; anti-affinity spreads pods across nodes; HPA scales between 3–10 replicas.
-- **Observability:** ServiceMonitor + PrometheusRule in `ops/k8s/base/` for error-rate/latency alerts. Expect a `/metrics` endpoint (enable FastAPI/Prometheus exporter in the image).
-- **Synthetic checks:** `ops/observability/k6-smoke.js` + `scripts/loadtest_k6.sh` run a lightweight smoke to catch regressions before promotion.
-- **Tracing:** set `OTEL_EXPORTER_OTLP_ENDPOINT` and propagate trace headers via ingress; wire FastAPI middleware to emit spans to your collector.
+```bash
+kustomize edit set image ghcr.io/your-org/spot-scam-api=<tag>
+```
 
-## Runbook snippets
-- Status: `argo-rollouts get rollout spot-scam-api -n spot-scam`
-- Pause canary: `argo-rollouts pause spot-scam-api -n spot-scam`
-- Promote: `argo-rollouts promote spot-scam-api -n spot-scam`
-- Roll back: `argo-rollouts rollback spot-scam-api -n spot-scam --to-revision <rev>`
+## CI/CD Pipeline Example (Tekton)
+
+The repo includes a Tekton pipeline definition at:
+
+- `ops/ci/tekton-pipeline.yaml`
+
+It covers the shape of a full pipeline, including:
+
+- Backend checks
+- Frontend checks and builds
+- Image builds and scans
+- Kubernetes apply
+- Smoke testing hooks
+- Promotion hooks
+
+Treat it as a reference pipeline that you can adapt.
+
+## Operational Guardrails Present in Repo
+
+Examples of guardrails in the manifest scaffolding:
+
+- Networking constraints via NetworkPolicy
+- Availability controls via PDB
+- Scaling controls via HPA
+- Storage scaffolding for model and tracking state
+- Observability hooks via ServiceMonitor and Prometheus rules
+
+These still require you to provide compatible cluster components (ingress, monitoring stack, storage class, and rollouts controller).
+
+## Runbook Snippets
+
+Common Argo Rollouts commands:
+
+```bash
+argo-rollouts get rollout spot-scam-api -n spot-scam
+argo-rollouts pause spot-scam-api -n spot-scam
+argo-rollouts promote spot-scam-api -n spot-scam
+argo-rollouts rollback spot-scam-api -n spot-scam --to-revision <rev>
+```
+
+## Related Documentation
+
+- Deployment checklist: [docs/deployment_guide.md](deployment_guide.md)
+- MLOps lifecycle: [MLOPS.md](../MLOPS.md)
+- System design: [ARCHITECTURE.md](../ARCHITECTURE.md)
+- Setup and operations: [INSTRUCTIONS.md](../INSTRUCTIONS.md)

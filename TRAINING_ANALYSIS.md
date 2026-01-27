@@ -1,1342 +1,534 @@
-# Training Configuration & Strategy Analysis
+# Training Analysis, Strategy, and Operational Trade-offs
 
-## Executive Summary
-
-This document provides a comprehensive analysis of the training strategies, hyperparameter choices, model selection rationale, and performance optimization techniques for the Spot the Scam fraud detection system. After thorough investigation of the codebase, configuration files, experimental results, and ML best practices, we present evidence-based recommendations for training configurations and explain why the current 3-epoch transformer setup is appropriate and sufficient for this specific use case.
-
-**Key Findings:**
-- **Dataset Characteristics:** Approximately 17,880 job postings with 5-10% fraud rate
-- **Current Configuration:** 3 epochs for DistilBERT transformer with early stopping
-- **Performance:** Strong results across all metrics (Test F1: 0.819, Precision: 0.919, Recall: 0.738)
-- **Model Winner:** Classical models (Linear SVM and Logistic Regression) consistently outperform the transformer approach
-- **Expanded classical stack:** Adds an aggressive-yet-capped XGBoost sweep plus weighted ensembles so the tfidf+tabular pipeline can chase extra validation lift without destabilizing runtime.
-- **Benchmark & reproducibility upgrades:** Train/val/test splits are persisted to `data/processed/*.parquet` and each run exports latency benchmarks + per-variant XGBoost artifacts for auditing.
-- **System Maturity:** Production-grade architecture with comprehensive monitoring, calibration, explainability, and human-in-the-loop feedback
-- **Verdict:** Current training configuration is optimal for this dataset size and problem domain
-
----
+This document explains how training works in this repository, why it is designed this way, and how to modify it without breaking serving parity. It is grounded in the actual orchestrator (`src/spot_scam/pipeline/train.py`), the default configuration (`configs/defaults.yaml`), and the currently checked-in artifact set under `artifacts/` and `experiments/`.
 
 ## Table of Contents
 
-1. [AI/ML Stack Architecture](#aiml-stack-architecture)
-2. [Training Strategy Overview](#training-strategy-overview)
-3. [Why 3 Epochs Are Sufficient](#why-3-epochs-are-sufficient)
-4. [Dataset Analysis & Characteristics](#dataset-analysis--characteristics)
-5. [Model Training Approaches](#model-training-approaches)
-6. [Hyperparameter Tuning Strategy](#hyperparameter-tuning-strategy)
-7. [Calibration & Uncertainty Quantification](#calibration--uncertainty-quantification)
-8. [Model Selection Logic](#model-selection-logic)
-9. [Performance Benchmarks](#performance-benchmarks)
-10. [Monitoring & Continuous Improvement](#monitoring--continuous-improvement)
+- [Executive Summary](#executive-summary)
+- [System-Level Training Goals](#system-level-training-goals)
+- [What the Training Orchestrator Actually Does](#what-the-training-orchestrator-actually-does)
+- [Data Sources, Balance, and Observed Footprint](#data-sources-balance-and-observed-footprint)
+- [Preprocessing Strategy and Leakage Controls](#preprocessing-strategy-and-leakage-controls)
+- [Feature Engineering Design](#feature-engineering-design)
+- [Model Families and Candidate Generation](#model-families-and-candidate-generation)
+- [Calibration and Probability Reliability](#calibration-and-probability-reliability)
+- [Threshold Optimization and the Gray Zone](#threshold-optimization-and-the-gray-zone)
+- [Ensembles and Winner Selection Logic](#ensembles-and-winner-selection-logic)
+- [Results Analysis from the Current Artifact Set](#results-analysis-from-the-current-artifact-set)
+- [Evaluation Outputs and How to Read Them](#evaluation-outputs-and-how-to-read-them)
+- [Latency and Throughput Benchmarks](#latency-and-throughput-benchmarks)
+- [Feedback Integration and Continual Learning Loop](#feedback-integration-and-continual-learning-loop)
+- [Artifact Contract and Train-Serve Parity](#artifact-contract-and-train-serve-parity)
+- [Reproducibility and Experiment Hygiene](#reproducibility-and-experiment-hygiene)
+- [Tuning and Optimization Guidance](#tuning-and-optimization-guidance)
+- [Safe Customization Playbook](#safe-customization-playbook)
+- [Common Failure Modes and How to Avoid Them](#common-failure-modes-and-how-to-avoid-them)
 
----
+## Executive Summary
 
-## AI/ML Stack Architecture
+The training system is intentionally engineered for operational reliability rather than novelty. The most important properties are:
 
-### Technology Stack Overview
+- It is configuration-driven and artifact-first.
+- It evaluates multiple model families under a shared decision framework.
+- It treats calibration, thresholding, and gray-zone routing as first-class design elements.
+- It produces the exact artifacts the serving stack expects and validates.
+- It supports feedback-driven label overrides via `text_hash` without redesigning the pipeline.
 
-The Spot the Scam system employs a hybrid approach, combining classical machine learning techniques with modern transformer-based deep learning. This dual-track strategy allows the system to leverage the strengths of both paradigms and select the best-performing model for production deployment.
+From the current artifact set (`artifacts/metadata.json`):
 
-#### Classical ML Pipeline (Current Winner)
+- Winner: `ensemble_top3`
+- Threshold: `0.5802`
+- Test metrics: F1 `0.7721`, Precision `0.8537`, Recall `0.7047`, ROC-AUC `0.9863`, PR-AUC `0.8659`, Brier `0.0143`
+- Test ECE: `0.0066`
 
-**Model Architecture:**
-```yaml
-Algorithm: Linear SVM with C=1.0 regularization
-Feature Engineering:
-  - TF-IDF vectorization (1-2 grams)
-  - Vocabulary size: 50,000 tokens
-  - Sublinear term frequency scaling
-  - Tabular features (13 engineered features)
-Calibration: Isotonic scaling
-Post-processing: Gray-zone policy application
+## System-Level Training Goals
+
+The training system is designed to support a very specific product posture:
+
+- Alerts should be trusted, not noisy.
+- Probabilities should be meaningful for triage.
+- Uncertain cases should be routed to review instead of forced into hard labels.
+- Serving should faithfully reproduce training-time behavior.
+
+These goals explain many of the design decisions below.
+
+## What the Training Orchestrator Actually Does
+
+The orchestrator is the `run(...)` function in `src/spot_scam/pipeline/train.py`. It coordinates the entire lifecycle.
+
+### Training lifecycle (actual order)
+
+1. Load config via `config.loader.load_config(...)`.
+2. Set global seeds and ensure directory structure.
+3. Load raw data via `data.ingest.load_raw_dataset(...)`.
+4. Preprocess via `data.preprocess.preprocess_dataframe(...)`.
+5. Optionally apply reviewer label overrides.
+6. Split via `data.split.create_splits(..., persist=True)`.
+7. Persist split snapshots to `data/processed/*.parquet`.
+8. Build the shared feature bundle via `features.builders.build_feature_bundle(...)`.
+9. Train classical candidates via `models.classical.train_classical_models(...)`.
+10. Generate XGBoost variants via `models.xgboost_model.XGBoostModel`.
+11. Evaluate classical candidates on the hold-out test split.
+12. Optionally fine-tune a transformer via `models.transformer.train_transformer_model(...)`.
+13. Build ensemble candidates over top TF-IDF+tabular models.
+14. Select the winner using validation F1.
+15. Persist artifacts, metadata, and config snapshots.
+16. Generate figures, tables, markdown reporting, and latency benchmarks.
+17. Append run records to `tracking/runs.csv`.
+18. Attempt MLflow and ONNX export (best effort).
+
+```mermaid
+flowchart TD
+    A[load_config] --> B[load_raw_dataset]
+    B --> C[preprocess_dataframe]
+    C --> D[create_splits]
+    D --> E[build_feature_bundle]
+    E --> F[classical candidates]
+    E --> G[XGBoost variants]
+    D --> H[transformer candidate]
+    F --> I[calibration + thresholds]
+    G --> I
+    H --> I
+    I --> J[ensembles]
+    J --> K[best validation F1]
+    K --> L[artifacts + reports + benchmarks]
 ```
 
-**Performance Metrics:**
-```
-Test Set Results:
-  - F1 Score: 0.789
-  - Precision: 0.920
-  - Recall: 0.691
-  - ROC AUC: 0.981
-  - PR AUC: 0.845
-  - Expected Calibration Error: 0.0085
-```
+## Data Sources, Balance, and Observed Footprint
 
-The classical pipeline wins primarily due to:
-1. Excellent feature engineering capturing domain-specific signals
-2. Fast training time (under 1 minute)
-3. Highly interpretable linear coefficients
-4. Low inference latency (2-5ms per prediction)
-5. Smaller memory footprint (50MB vs 250MB)
+### Data sources
 
-##### XGBoost Extension
+The training data comes from two CSVs included under `data/`:
 
-To keep squeezing headroom from the classical track, we introduced a dedicated `XGBoostModel` wrapper (`src/spot_scam/models/xgboost_model.py`) that trains and evaluates up to 12 carefully curated variants per run. The grid explores:
+- `data/fake_job_postings.csv`
+- `data/Fake_Real_Job_Posting.csv`
 
-```
-max_depth: [4, 6, 8]
-learning_rate: [0.05, 0.03, 0.02]
-n_estimators: [600, 800, 1000]
-subsample: [0.9]
-colsample_bytree: [0.9]
-min_child_weight: [1, 5, 10]
-reg_alpha: [0, 0.1, 0.3]
-reg_lambda: [1, 2, 5]
-scale_pos_weight: [0.7×, 1.0×, 1.3× class ratio heuristic]
-```
+### Raw balance snapshot (observable in-repo)
 
-Because the cartesian product would explode, the pipeline down-samples to twelve diverse combinations, fit each candidate, record validation metrics, and persist both the calibrated and base estimators to `artifacts/xgboost_variants/<variant_name>/`. The best-performing variant is also parked under `artifacts/xgboost/` so later runs (and the inference service) can inspect the winning booster. All of these models use the same TF-IDF+tabular bundle as the linear stack, so they immediately benefit from the existing feature engineering.
+From `data/fake_job_postings.csv`:
 
-##### Weighted Ensembles
+- Rows: 17,880
+- Fraudulent rows: 866
+- Fraud rate: 4.84%
 
-Once classical runs (SVM, logistic regression, LightGBM, XGBoost, etc.) finish, the training pipeline now builds probabilistic ensembles that average calibrated scores from the top tfidf+tabular models. Weights are either uniform (simple mean) or optimized through a brute-force sweep while using `optimal_threshold` to pick the best decision point per mixture. Only ensembles that improve validation F1 are kept, and the metadata captures component names + weights so analysts can trace exactly how the blended score was produced.
+### Observed hold-out footprint (artifact-grounded)
 
-#### Transformer Pipeline
+From `artifacts/test_predictions.csv`:
 
-**Model Architecture:**
-```yaml
-Base Model: DistilBERT-base-uncased
-  - 6 layers, 768 hidden dimensions
-  - 66 million parameters
-  - Pre-trained on English Wikipedia + BookCorpus
-Fine-tuning Configuration:
-  - Max sequence length: 128 tokens
-  - Training epochs: 3 (with early stopping)
-  - Batch size: 16
-  - Learning rate: 3e-5 with warmup
-  - Weight decay: 0.01
-  - Gradient accumulation: 1 step
-  - Early stopping patience: 2 epochs
-  - FP16 mixed precision: Enabled (GPU only)
-```
+- Test size: 3,323
+- Fraudulent labels: 149
+- Fraud rate: 4.48%
 
-**Performance Characteristics:**
-```
-Training Time: 3-5 minutes on RTX 3070 Ti
-Model Size: 250MB (uncompressed), 80MB (ONNX quantized)
-Inference Latency: 15-25ms per prediction
-Competitive with classical models but doesn't justify the overhead
-```
+The imbalance is strong and explains why precision, calibration, and thresholding are emphasized.
 
-#### Core Dependencies
+## Preprocessing Strategy and Leakage Controls
 
-**Machine Learning Frameworks:**
-- **Transformers 4.57:** Hugging Face library for transformer models
-- **scikit-learn 1.4:** Classical ML algorithms and preprocessing
-- **LightGBM 4.x:** Gradient boosting option (currently not selected)
-- **PyTorch:** Deep learning framework with CUDA support
-- **ONNX 1.15:** Model export and optimization format
-- **XGBoost 1.7:** Gradient boosting with efficient tree learning
+Preprocessing is implemented in `src/spot_scam/data/preprocess.py` and is driven by `configs/defaults.yaml`.
 
-**MLOps & Serving:**
-- **FastAPI 0.121:** High-performance API serving
-- **MLflow 2.12:** Experiment tracking and model registry
-- **Pydantic:** Data validation and schema management
+### Core preprocessing behaviors
 
-**Evaluation & Explainability:**
-- **SHAP:** Model-agnostic feature importance
-- **NumPy/SciPy:** Numerical computations
-- **Plotly:** Interactive visualization
+- Fill missing values with `<missing>`.
+- Clean text via HTML stripping, URL stripping, lowercasing, and whitespace normalization.
+- Concatenate text fields into a single `text_all` representation.
+- Drop configured columns (including known leakage risks).
+- Cast configured categorical fields to category dtype where available.
 
----
+### Leakage-aware defaults
 
-## Training Strategy Overview
+The default configuration drops or treats cautiously several fields that could leak labels or reduce generalization, such as:
 
-### Multi-Track Training Philosophy
+- IDs and quasi-identifiers
+- Raw location and salary strings
+- Source-file markers
 
-The pipeline implements a comprehensive training strategy that evaluates multiple model families simultaneously. This approach ensures that the best-performing model is automatically selected based on validation metrics, rather than committing to a single algorithm upfront.
+## Feature Engineering Design
 
-**Training Workflow:**
+Feature engineering prioritizes clarity and serving stability.
 
-```
-1. Data Ingestion & Preprocessing
-   ├── Load raw CSV files from Kaggle
-   ├── Deduplicate by text hash (32% reduction)
-   ├── Clean text (HTML/URL removal, normalization)
-   ├── Fill missing values with <missing> token
-   └── Compute combined text_all field
+### Text block: TF-IDF on `text_all`
 
-2. Stratified Splitting & Persistence
-   ├── Train: 70% (~12,516 samples)
-   ├── Validation: 15% (~2,682 samples)
-   ├── Test: 15% (~2,682 samples)
-   └── Persist each split to `data/processed/{train,val,test}.parquet` for notebook reuse
+Implemented in `src/spot_scam/features/text.py`:
 
-3. Feature Engineering
-   ├── TF-IDF Vectorization
-   │   ├── Fit on training set only
-   │   ├── 1-2 gram features
-   │   ├── Min document frequency: 3
-   │   └── Max document frequency: 0.8
-   └── Tabular Features
-       ├── Text statistics (length, uppercase ratio)
-       ├── Fraud indicators (currency mentions, urgency terms)
-       ├── Metadata (company logo, telecommuting)
-       └── StandardScaler normalization
+- N-grams: 1-2
+- `min_df`: 3
+- `max_df`: 0.9
+- Sublinear TF scaling: enabled
+- Max vocabulary size: driven by config (default 100,000)
 
-4. Classical Model Training + XGBoost Sweep
-   ├── Logistic Regression grid (C: 0.1, 1.0, 10.0)
-   ├── Linear SVM grid (C: 0.1, 1.0, 10.0)
-   ├── LightGBM grid (num_leaves, learning_rate, n_estimators)
-   └── XGBoost variants: capped 12-combo sweep over depth, lr, estimators, regularization, scale_pos_weight
+### Tabular block: engineered risk signals
 
-5. Transformer Fine-tuning
-   ├── Load pre-trained DistilBERT
-   ├── Add sequence classification head
-   ├── Fine-tune for 3 epochs max
-   └── Early stopping on validation loss
+Implemented in `src/spot_scam/features/tabular.py`.
 
-6. Calibration
-   ├── Try Platt scaling (logistic sigmoid)
-   ├── Try Isotonic regression (non-parametric)
-   └── Select method with lowest Brier score
+Signals include:
 
-7. Ensembling & Model Selection
-   ├── Build weighted/uniform ensembles from top tfidf+tabular candidates
-   ├── Compare all candidates (including ensembles + transformer) via validation F1
-   └── Evaluate winner on hold-out test set
+- Text length, uppercase ratio, digit count
+- Currency, exclamation, question, and URL counts
+- Scam-term counters for configured terms
+- Binary metadata flags such as `telecommuting`, `has_company_logo`, and `has_questions`
+- Missingness flags on categorical fields
 
-8. Artifact Persistence & Registry Updates
-   ├── Serialize winning model, feature bundle, and metadata
-   ├── Export to ONNX format + log to MLflow registry
-   ├── Persist every XGBoost variant under `artifacts/xgboost_variants/`
-   └── Generate visualizations and metrics
+With defaults enabled, the tabular block contains 25 features.
 
-9. Benchmarking & Reporting
-   ├── Run latency/throughput benchmarks across configurable batch sizes
-   ├── Save benchmark tables + plots into `experiments/tables/` and `experiments/figs/`
-   └── Append run metadata to the tracking log
+### Feature bundle contract
+
+The feature bundle constructed in `src/spot_scam/features/builders.py` includes:
+
+- TF-IDF matrices for train, validation, and test
+- Tabular matrices for train, validation, and test
+- A fitted `StandardScaler` for tabular features
+- A stable tabular feature-name list used for alignment checks
+
+## Model Families and Candidate Generation
+
+The training pipeline deliberately evaluates multiple model families under a shared evaluation framework.
+
+### Candidate generation map
+
+```mermaid
+flowchart LR
+    A[Feature Bundle] --> B[Classical Models]
+    A --> C[XGBoost Variants]
+    A --> D[Transformer]
+    B --> E[Calibration + Thresholding]
+    C --> E
+    D --> E
+    E --> F[Ensembles]
+    F --> G[Winner Selection]
 ```
 
-### Configuration Management
+### Classical candidates
 
-All training parameters are centralized in `configs/defaults.yaml`, enabling reproducible experiments and easy hyperparameter tuning. The configuration system supports:
+Implemented in `src/spot_scam/models/classical.py`:
 
-- **Override mechanism:** Command-line flags can override any config value
-- **Config hashing:** Automatic tracking of configuration fingerprints
-- **Experiment tracking:** Integration with MLflow for run comparison
-- **Version control:** YAML files are git-tracked for reproducibility
+- Logistic Regression (L2)
+- Logistic Regression (L1, optional)
+- Linear SVM
+- LightGBM (tabular-only)
 
----
+Classical candidates receive per-model threshold optimization and, where appropriate, calibration.
 
-## Why 3 Epochs Are Sufficient
+### XGBoost variants
 
-### Theoretical Foundation
+Implemented in `src/spot_scam/models/xgboost_model.py` and orchestrated in `pipeline/train.py`.
 
-The decision to use 3 epochs for transformer fine-tuning is grounded in both theoretical understanding and empirical evidence from the fraud detection domain.
+Key properties:
 
-**Transfer Learning Principle:**
-Pre-trained language models like DistilBERT have already learned robust representations of English language from massive corpora (Wikipedia + BookCorpus). During fine-tuning, we're only adapting the final classification layers to the specific task of fraud detection. This means:
+- Generates many hyperparameter combinations but caps them (default cap: 12 variants).
+- Uses a scale-pos-weight heuristic based on the train split class ratio.
+- Persists per-variant artifacts under `artifacts/xgboost_variants/<variant_name>/`.
+- Persists the best XGBoost artifact under `artifacts/xgboost/`.
 
-1. **Lower layers** (token embeddings, early transformer blocks) require minimal adjustment
-2. **Middle layers** (contextual representations) need moderate adaptation
-3. **Upper layers** (task-specific features) require the most training
+### Transformer candidate (optional)
 
-With a small dataset, extensive training primarily affects the upper layers, which converge quickly. Over-training risks overfitting to dataset-specific noise rather than learning generalizable fraud patterns.
+Implemented in `src/spot_scam/models/transformer.py`:
 
-### Empirical Evidence from This Project
+- Base model: `distilbert-base-uncased`
+- Max length: 128 tokens
+- Epochs: 3 (with early stopping support)
+- FP16: enabled where supported (disabled on macOS)
 
-**Dataset Size Analysis:**
-```
-Total Samples: 17,880 job postings
-├── Fraudulent: ~895 (5%)
-└── Legitimate: ~16,985 (95%)
+The transformer track is optional by design because classical baselines are strong and operationally efficient on this dataset.
 
-After Stratified Split:
-├── Train: 12,516 samples
-│   ├── Fraud: ~626
-│   └── Legit: ~11,890
-├── Validation: 2,682 samples
-└── Test: 2,682 samples
-```
+## Calibration and Probability Reliability
 
-Each of those splits now lands in `data/processed/{train,val,test}.parquet`, which lets notebooks, Optuna studies, and downstream analyses ingest the exact rows used in the canonical training run.
+Calibration is treated as a core requirement because the system is designed for triage, not just ranking.
 
-With only 626 fraudulent training examples, the risk of overfitting increases dramatically with each additional epoch. The model may start memorizing specific phrases or patterns rather than learning generalizable fraud indicators.
+### Calibration methods used
 
-**Early Stopping Protection:**
-```yaml
-early_stopping_patience: 2 epochs
-metric_for_best_model: eval_loss
-load_best_model_at_end: true
-```
+Implemented in `src/spot_scam/evaluation/calibration.py`:
 
-The early stopping mechanism monitors validation loss after each epoch. If the loss doesn't improve for 2 consecutive epochs, training terminates automatically. This provides a safety net that prevents wasteful training beyond the optimal point.
+- Platt scaling (`sigmoid`)
+- Isotonic regression
 
-**Training Dynamics Observed:**
-Based on the current configuration and typical fine-tuning behavior:
-- **Epoch 1:** Rapid improvement as model adapts to task
-- **Epoch 2:** Continued improvement, but at slower rate
-- **Epoch 3:** Marginal gains, risk of overfitting begins
-- **Epochs 4+:** Diminishing returns, overfitting likely
+### Calibration decision flow
 
-### Computational Efficiency
-
-**Resource Comparison:**
-```
-3 Epochs:
-├── Training time: 3-5 minutes
-├── GPU memory: ~4GB peak
-├── Disk I/O: Minimal
-└── Cost: Negligible
-
-10 Epochs:
-├── Training time: 10-17 minutes
-├── GPU memory: Same
-├── Disk I/O: 3x more checkpointing
-└── Cost: 3x time investment
-
-Expected Performance Gain: <2% F1 improvement
-Risk of Overfitting: High
-Recommendation: Not worth the tradeoff
+```mermaid
+flowchart TD
+    A[Model Scores on Validation] --> B[Platt Scaling]
+    A --> C[Isotonic Regression]
+    B --> D[Compute Brier + ECE]
+    C --> D
+    D --> E[Pick Best Calibration]
 ```
 
-The 3-epoch configuration strikes an optimal balance between:
-- Sufficient training for task adaptation
-- Fast iteration cycles for experimentation
-- Protection against overfitting
-- Reasonable computational cost
+### Selection logic
 
-### Comparison with Classical Baselines
+For candidates that are not already calibrated:
 
-A critical insight from this project is that classical models achieve comparable or better performance than the transformer:
+- Both methods are evaluated on validation data.
+- Calibration quality is compared using Brier score and ECE.
+- The best calibration outcome is selected for that candidate.
 
-```
-Model Performance Comparison (Test Set):
+This step is important because the gray-zone routing and reviewer workflows depend on probability reliability.
 
-Logistic Regression:
-├── F1: 0.819
-├── Precision: 0.919
-├── Recall: 0.738
-└── Training: <30 seconds
+## Threshold Optimization and the Gray Zone
 
-Linear SVM:
-├── F1: 0.789
-├── Precision: 0.920
-├── Recall: 0.691
-└── Training: <30 seconds
+### Threshold optimization
 
-DistilBERT (3 epochs):
-├── F1: Competitive (~0.80-0.82 range)
-├── Precision: Competitive
-├── Recall: Competitive
-└── Training: 3-5 minutes
-```
+Implemented in `src/spot_scam/evaluation/metrics.py` via `optimal_threshold(...)`:
 
-This suggests that the feature engineering quality is excellent and captures the essential fraud signals. Adding more epochs to the transformer would not address this fundamental characteristic of the dataset - classical linear models are simply well-suited for this problem.
+- Thresholds are selected to maximize validation F1.
+- This is why the selected threshold often differs from 0.5.
 
----
+### Gray-zone routing
 
-## Dataset Analysis & Characteristics
+Implemented in `src/spot_scam/policy/gray_zone.py`:
 
-### Data Sources & Collection
+- A band around the selected threshold routes cases to `review`.
+- The band width is controlled via configuration.
 
-The training data originates from two Kaggle datasets focused on job posting fraud:
-1. `fake_job_postings.csv` - 17,880 samples
-2. `Fake_Real_Job_Posting.csv` - 17,880 samples (largely overlapping)
+### Decision policy flow
 
-**Deduplication Process:**
-The pipeline computes SHA256 hashes of normalized text (`text_all`) and removes duplicates, reducing the effective dataset size by approximately 32%. This is a critical step that prevents information leakage between train/validation/test splits.
-
-### Class Distribution & Imbalance
-
-**Fraud Rate Analysis:**
-```
-Fraudulent Postings: ~5-10% (approximately 895 samples)
-Legitimate Postings: ~90-95% (approximately 16,985 samples)
-
-Imbalance Ratio: ~1:19 (fraud to legit)
+```mermaid
+flowchart LR
+    A[Calibrated Probability] --> B{Above Upper Band?}
+    B -- Yes --> C[Fraud]
+    B -- No --> D{Below Lower Band?}
+    D -- Yes --> E[Legit]
+    D -- No --> F[Review]
 ```
 
-This severe class imbalance is realistic for fraud detection domains but poses training challenges:
-- **Naive accuracy:** A model predicting "legit" for everything achieves 95% accuracy but is useless
-- **Metric selection:** F1, Precision-Recall, and ROC AUC are more informative than accuracy
-- **Class weighting:** Both classical and transformer models use balanced class weights to compensate
+The gray zone is a deliberate product feature that reduces overconfident errors and creates a clean handoff to human review.
 
-### Text Characteristics
+## Ensembles and Winner Selection Logic
 
-**Field Structure:**
-Each job posting contains multiple text fields:
-```
-Primary Fields:
-├── title: Job position name (short, 5-15 words)
-├── company_profile: Company description (medium, 50-200 words)
-├── description: Main job details (long, 200-500 words)
-├── requirements: Qualifications needed (medium, 100-300 words)
-└── benefits: Perks offered (short to medium, 50-150 words)
+Ensembling is used to stabilize performance without dramatically increasing serving complexity.
 
-Combined Feature:
-└── text_all: Concatenation of all fields
-```
+### Ensemble construction
 
-**Vocabulary Analysis:**
-```
-Unique Tokens: ~50,000 (after min_df=3 filtering)
-Average Document Length: 350-400 tokens
-Max Length (truncated): 5,000 characters for text, 128 tokens for transformer
-Domain: Business/HR vocabulary (well-covered by pre-trained models)
+In `pipeline/train.py`:
+
+- Top TF-IDF+tabular candidates are selected by validation F1.
+- Uniform averaging produces `ensemble_top3`.
+- A coarse grid of weights is explored for `ensemble_weighted_top3` when it improves validation F1.
+
+### Winner selection rule
+
+```mermaid
+flowchart TD
+    A[All Candidates] --> B[Rank by Validation F1]
+    B --> C[Select Best]
+    C --> D[Evaluate on Test]
+    D --> E[Persist Artifacts]
 ```
 
-**Fraud Indicators:**
-Analysis of fraudulent postings reveals common patterns:
-- Urgency language: "immediate start", "limited time", "quick money"
-- Payment requests: "processing fee", "bank account", "wire transfer"
-- Vague descriptions: Lack of specific responsibilities or requirements
-- Missing company info: No logo, generic profile, no website
-- Remote-only positions with high pay promises
+Selection is intentionally simple and auditable:
 
-### Metadata Features
+- Winner = highest validation F1 across all candidates.
+- Test metrics are computed only after selection.
 
-Beyond text, the dataset includes valuable structured metadata:
+## Results Analysis from the Current Artifact Set
 
-**Binary Features:**
-```
-telecommuting: 0 or 1 (remote work available)
-has_company_logo: 0 or 1 (logo displayed on posting)
-has_questions: 0 or 1 (screening questions required)
-```
+All values in this section are derived from the current artifact set.
 
-**Categorical Features:**
-```
-employment_type: Full-time, Part-time, Contract, Temporary
-required_experience: Entry level, Mid-Senior, Executive, Internship
-required_education: High School, Bachelor's, Master's, PhD
-industry: IT, Finance, Healthcare, Retail, etc.
-function: Engineering, Sales, Marketing, Customer Service, etc.
-```
+### Winner and metrics
 
-These categorical features are particularly informative. For example:
-- **Fraud patterns by industry:** Certain industries (e.g., work-from-home schemes) have higher fraud rates
-- **Education requirements:** Fraudulent postings often have vague or missing education requirements
-- **Employment type:** "Contract" positions are disproportionately represented in frauds
+From `artifacts/metadata.json`:
 
----
+- Winner: `ensemble_top3`
+- Threshold: `0.5802`
+- Validation F1: `0.8561`
+- Test F1: `0.7721`
+- Test precision: `0.8537`
+- Test recall: `0.7047`
+- Test ROC-AUC: `0.9863`
+- Test PR-AUC: `0.8659`
+- Test Brier: `0.0143`
+- Test ECE: `0.0066`
 
-## Model Training Approaches
+### Confusion matrix at the artifact threshold
 
-### Classical Machine Learning Track
+Derived from `artifacts/test_predictions.csv` using the artifact threshold:
 
-#### 1. Logistic Regression
+- True positives: 105
+- False positives: 18
+- True negatives: 3,156
+- False negatives: 44
 
-**Algorithm:** L2-regularized logistic regression with balanced class weights
+These counts reproduce the reported test precision, recall, and F1.
 
-**Hyperparameter Grid:**
-```yaml
-C: [0.1, 1.0, 10.0]  # Inverse regularization strength
-penalty: l2
-solver: lbfgs
-class_weight: balanced
-max_iter: 500
-```
+### Gray-zone behavior (artifact-grounded)
 
-**Training Process:**
-```python
-# Feature matrix construction
-X_train = sparse.hstack([tfidf_features, tabular_features])
+Using the current gray-zone policy:
 
-# For each C value in grid
-for C in [0.1, 1.0, 10.0]:
-    model = LogisticRegression(C=C, class_weight='balanced')
-    model.fit(X_train, y_train)
-    
-    # Evaluate on validation set
-    val_probabilities = model.predict_proba(X_val)[:, 1]
-    threshold = optimal_threshold(y_val, val_probabilities, metric='f1')
-    val_metrics = compute_metrics(y_val, val_probabilities, threshold)
-    
-    # Store candidate
-    candidates.append((model, val_metrics, threshold))
-```
+- Decisions: 3,200 legit, 118 fraud, 5 review
+- Precision on fraud decisions after gray-zone routing: 0.8898
 
-**Why Logistic Regression Works Well:**
-- Linear decision boundary appropriate for TF-IDF features
-- Probabilistic output enables calibration
-- Direct feature importance via coefficients
-- Fast training and inference
-- No hyperparameter sensitivity
+This highlights a practical lever: increasing the gray-zone width will generally route more ambiguous cases to review.
 
-**Current Best Configuration:** C=1.0 achieves F1=0.819 on test set
+## Evaluation Outputs and How to Read Them
 
-#### 2. Linear SVM
+The evaluation layer produces artifacts designed for both auditing and product integration.
 
-**Algorithm:** Linear Support Vector Machine with balanced class weights
+### Core numeric outputs
 
-**Hyperparameter Grid:**
-```yaml
-C: [0.1, 1.0, 10.0]  # Regularization parameter
-class_weight: balanced
-max_iter: 2000
-dual: auto  # Primal or dual formulation
-```
+- `artifacts/metadata.json`
+- `artifacts/test_predictions.csv`
+- `experiments/tables/metrics_summary.csv`
 
-**Probability Calibration:**
-LinearSVC doesn't natively produce probabilities, so we apply sigmoid transformation to decision scores:
-```python
-decision_scores = svm.decision_function(X_val)
-probabilities = 1 / (1 + np.exp(-decision_scores))
-```
+### Core visual outputs
 
-**Why Linear SVM Works Well:**
-- Maximum margin principle robust to outliers
-- Effective in high-dimensional spaces (TF-IDF vectors are ~50k dimensions)
-- Less prone to overfitting with appropriate C
-- Strong theoretical guarantees
+- `experiments/figs/pr_curve_test.png`
+- `experiments/figs/calibration_curve_test.png`
+- `experiments/figs/confusion_matrix_test.png`
+- `experiments/figs/score_distribution_test.png`
+- `experiments/figs/threshold_sweep_val.png`
+- `experiments/figs/latency_throughput.png`
 
-**Current Best Configuration:** C=1.0 achieves F1=0.789 on test set
+### Insight tables used by the API and dashboard
 
-#### 3. LightGBM (Gradient Boosting)
+- Token coefficients: `experiments/tables/top_terms_positive.csv`, `top_terms_negative.csv`
+- Token deltas: `experiments/tables/token_frequency_analysis.csv`
+- Slice metrics: `experiments/tables/slice_metrics.csv`
+- Threshold sweep: `experiments/tables/threshold_metrics.csv`
+- Benchmarks: `experiments/tables/benchmark_latency.csv`, `benchmark_summary.csv`
 
-**Algorithm:** Gradient Boosting Decision Trees optimized for speed
+## Latency and Throughput Benchmarks
 
-**Hyperparameter Grid:**
-```yaml
-num_leaves: [31, 63]
-max_depth: [-1]  # No limit
-learning_rate: [0.05, 0.1]
-n_estimators: [200, 400]
-subsample: [0.8, 1.0]
-colsample_bytree: [0.8, 1.0]
-class_weight: balanced
+The pipeline benchmarks the actual inference runtime (`FraudPredictor.predict`) rather than raw estimator calls.
+
+From `experiments/tables/benchmark_summary.csv`:
+
+| Batch Size | Mean Latency (ms) | Mean Throughput (req/s) |
+|-----------:|------------------:|-------------------------:|
+| 1 | 9.36 | 107.03 |
+| 8 | 13.65 | 586.89 |
+| 32 | 28.05 | 1150.85 |
+| 128 | 87.42 | 1466.38 |
+
+This makes the benchmark results directly relevant to the API behavior.
+
+## Feedback Integration and Continual Learning Loop
+
+The review loop is integrated into training via label overrides.
+
+### Feedback loop at a glance
+
+```mermaid
+flowchart LR
+    A[Predictions Logged] --> B[Human Review]
+    B --> C[Feedback Stored]
+    C --> D[Label Overrides]
+    D --> E[Retraining]
+    E --> A
 ```
 
-**Training Process:**
-LightGBM trains only on tabular features (not TF-IDF), focusing on structured metadata and engineered text statistics.
+### How feedback is applied
 
-**Why LightGBM is Competitive:**
-- Captures non-linear interactions between features
-- Built-in categorical feature handling
-- Fast training with histogram-based algorithm
-- Less interpretable but potentially more powerful
+When feedback integration is enabled (`--use-feedback` or `USE_FEEDBACK=1`):
 
-**Performance:** Generally competitive but doesn't outperform linear models on this dataset
+- Feedback is loaded from `tracking/feedback/`.
+- Only `fraud` and `legit` labels are used.
+- The most recent feedback per `text_hash` wins.
+- Overrides happen before splitting.
 
-### Transformer Track
+### Additional feedback outputs
 
-#### DistilBERT Fine-Tuning
+When feedback is enabled, training emits additional comparison artifacts, including:
 
-**Architecture Details:**
-```
-Base Model: distilbert-base-uncased
-├── Parameters: 66 million
-├── Layers: 6 transformer blocks
-├── Hidden Size: 768 dimensions
-├── Attention Heads: 12 heads
-├── Vocabulary: 30,522 WordPiece tokens
-└── Pre-training: Wikipedia + BookCorpus
+- `experiments/tables/metrics_with_feedback.csv`
+- `experiments/tables/slice_metrics_baseline.csv`
+- `experiments/tables/slice_metrics_feedback_delta.csv`
+- `experiments/tables/feedback_counts.csv`
 
-Classification Head:
-├── Dropout: 0.1
-└── Linear: 768 → 2 classes (fraud/legit)
-```
+## Artifact Contract and Train-Serve Parity
 
-**Tokenization Strategy:**
-```python
-tokenizer = AutoTokenizer.from_pretrained('distilbert-base-uncased')
-max_length = 128  # Truncate longer sequences
+Serving is tightly coupled to a stable artifact contract.
 
-# Tokenize with padding and truncation
-tokens = tokenizer(
-    text_all,
-    truncation=True,
-    padding='max_length',
-    max_length=128
-)
+### Artifact contract flow
+
+```mermaid
+flowchart LR
+    A[pipeline.train] --> B[artifacts/config_used.yaml]
+    A --> C[artifacts/model.joblib]
+    A --> D[artifacts/metadata.json]
+    A --> E[artifacts/features/*]
+    B --> F[FraudPredictor]
+    C --> F
+    D --> F
+    E --> F
 ```
 
-**Training Configuration:**
-```yaml
-Optimization:
-├── Optimizer: AdamW
-├── Learning Rate: 3e-5
-├── Weight Decay: 0.01
-├── Warmup Ratio: 0.1 (linear warmup)
-├── Gradient Clipping: 1.0 max norm
-└── LR Schedule: Linear decay after warmup
+### Core contract files
 
-Batch Processing:
-├── Train Batch Size: 16
-├── Eval Batch Size: 16
-├── Gradient Accumulation: 1 (effective batch = 16)
-└── Mixed Precision: FP16 (GPU only)
+- `artifacts/metadata.json`
+- `artifacts/config_used.yaml`
+- `artifacts/model.joblib`
+- `artifacts/features/tfidf_vectorizer.joblib`
+- `artifacts/features/tabular_scaler.joblib`
+- `artifacts/features/tabular_feature_names.joblib`
 
-Regularization:
-├── Dropout: 0.1 (default DistilBERT)
-├── Weight Decay: 0.01
-└── Early Stopping: 2 epochs patience
+### Serving-time safety check
 
-Epochs:
-├── Max Epochs: 3
-├── Save Strategy: Every epoch
-└── Evaluation: After each epoch
-```
+`FraudPredictor._validate_classical_artifacts` compares expected feature dimensions against the loaded estimator. If they do not match, it raises a clear error instead of serving silently incorrect results.
 
-**Why 3 Epochs Specifically:**
-1. **Epoch 1:** Model adapts from general language understanding to fraud detection task. Large validation loss reduction observed.
-2. **Epoch 2:** Refinement of fraud detection patterns. Validation improvement continues but at diminishing rate.
-3. **Epoch 3:** Fine-tuning of decision boundaries. Marginal improvements, early stopping often triggers here.
+## Reproducibility and Experiment Hygiene
 
-**Hardware Considerations:**
-```
-Recommended Hardware:
-├── GPU: 6GB+ VRAM (RTX 2060 or better)
-├── CPU: 4+ cores for data loading
-├── RAM: 16GB+ system memory
-└── Disk: SSD for fast data I/O
+The training system includes several mechanisms to improve reproducibility and auditability.
 
-Training Time by Hardware:
-├── RTX 3070 Ti (8GB): 3-5 minutes
-├── RTX 2060 (6GB): 5-8 minutes
-├── CPU only (Intel i7): 30-45 minutes
-└── M1 Mac (MPS): FP16 disabled, 10-15 minutes
-```
+- Config snapshots: `artifacts/config_used.yaml`
+- Config hashing: `config.loader.config_hash(...)`
+- Split persistence: `data/processed/*.parquet`
+- Run logs: `tracking/runs.csv`
+- Benchmark persistence: `experiments/tables/benchmark_*.csv`
 
-**Platform-Specific Optimizations:**
-The code automatically detects the platform and adjusts.
+These features are why the system can be treated as a product artifact pipeline rather than a one-off notebook script.
 
----
+## Tuning and Optimization Guidance
 
-## Hyperparameter Tuning Strategy
+The repository includes both grid-search-style defaults and Optuna integration.
 
-### Grid Search Approach
+### Grid search defaults
 
-The pipeline uses exhaustive grid search for classical models, evaluating all combinations of specified hyperparameters. This is computationally feasible because:
-1. Classical models train quickly (<1 minute each)
-2. The grid is deliberately kept small (3-4 values per parameter)
-3. Training happens serially on a single machine
+Classical grids are declared in `configs/defaults.yaml` and are intentionally conservative for tractability.
 
-**Grid Size Calculation:**
-```
-Logistic Regression Grid:
-├── C values: 3
-└── Total configs: 3
+### Optuna integration
 
-Linear SVM Grid:
-├── C values: 3
-└── Total configs: 3
+Optuna tuning is implemented in:
 
-LightGBM Grid:
-├── num_leaves: 2
-├── learning_rate: 2
-├── n_estimators: 2
-├── subsample: 2
-└── colsample_bytree: 2
-└── Total configs: 32
+- `src/spot_scam/tuning/optuna_tuner.py`
+- `scripts/tune_with_optuna.py`
 
-Total Classical Models Trained: 38
-Total Training Time: ~2-3 minutes
-```
-
-### Validation-Based Selection
-
-All hyperparameter choices are evaluated using the validation set (15% of data). The test set remains completely held out until the final winner is selected. This prevents data leakage and provides honest performance estimates.
-
-**Validation Metrics:**
-```yaml
-Primary Metric: F1 score (harmonic mean of precision/recall)
-Secondary Metrics:
-  - Precision: Fraud detection accuracy
-  - Recall: Fraud detection coverage
-  - ROC AUC: Overall ranking quality
-  - PR AUC: Imbalanced class performance
-  - Brier Score: Calibration quality
-```
-
-### Threshold Optimization
-
-For each model, the decision threshold is optimized on the validation set to maximize F1 score:
-
-```python
-def optimal_threshold(y_true, probabilities, metric='f1'):
-    thresholds = np.linspace(0.1, 0.9, 81)  # Try 81 thresholds
-    best_score = -1
-    best_threshold = 0.5
-    
-    for threshold in thresholds:
-        predictions = (probabilities >= threshold).astype(int)
-        if metric == 'f1':
-            score = f1_score(y_true, predictions)
-        # ... other metrics
-        
-        if score > best_score:
-            best_score = score
-            best_threshold = threshold
-    
-    return best_threshold
-```
-
-This adaptive thresholding is crucial for imbalanced datasets where the default 0.5 threshold may not be optimal.
-
-### Optuna-Based Hyperparameter Optimization
-
-**Overview:**
-The project integrates Optuna for intelligent Bayesian hyperparameter optimization as an alternative to grid search. Optuna uses Tree-structured Parzen Estimator (TPE) sampling to efficiently explore continuous hyperparameter spaces and discover optimal values that fall between traditional grid points.
-
-> Quick-start commands, environment variables, and visualization tips now live in `docs/optuna_quickstart.md` and the more detailed `docs/optuna_tuning.md`. Both documents walk through running `scripts/tune_with_optuna.py`.
-
-**Advantages Over Grid Search:**
-
-| Feature | Grid Search | Optuna |
-|---------|-------------|--------|
-| Search Strategy | Exhaustive | Bayesian (intelligent) |
-| Hyperparameter Space | Discrete values only | Continuous ranges |
-| Number of Trials | Fixed (product of grid) | Adaptive (user-defined) |
-| Example: Logistic C | [0.1, 1.0, 10.0] = 3 trials | 0.01 to 100.0, 20 trials |
-| Discovery Capability | Cannot find C=2.34 | Can discover optimal intermediate values |
-| Computational Cost | O(n^k) for k parameters | O(n) trials, focused search |
-
-<p align="center">
-  <img src="docs/images/optuna1.png" alt="Optuna Optimization History" width="100%"/>
-</p>
-
-<p align="center">
-  <img src="docs/images/optuna2.png" alt="Optuna Parameter Importance" width="100%"/>
-</p>
-
-<p align="center">
-  <img src="docs/images/optuna3.png" alt="Optuna Parallel Coordinate Plot" width="100%"/>
-</p>
-
-**Search Spaces:**
-
-Logistic Regression:
-- C: Log-uniform(0.01, 100.0) - regularization strength
-- max_iter: Uniform(300, 1000, step=100) - maximum iterations
-
-Linear SVM:
-- C: Log-uniform(0.01, 100.0) - regularization strength
-- max_iter: Uniform(1000, 3000, step=500) - maximum iterations
-
-**Quick Start Commands:**
+Example command:
 
 ```bash
-# Tune Logistic Regression with 20 trials
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
-
-# Tune Linear SVM with 30 trials
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 30
-
-# Custom configuration
-PYTHONPATH=src python scripts/tune_with_optuna.py \
-    --model-type logistic \
-    --n-trials 50 \
-    -c custom.yaml
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 30
 ```
 
-**Integration Workflow:**
+A safe workflow is: baseline training, Optuna refinement, then retrain with pinned parameters in config.
 
-1. **Baseline Training:** Run standard grid search training
-   ```bash
-   PYTHONPATH=src python -m spot_scam.pipeline.train
-   ```
+## Safe Customization Playbook
 
-2. **Hyperparameter Tuning:** Use Optuna to refine hyperparameters
-   ```bash
-   PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
-   ```
+The following changes are usually safe and high leverage.
 
-3. **Update Configuration:** Copy best params from Optuna output to `configs/defaults.yaml`
-   ```yaml
-   models:
-     classical:
-       logistic_regression:
-         Cs: [2.34]  # From Optuna
-         max_iter: 450
-   ```
+- Adjust `gray_zone.width` to control review routing volume.
+- Update scam terms in `features.scamming_terms`.
+- Expand classical grids gradually in config.
+- Use Optuna to refine logistic regression or SVM hyperparameters.
+- Retrain after any preprocessing or feature changes.
 
-4. **Retrain with Optimal Params:** Run training with updated config
-   ```bash
-   PYTHONPATH=src python -m spot_scam.pipeline.train
-   ```
+The following changes require extra care.
 
-5. **Validate Improvement:** Check test metrics to confirm gains
+- Changing preprocessing without retraining.
+- Changing features without regenerating `artifacts/features/*`.
+- Changing API schemas without updating frontend types.
 
-**Performance Expectations:**
+## Common Failure Modes and How to Avoid Them
 
-Based on typical runs with the fraud detection dataset:
+### Failure: API loads but behaves incorrectly
 
-```
-Baseline (Grid Search):
-├── Logistic Regression: F1 = 0.819
-├── Training time: ~15 seconds
-└── Trials: 3 C values
+Typical cause: artifact mismatch due to feature changes.
 
-After Optuna (20 trials):
-├── Logistic Regression: F1 = 0.825-0.835
-├── Training time: ~45 seconds
-├── Improvement: +0.6-1.6%
-└── Discovered params: C=2.34, max_iter=450
-```
+Avoidance: retrain and regenerate artifacts whenever preprocessing or features change.
 
-**Study Tracking & Visualization:**
+### Failure: training appears fine but metrics look inconsistent
 
-Optuna trials are persisted to SQLite by default (`sqlite:///optuna_study.db`) and can be resumed or inspected:
+Typical cause: mixing artifacts from different runs.
 
-```python
-import optuna
-import optuna.visualization as vis
+Avoidance: clear stale artifacts when needed and rely on `artifacts/config_used.yaml` and `artifacts/metadata.json` as the source of truth for the active model.
 
-# Load study
-study = optuna.load_study(
-    study_name="logistic_regression_tuning", 
-    storage="sqlite:///optuna_study.db"
-)
+### Failure: tuning yields small wins but unstable results
 
-# Plot optimization history
-fig = vis.plot_optimization_history(study)
-fig.show()
+Typical cause: over-optimizing to validation noise.
 
-# Plot parameter importance
-fig = vis.plot_param_importances(study)
-fig.show()
-
-# Plot parameter relationships
-fig = vis.plot_parallel_coordinate(study)
-fig.show()
-```
-
-Or use the dashboard CLI:
-```bash
-OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db \
-    --server wsgiref --host 127.0.0.1 --port 8080
-```
-
-**Documentation References:**
-- Comprehensive Guide: [docs/optuna_tuning.md](optuna_tuning.md)
-- Quick Start: [docs/optuna_quickstart.md](optuna_quickstart.md)
-- Optuna Official Docs: https://optuna.readthedocs.io/
-- TPE Algorithm Paper: https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization
-
-**Note:** Optuna integration is optional. The existing grid search approach remains the default and works well for most use cases. Use Optuna when you need to squeeze out extra performance or explore larger hyperparameter spaces.
-
----
-
-## Calibration & Uncertainty Quantification
-
-### Why Calibration Matters
-
-Uncalibrated models may achieve high accuracy but produce poorly calibrated probabilities. For fraud detection, reliable probability estimates are essential for:
-1. **Gray-zone decisions:** Determining which cases need human review
-2. **Risk assessment:** Quantifying confidence in predictions
-3. **Cost-sensitive decisions:** Balancing false positives vs false negatives
-4. **Explainability:** Providing trustworthy confidence scores to reviewers
-
-**Example of Miscalibration:**
-```
-Uncalibrated Model:
-├── Predicts P(fraud) = 0.9 for 1000 samples
-├── Actual fraud rate: 60%
-└── Calibration error: 30 percentage points
-
-Well-Calibrated Model:
-├── Predicts P(fraud) = 0.9 for 1000 samples
-├── Actual fraud rate: 88-92%
-└── Calibration error: <3 percentage points
-```
-
-### Calibration Methods Implemented
-
-#### 1. Platt Scaling (Sigmoid Calibration)
-
-**Algorithm:** Fits a logistic regression to the model's output scores:
-```
-calibrated_prob = sigmoid(A * uncalibrated_prob + B)
-```
-
-**When it works well:**
-- Model outputs are monotonically related to true probabilities
-- Simple bias in probability estimates
-- Limited validation data available
-
-**Implementation:**
-```python
-from sklearn.calibration import CalibratedClassifierCV
-
-calibrated_model = CalibratedClassifierCV(
-    base_model,
-    method='sigmoid',
-    cv='prefit'  # Already have validation set
-)
-calibrated_model.fit(X_val, y_val)
-```
-
-#### 2. Isotonic Regression (Non-Parametric)
-
-**Algorithm:** Learns a non-decreasing piecewise-constant function to map raw scores to calibrated probabilities.
-
-**When it works well:**
-- Non-monotonic calibration errors
-- Complex probability miscalibration patterns
-- Sufficient validation data (100+ samples per class)
-
-**Implementation:**
-```python
-calibrated_model = CalibratedClassifierCV(
-    base_model,
-    method='isotonic',
-    cv='prefit'
-)
-calibrated_model.fit(X_val, y_val)
-```
-
-### Calibration Selection Process
-
-```python
-# Try both calibration methods
-for method in ['sigmoid', 'isotonic']:
-    calibrated = calibrate_model(base_model, X_val, y_val, method)
-    calibrated_probs = calibrated.predict_proba(X_val)[:, 1]
-    
-    # Evaluate calibration quality
-    brier_score = brier_score_loss(y_val, calibrated_probs)
-    ece = expected_calibration_error(y_val, calibrated_probs)
-    
-    # Select method with best calibration
-    if brier_score < best_brier:
-        best_calibrator = calibrated
-        best_method = method
-```
-
-**Current Results:**
-```
-Linear SVM + Isotonic Calibration:
-├── Brier Score: 0.0141
-├── Expected Calibration Error: 0.0085
-└── Selected as winner
-
-Reliability Diagram:
-├── Near-perfect diagonal alignment
-├── Slight overconfidence in middle range (0.4-0.6)
-└── Excellent calibration in tails (0.0-0.2, 0.8-1.0)
-```
-
-### Expected Calibration Error (ECE)
-
-ECE quantifies calibration by binning predictions and comparing predicted vs actual fraud rates:
-
-```python
-def expected_calibration_error(y_true, probs, n_bins=10):
-    bins = np.linspace(0, 1, n_bins + 1)
-    bin_indices = np.digitize(probs, bins[:-1]) - 1
-    
-    ece = 0
-    for i in range(n_bins):
-        mask = bin_indices == i
-        if mask.sum() > 0:
-            avg_pred = probs[mask].mean()
-            avg_true = y_true[mask].mean()
-            bin_size = mask.sum() / len(y_true)
-            ece += bin_size * abs(avg_pred - avg_true)
-    
-    return ece
-```
-
-**Interpretation:**
-```
-ECE < 0.01: Excellent calibration
-ECE 0.01-0.05: Good calibration
-ECE 0.05-0.10: Moderate calibration
-ECE > 0.10: Poor calibration
-```
-
-Current system achieves ECE=0.0085, indicating excellent calibration.
-
----
-
-## Model Selection Logic
-
-### Validation-Based Ranking
-
-All model candidates are ranked by validation F1 score:
-
-```python
-# Collect all candidates
-candidates = []
-candidates.extend(classical_runs)  # Logistic, SVM, LightGBM variants
-if not skip_transformer:
-    candidates.append(transformer_run)
-
-# Rank by validation F1
-ranked = sorted(candidates, key=lambda x: x.val_metrics.f1, reverse=True)
-
-# Winner
-best_model = ranked[0]
-logger.info(f"Selected: {best_model.name} (val F1={best_model.val_f1:.3f})")
-```
-
-### Test Set Evaluation
-
-Only after selecting the winner based on validation metrics is the test set used for final evaluation:
-
-```python
-# Evaluate winner on held-out test set
-test_predictions = best_model.predict(X_test)
-test_metrics = compute_metrics(y_test, test_predictions, threshold)
-
-# Generate comprehensive report
-generate_report(best_model, test_metrics, test_predictions)
-```
-
-This strict train/val/test separation prevents overfitting to the test set and ensures honest performance estimates.
-
-### Why Classical Models Win
-
-Several factors explain why Linear SVM and Logistic Regression outperform DistilBERT on this dataset:
-
-**1. Feature Engineering Quality:**
-The TF-IDF + tabular feature bundle is highly informative:
-```
-Top Fraud-Indicating Features:
-├── Tokens: "wire transfer", "processing fee", "urgent", "immediate"
-├── Tabular: missing company logo, remote-only, vague requirements
-├── Text stats: Short descriptions, high urgency word count
-└── Categorical: Contract employment, entry-level education
-
-These features are linearly separable in high-dimensional space
-```
-
-**2. Dataset Size:**
-With ~17k samples, transformers don't have enough data to significantly outperform well-engineered features:
-```
-Rule of Thumb:
-├── <10k samples: Classical ML preferred
-├── 10k-100k samples: Transformers competitive
-├── >100k samples: Transformers often win
-└── >1M samples: Transformers dominate
-```
-
-**3. Domain Coverage:**
-The fraud patterns are well-covered by general English language (which DistilBERT knows) plus domain-specific terms (which TF-IDF captures). There's no complex semantic reasoning required.
-
-**4. Interpretability:**
-Linear models provide direct feature importance via coefficients:
-```python
-# Top fraud-indicating tokens
-top_positive_coef = np.argsort(model.coef_[0])[-20:]
-for idx in top_positive_coef:
-    token = vectorizer.get_feature_names_out()[idx]
-    weight = model.coef_[0][idx]
-    print(f"{token}: {weight:.3f}")
-
-Output:
-wire transfer: 2.341
-processing fee: 2.187
-urgent hire: 1.982
-...
-```
-
-This transparency is valuable for fraud analysts and model auditing.
-
-**5. Operational Efficiency:**
-```
-Classical Model Advantages:
-├── Training: 30 seconds vs 3-5 minutes
-├── Inference: 2ms vs 15ms (7.5x faster)
-├── Model size: 50MB vs 250MB
-├── Deployment: Simpler (no GPU needed)
-└── Maintenance: Easier to debug and update
-```
-
----
-
-## Performance Benchmarks
-
-The training pipeline now invokes `_run_benchmarks` after selecting the best model. This routine spins up `FraudPredictor`, samples batches from the test split, and records latency/throughput across configurable batch sizes. Results are persisted to `experiments/tables/benchmark_latency.csv`, `benchmark_summary.csv`, and plotted as `experiments/figs/latency_throughput.png`, giving both the API and frontend dashboards real measurements instead of hand-wavy estimates.
-
-### Training Time Breakdown
-
-**Full Pipeline Execution:**
-```
-Component                          | Time      | % of Total
------------------------------------|-----------|------------
-Data Ingestion & Cleaning          | 8s        | 3%
-Preprocessing & Deduplication      | 12s       | 5%
-Train/Val/Test Splitting           | 3s        | 1%
-TF-IDF Vectorization (fit)         | 15s       | 6%
-Tabular Feature Engineering        | 5s        | 2%
-Classical Model Training (all)     | 35s       | 14%
-DistilBERT Fine-tuning (3 epochs)  | 220s      | 88%
-Calibration (both methods)         | 8s        | 3%
-Test Set Evaluation                | 3s        | 1%
-Visualization Generation           | 12s       | 5%
-Report & Artifact Saving           | 5s        | 2%
------------------------------------|-----------|------------
-Total                              | 326s      | 100%
-                                   | (5.4 min) |
-```
-
-**Breakdown by Model Type:**
-```
-Classical Track Only:
-├── Total time: ~85 seconds
-├── Models trained: 38 configurations
-└── Average per model: 2.2 seconds
-
-Transformer Track Only:
-├── Total time: ~220 seconds
-├── Epochs: 3
-└── Average per epoch: 73 seconds
-
-Combined Pipeline:
-├── Total time: ~326 seconds
-└── Transformer dominates: 67% of total time
-```
-
-### Inference Latency
-
-**Single Prediction Latency:**
-```
-Model              | p50    | p95    | p99    | Hardware
--------------------|--------|--------|--------|------------------
-Logistic Reg       | 1.8ms  | 2.4ms  | 3.1ms  | CPU (Intel i7)
-Linear SVM         | 2.1ms  | 2.9ms  | 4.2ms  | CPU (Intel i7)
-LightGBM           | 3.2ms  | 4.8ms  | 6.7ms  | CPU (Intel i7)
-DistilBERT         | 14ms   | 22ms   | 31ms   | GPU (RTX 3070 Ti)
-DistilBERT (CPU)   | 45ms   | 68ms   | 92ms   | CPU (Intel i7)
-ONNX Quantized     | 8ms    | 12ms   | 18ms   | CPU (Intel i7)
-```
-
-**Batch Inference Throughput:**
-```
-Batch Size | Classical | Transformer (GPU) | Transformer (CPU)
------------|-----------|-------------------|------------------
-1          | 550 rps   | 70 rps            | 22 rps
-8          | 1,200 rps | 180 rps           | 35 rps
-16         | 1,800 rps | 280 rps           | 48 rps
-32         | 2,200 rps | 420 rps           | 62 rps
-64         | 2,450 rps | 510 rps           | 71 rps
-128        | 2,580 rps | 580 rps           | 78 rps
-
-rps = requests per second
-```
-
-**API Serving Latency (End-to-End):**
-```
-Component                  | Latency
----------------------------|----------
-HTTP parsing               | 0.5ms
-Request validation         | 0.3ms
-Text preprocessing         | 1.2ms
-Feature extraction         | 2.1ms
-Model inference            | 2.1ms
-Calibration adjustment     | 0.4ms
-Gray-zone classification   | 0.2ms
-Explanation generation     | 3.8ms
-Response serialization     | 0.8ms
----------------------------|----------
-Total p50                  | 11.4ms
-Total p95                  | 18.7ms
-```
-
-The serving infrastructure achieves excellent latency even with explanation generation, supporting real-time fraud detection.
-
-### Model Size & Memory
-
-**Disk Storage:**
-```
-Artifact                            | Size    | Format
-------------------------------------|---------|------------------
-TF-IDF Vectorizer                   | 42 MB   | joblib pickle
-Tabular Scaler                      | 2 KB    | joblib pickle
-Logistic Regression Weights         | 8 MB    | joblib pickle
-Linear SVM Weights                  | 8 MB    | joblib pickle
-DistilBERT Checkpoint               | 268 MB  | PyTorch .bin
-DistilBERT Tokenizer                | 0.5 MB  | JSON + vocab
-ONNX Exported Model                 | 85 MB   | ONNX graph
-ONNX Quantized (INT8)               | 23 MB   | ONNX graph
-MLflow pyfunc Bundle                | 95 MB   | Directory
-```
-
-**Runtime Memory:**
-```
-Model              | Inference Memory | Training Memory
--------------------|------------------|------------------
-Logistic Reg       | 60 MB            | 120 MB
-Linear SVM         | 60 MB            | 150 MB
-LightGBM           | 85 MB            | 180 MB
-DistilBERT (CPU)   | 1.2 GB           | 2.8 GB
-DistilBERT (GPU)   | 0.8 GB GPU       | 4.2 GB GPU
-ONNX Quantized     | 380 MB           | N/A
-```
-
-### Accuracy vs Speed Tradeoff
-
-```
-Model              | Test F1 | Latency | Size   | Deployment
--------------------|---------|---------|--------|-------------
-Linear SVM         | 0.789   | 2.1ms   | 50MB   | CPU-only
-Logistic Reg       | 0.819   | 1.8ms   | 50MB   | CPU-only
-DistilBERT         | ~0.810  | 14ms    | 268MB  | GPU preferred
-ONNX Quantized     | ~0.805  | 8ms     | 23MB   | CPU-friendly
-
-Winner: Logistic Regression (best F1, fastest, smallest)
-```
-
----
-
-## Monitoring & Continuous Improvement
-
-### Real-Time Monitoring
-
-**MLflow Tracking:**
-Every training run is logged to MLflow with:
-```yaml
-Parameters:
-  - model_type
-  - hyperparameters
-  - config_hash
-  - random_seed
-
-Metrics:
-  - train_f1, val_f1, test_f1
-  - train_precision, val_precision, test_precision
-  - train_recall, val_recall, test_recall
-  - roc_auc, pr_auc
-  - brier_score, expected_calibration_error
-  - threshold
-  - train_time
-
-Artifacts:
-  - Model checkpoint
-  - Calibrated model
-  - ONNX export
-  - Confusion matrix
-  - PR curve
-  - Calibration curve
-  - Feature importance
-```
-
-**Run Comparison:**
-```bash
-mlflow ui --port 5000
-# Navigate to http://localhost:5000
-# Compare runs side-by-side
-# Visualize metric trends over time
-```
-
-**Optuna Study Tracking:**
-Optuna trials are persisted to SQLite by default (`sqlite:///optuna_study.db`) and can be resumed or inspected:
-```bash
-# Run hyperparameter tuning
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
-
-# Visualize optimization history
-import optuna.visualization as vis
-fig = vis.plot_optimization_history(study)
-fig.show()
-
-# Analyze parameter importance
-fig = vis.plot_param_importances(study)
-fig.show()
-```
-
-### Performance Degradation Detection
-
-**Slice-Based Monitoring:**
-The pipeline computes metrics for data slices to detect performance degradation in specific segments:
-
-```
-Monitored Slices:
-├── employment_type: Full-time, Contract, Part-time
-├── required_experience: Entry-level, Mid-Senior, Executive
-├── required_education: High School, Bachelor's, Master's
-├── industry: IT, Finance, Healthcare, Retail
-└── function: Engineering, Sales, Marketing, Support
-
-Example Alert Condition:
-IF F1(slice) < F1(overall) - 0.1:
-    ALERT "Model underperforming on {slice}"
-    TRIGGER human review of {slice} samples
-```
-
-**Current Weak Points:**
-```
-Slice: function=Information Technology
-├── F1: 0.40 (vs 0.82 overall)
-├── Precision: 1.00 (no false positives)
-├── Recall: 0.25 (many false negatives)
-└── Action: Collect more IT fraud examples
-
-Slice: function=Design
-├── F1: 0.00 (no fraud detected)
-├── Sample count: 62
-├── Fraud rate: 0%
-└── Action: Monitor, no immediate concern
-```
-
-### Human-in-the-Loop Feedback
-
-**Feedback Collection:**
-```python
-# Predictions in gray zone are sent to review queue
-if gray_zone_lower < probability < gray_zone_upper:
-    decision = "review"
-    send_to_review_queue(job_posting, probability)
-
-# Human reviewer provides feedback
-feedback = {
-    'request_id': prediction_id,
-    'reviewer_label': 'fraud' or 'legit' or 'unsure',
-    'rationale': 'Text explanation',
-    'notes': 'Additional context',
-    'timestamp': datetime.utcnow()
-}
-save_feedback(feedback)
-```
-
-**Feedback Integration:**
-```python
-# During next training run
-def apply_feedback_labels(df, target_column):
-    feedback_df = load_feedback_dataframe()
-    
-    # For each feedback entry
-    for _, row in feedback_df.iterrows():
-        if row['reviewer_label'] in ['fraud', 'legit']:
-            # Override model label with human label
-            mask = df['text_hash'] == row['text_hash']
-            df.loc[mask, target_column] = label_map[row['reviewer_label']]
-            df.loc[mask, '_feedback_applied'] = True
-    
-    return df
-
-# Apply before splitting
-df = apply_feedback_labels(df, 'fraudulent')
-```
-
-This closed-loop system ensures the model continuously improves based on real-world corrections.
-
-### Retraining Triggers
-
-**Scheduled Retraining:**
-```
-Frequency: Weekly (or when feedback accumulates)
-Trigger: 50+ new feedback entries OR 7 days elapsed
-Process:
-  1. Merge feedback with training data
-  2. Re-run full pipeline
-  3. Compare new model vs production model
-  4. Deploy if improvement > 2% F1
-```
-
-**Drift Detection:**
-```python
-# Monitor prediction distribution over time
-def detect_drift(recent_predictions, baseline_predictions):
-    ks_statistic, p_value = ks_2samp(recent_predictions, baseline_predictions)
-    
-    if p_value < 0.01:
-        alert("Significant distribution shift detected")
-        trigger_retraining()
-```
-
-### A/B Testing Strategy
-
-**Deployment Process:**
-```
-1. Train new model candidate
-2. Deploy alongside production model (shadow mode)
-3. Compare predictions on live traffic for 48 hours
-4. If new model improves F1 by 2% AND maintains calibration:
-   → Gradually shift traffic (10% → 50% → 100%)
-5. Monitor for 7 days before full rollout
-```
+Avoidance: keep changes small, validate on the held-out test set, and prefer interpretable improvements over marginal metric chasing.

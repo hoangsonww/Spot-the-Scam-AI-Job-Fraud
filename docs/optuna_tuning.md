@@ -1,208 +1,158 @@
 # Optuna Hyperparameter Tuning
 
-This document explains how to use Optuna for automated hyperparameter optimization in the Spot the Scam project.
+This document explains how Optuna tuning is integrated into this repository and how to use it without breaking reproducibility or serving parity.
 
-## Overview
+## Table of Contents
 
-Optuna is a hyperparameter optimization framework that uses Bayesian optimization (TPE sampler) to efficiently search the hyperparameter space. Unlike grid search, Optuna intelligently samples promising regions based on previous trial results.
+- [Scope of the Current Integration](#scope-of-the-current-integration)
+- [How to Run Tuning](#how-to-run-tuning)
+- [Command Line Interface](#command-line-interface)
+- [Hyperparameter Search Spaces](#hyperparameter-search-spaces)
+- [Recommended Workflow](#recommended-workflow)
+- [Study Storage and Visualization](#study-storage-and-visualization)
+- [Grid Search vs Optuna](#grid-search-vs-optuna)
+- [Best Practices](#best-practices)
+- [Known Limitations](#known-limitations)
+- [Troubleshooting](#troubleshooting)
+- [Related Documentation](#related-documentation)
 
-## Installation
+## Scope of the Current Integration
 
-Optuna is included in the project dependencies. If you need to install it separately:
+Optuna tuning is currently implemented for two classical models:
 
-```bash
-pip install optuna>=3.5.0
-```
+- Logistic Regression
+- Linear SVM
 
-## Usage
+Implementation locations:
 
-### Quick Start
+- Tuning logic: `src/spot_scam/tuning/optuna_tuner.py`
+- CLI wrapper: `scripts/tune_with_optuna.py`
 
-Run hyperparameter tuning for Logistic Regression:
+Transformer tuning is intentionally not automated here due to the much higher per-trial cost.
+
+## How to Run Tuning
+
+### Logistic Regression
 
 ```bash
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
 ```
 
-Run hyperparameter tuning for Linear SVM:
+### Linear SVM
 
 ```bash
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 20
 ```
 
-### Command Line Options
+## Command Line Interface
 
-- `--model-type`: Model to optimize (`logistic` or `svm`)
-- `--n-trials`: Number of optimization trials (default: 20)
-- `--config-path`: Path to configuration file (default: `configs/defaults.yaml`)
+The tuning script supports these options:
 
-### Example Output
+- `--model-type`: `logistic` or `svm`
+- `--n-trials`: number of Optuna trials
+- `-c` or `--config-name`: config filename to load (defaults to `defaults.yaml`)
 
-```
-[INFO] Starting Optuna optimization for Logistic Regression (20 trials)
-[I 2024-11-15 00:00:01] Trial 0 finished with value: 0.8234
-[I 2024-11-15 00:00:03] Trial 1 finished with value: 0.8156
-...
-[INFO] Optuna optimization complete. Best F1=0.8345 with params: {'C': 2.34, 'max_iter': 500}
+Example:
 
-============================================================
-OPTUNA OPTIMIZATION RESULTS
-============================================================
-Model: logistic
-Best F1: 0.8345
-Best params: {'C': 2.34, 'max_iter': 500}
-Trials: 20
-Time: 45.2s
-============================================================
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 30 -c defaults.yaml
 ```
 
 ## Hyperparameter Search Spaces
 
 ### Logistic Regression
 
-- **C**: Log-uniform distribution from 0.01 to 100.0 (regularization strength)
-- **max_iter**: Integer from 300 to 1000 in steps of 100 (maximum iterations)
+- `C`: log-uniform from 0.01 to 100.0
+- `max_iter`: integer from 300 to 1000 (step 100)
 
 ### Linear SVM
 
-- **C**: Log-uniform distribution from 0.01 to 100.0 (regularization strength)
-- **max_iter**: Integer from 1000 to 3000 in steps of 500 (maximum iterations)
+- `C`: log-uniform from 0.01 to 100.0
+- `max_iter`: integer from 1000 to 3000 (step 500)
 
-## Integration with Training Pipeline
+Both objectives optimize validation F1 using the same threshold optimization logic as the main pipeline.
 
-To use Optuna-optimized hyperparameters in your training pipeline:
+## Recommended Workflow
 
-1. Run Optuna tuning to find best hyperparameters
-2. Update `configs/defaults.yaml` with the discovered values
-3. Run the full training pipeline
+A safe and reproducible workflow:
 
-Example:
+1. Run a baseline training pass.
+2. Run Optuna tuning for the model you want to improve.
+3. Copy the best parameters into your config.
+4. Re-run the standard training pipeline.
+5. Confirm the winner and metrics in `artifacts/metadata.json`.
+
+Example flow:
 
 ```bash
-# Step 1: Find optimal hyperparameters
+# Baseline
+make train-fast
+
+# Tune
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 30
 
-# Step 2: Update configs/defaults.yaml with best params
-# (manually edit the file)
-
-# Step 3: Run full training
-make train
+# Retrain with pinned params
+make train-fast
 ```
 
-## Advanced Features
+## Study Storage and Visualization
 
-### Pruning
+Optuna studies are stored in a local SQLite DB by default:
 
-Optuna supports early stopping of unpromising trials. You can add pruning to speed up optimization:
+- `optuna_study.db`
 
-```python
-from optuna.pruners import MedianPruner
-
-study = optuna.create_study(
-    direction="maximize",
-    pruner=MedianPruner(n_startup_trials=5, n_warmup_steps=0),
-)
-```
-
-### Parallel Optimization
-
-Run multiple trials in parallel using multiple processes:
+Launch the dashboard:
 
 ```bash
-# Terminal 1
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 10
-
-# Terminal 2 (shares the same study)
-PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 10
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
 ```
 
-### Visualization
+You can run multiple tuning processes against the same study DB if needed.
 
-Optuna provides visualization tools. Install the dashboard:
+## Grid Search vs Optuna
 
-```bash
-pip install optuna-dashboard
-optuna-dashboard sqlite:///optuna_study.db
-```
-
-Or use built-in plotting:
-
-```python
-import optuna.visualization as vis
-
-fig = vis.plot_optimization_history(study)
-fig.show()
-
-fig = vis.plot_param_importances(study)
-fig.show()
-```
-
-## Comparison: Grid Search vs Optuna
+Both are useful in this repository, but they serve different goals.
 
 | Aspect | Grid Search | Optuna |
 |--------|-------------|--------|
-| **Search Strategy** | Exhaustive | Bayesian (intelligent) |
-| **Efficiency** | Low (tries all combinations) | High (focuses on promising regions) |
-| **Trials Needed** | C1 × C2 × ... × Cn | 10-50 typically sufficient |
-| **Best For** | Small search spaces | Large/continuous search spaces |
-| **Example** | 3 × 3 × 2 = 18 trials | 20 trials (adaptive) |
+| Search strategy | Exhaustive over fixed points | Bayesian over continuous spaces |
+| Runtime | Short and predictable | Longer but more flexible |
+| Best for | Fast baselines | Refinement and sensitivity exploration |
 
-### Example Comparison
-
-**Grid Search** (current implementation):
-- Logistic Regression: 3 C values = 3 trials
-- Linear SVM: 3 C values = 3 trials
-- Total: 6 trials, ~15 seconds
-
-**Optuna** (with this integration):
-- Logistic Regression: 20 trials exploring continuous space
-- Can discover intermediate values like C=2.34, max_iter=450
-- Total: 20 trials, ~45 seconds, potentially better results
-
-## When to Use Optuna
-
-**Use Optuna when:**
-- You want to explore continuous hyperparameter spaces
-- You have computational budget for 20+ trials
-- You want to discover non-obvious hyperparameter combinations
-- You're tuning complex models with many hyperparameters
-
-**Use Grid Search when:**
-- You have a small, discrete search space
-- You want deterministic, exhaustive results
-- You have very limited compute time (<1 minute)
-- You're doing quick experimentation
+Grid search remains the default inside the main training pipeline.
 
 ## Best Practices
 
-1. **Start with Grid Search:** Use the existing grid search to get baseline hyperparameters
-2. **Refine with Optuna:** Use Optuna to explore around the grid search winners
-3. **Validate Results:** Always validate Optuna's suggestions on the test set
-4. **Save Studies:** Keep Optuna study objects for later analysis and visualization
-5. **Monitor Progress:** Use `show_progress_bar=True` to track optimization
+- Use Optuna after you have a stable baseline.
+- Pin best parameters into config to keep runs reproducible.
+- Validate improvements on the held-out test split.
+- Track changes via `tracking/runs.csv` and `artifacts/metadata.json`.
 
-## Limitations
+## Known Limitations
 
-- **Transformer Tuning:** The current implementation has a placeholder for transformer optimization due to computational cost. Each trial would take 3-5 minutes.
-- **Overfitting Risk:** More trials can lead to overfitting on the validation set. Use cross-validation or a separate tuning set if concerned.
-- **Randomness:** Results may vary slightly between runs due to the stochastic nature of TPE sampling.
-
-## Further Reading
-
-- [Optuna Documentation](https://optuna.readthedocs.io/)
-- [TPE Sampler Paper](https://papers.nips.cc/paper/4443-algorithms-for-hyper-parameter-optimization)
-- [Hyperparameter Tuning Best Practices](https://arxiv.org/abs/1502.02127)
+- Transformer tuning is not automated here.
+- Optuna can still overfit to the validation split if you chase very small gains.
+- The best parameters for validation F1 may not be the best for your operational objective.
 
 ## Troubleshooting
 
-**Issue:** Optuna trials are very slow
-- **Solution:** Reduce `n_trials` or use faster models (grid search may be better)
+### Tuning is too slow
 
-**Issue:** All trials have similar performance
-- **Solution:** Expand the search space or the hyperparameters don't matter much for this dataset
+- Reduce `--n-trials`.
+- Use `--skip-transformer` in follow-up training runs.
 
-**Issue:** Best params differ significantly from grid search
-- **Solution:** This is expected! Optuna can discover better intermediate values
+### Results differ from grid search
 
-**Issue:** Results not reproducible
-- **Solution:** Set `random_seed` in config to ensure TPE sampler is deterministic
+- This is normal; Optuna explores intermediate values.
+
+### Results are not reproducible
+
+- Confirm the config seed is stable.
+- Re-run tuning with the same study DB.
+
+## Related Documentation
+
+- Quick start: [docs/optuna_quickstart.md](optuna_quickstart.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Pipeline narrative: [docs/pipeline_walkthrough.md](pipeline_walkthrough.md)
+- Setup and workflows: [INSTRUCTIONS.md](../INSTRUCTIONS.md)

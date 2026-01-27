@@ -3,7 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.121-009688?logo=fastapi&logoColor=white)
 ![Transformers](https://img.shields.io/badge/Transformers-4.57-FF6F61?logo=huggingface&logoColor=white)
-![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4-F7931E?logo=scikit-learn&logoColor=white)
+![scikit-learn](https://img.shields.io/badge/scikit--learn-1.7.2-F7931E?logo=scikit-learn&logoColor=white)
 ![Pandas](https://img.shields.io/badge/Pandas-2.2-150458?logo=pandas&logoColor=white)
 ![Google Generative AI](https://img.shields.io/badge/Google_Generative_AI-0.13-4285F4?logo=google&logoColor=white)
 ![NumPy](https://img.shields.io/badge/NumPy-1.26-013243?logo=numpy&logoColor=white)
@@ -22,73 +22,91 @@
 
 Spot the Scam delivers an uncertainty-aware job-posting fraud detector with calibrated probabilities, a gray-zone review policy, and an interactive dashboard for analysis.
 
-> [!NOTE]
-> Intelligent fraud triage for job postings - built for transparency and speed!
+## Table of Contents
 
-## Training Pipeline
+- [At a Glance](#at-a-glance)
+- [What Makes It Practical](#what-makes-it-practical)
+- [Training System Summary](#training-system-summary)
+- [Serving and Review Summary](#serving-and-review-summary)
+- [Explainability Summary](#explainability-summary)
+- [Packaging and Deployment Summary](#packaging-and-deployment-summary)
+- [Where to Go Next](#where-to-go-next)
 
-The training pipeline provides a reproducible, config-driven workflow that includes:
-- Automated data ingestion with stratified splitting
-- Feature engineering: TF-IDF vectorization + tabular features
-- Classical baselines (Logistic Regression, Linear SVM, etc.)
-- XGBoost hyperparameter sweeps
-- Weighted ensemble models
-- DistilBERT fine-tuning for advanced text classification
-- Strict artifact persistence
+## At a Glance
 
-All training runs are fully configurable and produce versioned artifacts for downstream deployment.
+This repository is full-stack and artifact-driven:
 
-## Hyperparameter Optimization
+- Offline training produces a clear artifact contract under `artifacts/`.
+- Online serving loads those artifacts through `FraudPredictor`.
+- The frontend consumes predictions, insights, and review workflows directly from the API.
 
-Optuna support that enables Bayesian hyperparameter tuning with:
-- Intelligent search strategies
-- Early stopping and pruning
-- Multi-objective optimization capabilities
+## What Makes It Practical
 
-## Uncertainty-Aware Predictions
+The design prioritizes operational reliability:
 
-- Validation-driven calibration using Platt scaling/isotonic regression
-- Predictions within an uncertainty range (gray-zone) are flagged for human review
-- Slice-based metrics to analyze performance across different data segments
-- Reliability plots to visualize calibration quality
+- Precision-first defaults so alerts are actionable.
+- Calibration and threshold optimization as first-class steps.
+- A gray-zone policy so ambiguous cases route to review.
+- Explanations attached to every prediction.
+- Tracking utilities that support auditability and feedback loops.
 
-## Human-in-the-Loop Review (HITL)
+## Training System Summary
 
-- Cases that the user submits are automatically added to the review queue. User can submit feedback via the API or frontend.
-- Feedback is persisted for retraining and calibration updates.
-- Subsequent pipeline runs can incorporate this feedback to refine model performance and decision thresholds, ensuring continuous improvement based on real-world inputs.
+The training pipeline (`src/spot_scam/pipeline/train.py`) provides a reproducible, config-driven workflow that includes:
 
-## Explainability
+- Automated data ingestion and normalization.
+- Stratified train/validation/test splits with persisted parquet snapshots.
+- TF-IDF plus engineered tabular features.
+- Classical baselines (Logistic Regression, Linear SVM, LightGBM).
+- XGBoost variant sweeps capped by configuration.
+- Optional DistilBERT fine-tuning.
+- Calibration, threshold optimization, and ensemble candidates.
+- Strict artifact persistence and report generation.
 
-Every prediction includes an **explanation** that helps reviewers understand the decision:
-- The FastAPI server surfaces the top supporting/opposing features (tokens and tabular signals) as well as the intercept
-- The Next.js dashboard renders these insights in the "Decision rationale" card
-- Classical models (logistic regression, etc.) export linear contributions directly
-- Transformer models surface gradient-derived token contributions (falling back to attention scores when gradients are unavailable, e.g. in quantized mode)
+Training runs emit artifacts and reports that the API and frontend read at runtime.
 
-## Model Packaging
+## Serving and Review Summary
 
-The training pipeline automatically packages models for production deployment:
-- Models are converted to **ONNX** format for efficient, cross-platform inference
-- An **MLflow pyfunc package** is created containing the vectorizer, scaler, ONNX graph, metadata, and decision policy
-- All artifacts are versioned and ready for serving
+The backend (`src/spot_scam/api/app.py`) exposes:
 
-This packaging approach ensures consistent, reproducible deployments across different environments.
+- Prediction endpoints (`/predict`, `/predict/single`).
+- Insights endpoints (`/insights/*`).
+- Review workflows (`/cases`, `/feedback`).
+- A streaming chat assistant (`/chat`, requires `GEMINI_API_KEY`).
 
-## Quantization
+Prediction logs and reviewer feedback are stored under `tracking/` as partitioned parquet files.
 
-Quantization is supported for classical models via `ONNXRuntime` optimizations:
-- Reduces model size and inference latency with minimal accuracy loss
-- Suitable for deployment scenarios with resource constraints
+## Explainability Summary
 
-> [!NOTE]
-> All reported benchmarks were produced on a workstation with an RTX 3070 Ti (8 GB) running CUDA-enabled PyTorch. Expect longer transformer fine-tuning times on smaller GPUs or CPU-only boxes.
+Every prediction includes an explanation payload:
 
-> [!IMPORTANT]
-> See [INSTRUCTIONS.md](INSTRUCTIONS.md) for setup and usage details. 
-> 
-> Visit [ARCHITECTURE.md](ARCHITECTURE.md) for system design and data flow diagrams. 
-> 
-> For training results and model diagnostics, refer to [RESULTS.md](RESULTS.md). 
-> 
-> To learn how to extend the model suite, check out [ADD_MODELS.md](ADD_MODELS.md).
+- Classical models compute signed contributions per feature.
+- Transformer models use gradient × input token attribution with an attention fallback.
+- The frontend renders both positive and negative signals plus a summary sentence.
+
+Interpretability artifacts are also generated under `experiments/tables/`.
+
+## Packaging and Deployment Summary
+
+The repository includes multiple packaging and deployment surfaces:
+
+- ONNX export and MLflow pyfunc packaging.
+- Docker and Docker Compose for local stacks.
+- Kubernetes progressive delivery scaffolding under `ops/k8s/`.
+- Load-testing and observability hooks under `ops/` and `scripts/`.
+
+Transformer quantization is supported via `spot_scam.pipeline.quantize`.
+
+## Where to Go Next
+
+For deeper detail, use this map:
+
+- Setup and operations: [INSTRUCTIONS.md](INSTRUCTIONS.md)
+- Architecture and data flow: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Training strategy and trade-offs: [TRAINING_ANALYSIS.md](TRAINING_ANALYSIS.md)
+- Metrics, plots, and diagnostics: [RESULTS.md](RESULTS.md)
+- Model extension guide: [ADD_MODELS.md](ADD_MODELS.md)
+- Deployment checklist: [docs/deployment_guide.md](docs/deployment_guide.md)
+- Pipeline narrative: [docs/pipeline_walkthrough.md](docs/pipeline_walkthrough.md)
+- Explainability details: [docs/explainability.md](docs/explainability.md)
+- Optuna usage: [docs/optuna_quickstart.md](docs/optuna_quickstart.md) and [docs/optuna_tuning.md](docs/optuna_tuning.md)
