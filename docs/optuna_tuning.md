@@ -152,7 +152,7 @@ Grid search remains the default inside the main training pipeline.
 
 ## Related Documentation
 
-- Quick start: `docs/optuna_quickstart.md`
-- Training strategy: `TRAINING_ANALYSIS.md`
-- Pipeline narrative: `docs/pipeline_walkthrough.md`
-- Setup and workflows: `INSTRUCTIONS.md`
+- Quick start: [docs/optuna_quickstart.md](optuna_quickstart.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Pipeline narrative: [docs/pipeline_walkthrough.md](pipeline_walkthrough.md)
+- Setup and workflows: [INSTRUCTIONS.md](../INSTRUCTIONS.md)

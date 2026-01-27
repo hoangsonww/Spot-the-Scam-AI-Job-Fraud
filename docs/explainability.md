@@ -120,8 +120,8 @@ curl -X POST http://localhost:8000/predict/single \
 
 ## Related Documentation
 
-- System design: `ARCHITECTURE.md`
-- Training strategy: `TRAINING_ANALYSIS.md`
-- Metrics and diagnostics: `RESULTS.md`
-- Pipeline narrative: `docs/pipeline_walkthrough.md`
-- Setup and operations: `INSTRUCTIONS.md`
+- System design: [ARCHITECTURE.md](../ARCHITECTURE.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Metrics and diagnostics: [RESULTS.md](../RESULTS.md)
+- Pipeline narrative: [docs/pipeline_walkthrough.md](pipeline_walkthrough.md)
+- Setup and operations: [INSTRUCTIONS.md](../INSTRUCTIONS.md)

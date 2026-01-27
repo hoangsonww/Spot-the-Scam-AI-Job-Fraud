@@ -113,6 +113,6 @@ Use Optuna when you want to:
 
 ## Related Documentation
 
-- Full tuning guide: `docs/optuna_tuning.md`
-- Training strategy: `TRAINING_ANALYSIS.md`
-- Setup and workflows: `INSTRUCTIONS.md`
+- Full tuning guide: [docs/optuna_tuning.md](optuna_tuning.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Setup and workflows: [INSTRUCTIONS.md](../INSTRUCTIONS.md)
