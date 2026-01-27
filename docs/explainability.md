@@ -1,65 +1,127 @@
 # Explainability in Spot the Scam
 
-This brief dives into how we generate and surface explanations for each prediction.
+This document explains how explanations are produced, where they come from in the code, and which artifacts support explainability and insights in the API and frontend.
 
-## 1. Classical models (Logistic Regression / Linear SVM - Support Vector Machine)
-- **Core idea:** multiply the standardized feature vector by the learned coefficients to get per-feature contributions.
-- **Implementation:** `spot_scam.inference.predictor.FraudPredictor._build_classical_explanations`.
-  - Extract TF-IDF activations for the posting.
-  - Extract tabular feature values (text length, digit count, scam term counts, etc.).
-  - Multiply by coefficient vector (includes intercept).
-  - Sort contributions descending → *top_positive*; ascending → *top_negative*.
-  - Summaries convert feature names to readable text:
-    ```
-    “Immediate start, data entry, and immediate pushed the score toward fraud; Quickbooks, experience, and preferred reinforced the legit decision.”
-    ```
-- **Output schema:** returned with every `/predict` response under `explanation`.
+## Table of Contents
 
-## 2. Transformer models (distilbert-base-uncased)
-- **Current behavior:** compute per-token contributions with a gradient × input attribution on the classification head. We build `inputs_embeds` manually, backprop the positive-class logit, and sum `(grad * embed)` across the hidden dimension to capture directional influence (positive ⇒ fraud leaning, negative ⇒ legit leaning). The UI now receives `top_positive` and `top_negative` tokens exactly like the classical stack.
-- **Fallback:** when gradients are unavailable (e.g., quantized INT8 mode) we fall back to centered CLS-attention scores so we can still highlight salient tokens, albeit without the signed magnitude guarantees of gradients.
+- [Design Goals](#design-goals)
+- [Classical Model Explanations](#classical-model-explanations)
+- [Transformer Model Explanations](#transformer-model-explanations)
+- [Explainability Artifacts and Insights Tables](#explainability-artifacts-and-insights-tables)
+- [How Explanations Flow Through the API](#how-explanations-flow-through-the-api)
+- [Frontend Rendering](#frontend-rendering)
+- [Validation and Practical Checks](#validation-and-practical-checks)
+- [Related Documentation](#related-documentation)
 
-## 3. Frontend display
-- `frontend/src/components/home-page.tsx` renders:
-  - Summary sentence.
-  - Two columns titled “Signals toward fraud” and “Signals toward legit” (list view of contributors).
-  - Intercept line (“Model intercept: -4.284”).
-- Styling ensures capitalized beginnings and sentence punctuation.
+## Design Goals
 
-## 4. Additional explainability artifacts
-- `experiments/tables/top_terms_positive.csv`, `top_terms_negative.csv`
-  - Derived from TF-IDF coefficients over validation set.
-- `experiments/tables/token_frequency_analysis.csv`
-  - Token frequency delta between predicted fraud vs legit posts.
-- `experiments/tables/slice_metrics.csv`
-  - Metrics per demographic/industry slice (for fairness audits).
-- `experiments/tables/shap_summary.csv`
-  - Only populated if LightGBM or other tabular-only models win; SHAP computed via `spot_scam.explainability.shapley`.
+Explanations in this project are designed to be:
 
-## 5. Usage in API / UI
-- FastAPI responses include explanation dictionaries:
-  ```json
-  {
-    "probability_fraud": 0.72,
-    "decision": "fraud",
-    "explanation": {
-      "top_positive": [...],
-      "top_negative": [...],
-      "intercept": -4.28,
-      "summary": "Immediate start...; Quickbooks..."
-    }
+- Directional: signals toward fraud vs signals toward legit.
+- Lightweight: fast enough to run on every prediction.
+- Consistent: the API and frontend share a common explanation schema.
+
+## Classical Model Explanations
+
+Classical explanations are built in `FraudPredictor._build_classical_explanations` in `src/spot_scam/inference/predictor.py`.
+
+Core idea:
+
+- Multiply activated feature values by linear coefficients to obtain per-feature contributions.
+- Rank positive contributions as fraud signals and negative contributions as legit signals.
+- Include the model intercept when available.
+
+Classical explanations require access to a linear base model (`coef_`). When coefficients are not available, the system returns a safe fallback summary.
+
+## Transformer Model Explanations
+
+Transformer explanations are built in `FraudPredictor._build_transformer_explanations`.
+
+Current approach:
+
+- Primary path: gradient × input token attribution on the positive-class logit.
+- Fallback path: centered CLS-attention scores when gradients are unavailable (for example, in quantized mode).
+
+The output mirrors the classical explanation schema so the frontend can render both uniformly.
+
+## Explainability Artifacts and Insights Tables
+
+The training pipeline generates explainability-related artifacts under `experiments/tables/`.
+
+Key tables:
+
+- Token coefficients:
+  - `experiments/tables/top_terms_positive.csv`
+  - `experiments/tables/top_terms_negative.csv`
+- Token frequency deltas:
+  - `experiments/tables/token_frequency_analysis.csv`
+- Slice performance summaries:
+  - `experiments/tables/slice_metrics.csv`
+- Threshold sweep points:
+  - `experiments/tables/threshold_metrics.csv`
+
+These power the insights endpoints and dashboard panels.
+
+## How Explanations Flow Through the API
+
+The explanation lifecycle is:
+
+1. Training creates artifacts and insight tables.
+2. `FraudPredictor.predict(...)` builds explanations per request.
+3. FastAPI returns the explanation under the `explanation` field.
+4. The frontend renders the explanation directly.
+
+Example shape:
+
+```json
+{
+  "probability_fraud": 0.72,
+  "decision": "fraud",
+  "explanation": {
+    "top_positive": [
+      { "feature": "wire transfer", "source": "token", "contribution": 0.42 }
+    ],
+    "top_negative": [
+      { "feature": "benefits", "source": "token", "contribution": -0.18 }
+    ],
+    "intercept": -0.12,
+    "summary": "Wire transfer pushed the score toward fraud."
   }
-  ```
-- Frontend uses that structure directly, so any API integration (internal tooling, moderation bots) can reuse the fields.
+}
+```
 
-## 6. Testing & Validation
-- Unit coverage is limited; rely on integration tests by scoring known samples.
-- To verify contributions manually:
-  1. Load `FraudPredictor` in REPL.
-  2. Run `.predict()` on a crafted posting.
-  3. Inspect `result["explanation"]`.
-- Future enhancement: add regression tests comparing explanation output to stored golden values for a curated set of posts.
+## Frontend Rendering
 
----
+The frontend consumes the explanation schema and renders:
 
-Refer back to `docs/pipeline_walkthrough.md` for how the explanations fit into the broader training and serving pipeline.
+- A summary sentence.
+- Signals toward fraud.
+- Signals toward legit.
+- An intercept line when provided.
+
+Frontend types and request helpers live in `frontend/src/lib/api.ts`.
+
+## Validation and Practical Checks
+
+There are limited unit tests specifically for explanations. Use these practical checks:
+
+- Run training and confirm insight tables are created in `experiments/tables/`.
+- Start the API and score known examples.
+- Inspect `explanation.top_positive` and `explanation.top_negative` in responses.
+
+Quick check:
+
+```bash
+PYTHONPATH=src uvicorn spot_scam.api.app:app --reload
+curl -X POST http://localhost:8000/predict/single \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Remote Data Entry","description":"...wire transfer..."}'
+```
+
+## Related Documentation
+
+- System design: `ARCHITECTURE.md`
+- Training strategy: `TRAINING_ANALYSIS.md`
+- Metrics and diagnostics: `RESULTS.md`
+- Pipeline narrative: `docs/pipeline_walkthrough.md`
+- Setup and operations: `INSTRUCTIONS.md`

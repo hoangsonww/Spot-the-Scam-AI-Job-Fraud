@@ -1,38 +1,75 @@
 # Deployment Guide
 
-This document provides a practical checklist for promoting Spot the Scam from local dev into staging/production.
+This document provides a practical checklist for promoting Spot the Scam from local development to staging or production. It is focused on what this repository already supports.
 
-## 1. Prerequisites
-- ✅ Python 3.12+ virtual environment
-- ✅ Node.js 18+ (Next.js dashboard)
-- ✅ Downloaded datasets (`scripts/download_data.py`)
-- ✅ GPU optional: install `onnxruntime-gpu==<matching version>` inside the virtualenv to avoid ORT CPU warnings.
-- ✅ MLflow tracking directory (`mlruns/`) or remote tracking server.
+## Table of Contents
 
-## 2. Build & Package
-1. **Install dependencies**
-   ```bash
-   source .venv/bin/activate
-   pip install -e '.[dev]'
-   npm --prefix frontend install
-   ```
-2. **Train models**
-   ```bash
-   PYTHONPATH=src python -m spot_scam.pipeline.train
-   ```
-   - Use `--skip-transformer` for quick iterations.
-   - Verify `artifacts/metadata.json` for final metrics.
-3. **Quantize transformer (optional)**
-   ```bash
-  PYTHONPATH=src python -m spot_scam.pipeline.quantize
-   ```
-4. **Inspect MLflow run**
-   ```bash
-   mlflow ui --backend-store-uri file:./mlruns
-   ```
+- [Deployment Prerequisites](#deployment-prerequisites)
+- [Build and Package Workflow](#build-and-package-workflow)
+- [Serving Options](#serving-options)
+- [Frontend Deployment Notes](#frontend-deployment-notes)
+- [Docker Compose Stack](#docker-compose-stack)
+- [Kubernetes Progressive Delivery](#kubernetes-progressive-delivery)
+- [Observability Checklist](#observability-checklist)
+- [Security and Privacy Considerations](#security-and-privacy-considerations)
+- [Production Promotion Checklist](#production-promotion-checklist)
+- [Rollback Strategy](#rollback-strategy)
+- [Related Documentation](#related-documentation)
 
-## 3. Serving Options
+## Deployment Prerequisites
+
+Recommended baseline:
+
+- Python 3.12+ virtual environment
+- Node.js 18+ for the frontend
+- Trained artifacts under `artifacts/`
+- A configured MLflow tracking directory or server
+- Optional GPU support for transformer workloads
+
+If the API fails on startup, the most common root cause is missing or stale artifacts. Re-run training to regenerate them.
+
+## Build and Package Workflow
+
+A standard “local to deployable” flow looks like this.
+
+### 1. Install dependencies
+
+```bash
+source .venv/bin/activate
+pip install -e '.[dev]'
+npm --prefix frontend install
+```
+
+### 2. Train models
+
+```bash
+PYTHONPATH=src python -m spot_scam.pipeline.train
+```
+
+For faster iterations:
+
+```bash
+PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
+```
+
+### 3. Quantize transformer (optional)
+
+```bash
+PYTHONPATH=src python -m spot_scam.pipeline.quantize
+```
+
+### 4. Inspect MLflow runs (optional but recommended)
+
+```bash
+mlflow ui --backend-store-uri file:./mlruns
+```
+
+## Serving Options
+
+The repository supports multiple serving paths. FastAPI is the most direct and is what the frontend expects.
+
 ### FastAPI (recommended)
+
 ```bash
 SPOT_SCAM_ALLOWED_ORIGINS="http://localhost:3000" \
 SPOT_SCAM_USE_QUANTIZED=0 \
@@ -40,73 +77,123 @@ PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### MLflow model server
+
 ```bash
 mlflow models serve --env-manager local -m runs:/<RUN_ID>/model -p 8080
 ```
+
 Notes:
-- `--env-manager local` ensures MLflow reuses the project virtualenv (prevents the `pyenv` error on hosts without pyenv).
-- The pyfunc model mirrors FastAPI logic (gray-zone, explanations, calibration).
 
-## 4. Frontend deployment
-1. Build optimized Next.js bundle:
-   ```bash
-   cd frontend
-   npm run build
-   npm run start  # or deploy via Vercel, Netlify, etc.
-   ```
-2. Set `NEXT_PUBLIC_API_BASE_URL` in `.env.production`.
-3. Container option: extend `Dockerfile` or create a separate Dockerfile for the frontend (SSR vs static export).
+- `--env-manager local` ensures MLflow reuses your current virtualenv.
+- The pyfunc model is designed to mirror core preprocessing and policy logic.
 
-## 5. Docker Compose (optional local stack)
-- Adjust `docker-compose.yml` to align with your environment.
-- Typical run:
-  ```bash
-  docker compose up --build
-  ```
-- Compose file includes API + frontend, mounts `configs/`, `data/`, `artifacts/`, `experiments/`, and `mlruns/`, and sets `MLFLOW_TRACKING_URI=file:///app/mlruns` so containerised jobs log to the shared volume. Update `SPOT_SCAM_ALLOWED_ORIGINS` in the compose file if you expose the API beyond the bundled frontend.
+## Frontend Deployment Notes
 
-## 6. Kubernetes progressive delivery (blue/green + canary)
-- Manifests live in `ops/k8s/` (base + overlays). Staging defaults to canary (`ops/k8s/overlays/staging-canary`), production defaults to blue/green (`ops/k8s/overlays/prod-bluegreen`).
-- Prereqs: Argo Rollouts CRD + CLI, NGINX Ingress, Prometheus for analysis templates, RWX storage class for PVCs, and cert-manager (for TLS secret `spot-scam-api-tls`).
-- Deploy:
-  ```bash
-  ./scripts/apply_k8s_overlay.sh ops/k8s/overlays/staging-canary spot-scam
-  # or production
-  ./scripts/apply_k8s_overlay.sh ops/k8s/overlays/prod-bluegreen spot-scam
-  ```
-- Promotion and health checks:
-  ```bash
-  argo-rollouts get rollout spot-scam-api -n spot-scam
-  argo-rollouts promote spot-scam-api -n spot-scam        # after preview validation
-  argo-rollouts terminate spot-scam-api -n spot-scam      # fast rollback
-  ```
-- Base resources include HPA (cpu+mem), PDB, NetworkPolicy, PVCs for artifacts/tracking/mlruns, ingress TLS, and Prometheus-based AnalysisTemplates for p95 latency + error budget.
-- Swap strategy by pointing the overlay to `rollout-canary.yaml` or `rollout-bluegreen.yaml` in `ops/k8s/base` and updating the image tag via `kustomize edit set image ghcr.io/your-org/spot-scam-api=<tag>`.
-- Optional smoke/load test before promotion: `API_BASE=https://staging-api.yourdomain ./scripts/loadtest_k6.sh` (uses `ops/observability/k6-smoke.js`).
+The frontend is a Next.js App Router app under `frontend/`.
 
-## 7. Observability Checklist
-- **Logging:** FastAPI uses standard logging; extend with structured logs (JSON) for production.
-- **Metrics:** expose `/metrics` (e.g., `prometheus-fastapi-instrumentator`) and scrape via ServiceMonitor (`ops/k8s/base/servicemonitor.yaml`). Alerts in `ops/k8s/base/prometheus-rules.yaml`.
-- **Tracing:** set `OTEL_EXPORTER_OTLP_ENDPOINT` to ship traces to your collector (already wired in ConfigMap).
-- **Alerts:** monitor F1 drop or distribution shift by comparing new predictions vs baseline token frequencies.
+### Build and run
 
-## 8. Security Considerations
-- Sanitize incoming JSON (FastAPI already enforces schema but consider additional checks).
-- Rate-limit `/predict` if exposed to public networks.
-- Store secrets (API keys, database connections) in environment variables or a secret manager.
+```bash
+cd frontend
+npm run build
+npm run start
+```
 
-## 9. Promoting to Production
-1. Run full training with transformer (time-intensive) and verify metrics.
-2. Review MLflow run; tag the best run as `Production`.
-3. Deploy FastAPI or MLflow server behind load balancer (ASGI app for Uvicorn/Gunicorn).
-4. Point Next.js app at the deployed API (update `.env`).
-5. Re-run sanity checks (score curated samples, run inference smoke tests).
+### Environment variable
 
-## 10. Rollback Plan
-- Keep previous model version in MLflow; revert by serving the earlier run ID.
-- Maintain last stable Docker image (tagged release).
-- If using feature flags, enable/disable new model features without redeploying code.
+Set the API base URL:
 
----
+- `NEXT_PUBLIC_API_BASE_URL`
 
-For a deeper look at data flow and modules, read `docs/pipeline_walkthrough.md` and `ARCHITECTURE.md`. For explanation specifics, see `docs/explainability.md`.
+For local deployments, `http://localhost:8000` is typical.
+
+## Docker Compose Stack
+
+`docker-compose.yml` provides a two-service local stack:
+
+```bash
+docker compose up --build
+```
+
+What it mounts and why:
+
+- `configs/` for config visibility
+- `artifacts/` for model persistence
+- `experiments/` for analysis outputs
+- `data/` as read-only input data
+- `mlruns/` for MLflow tracking
+
+Update `SPOT_SCAM_ALLOWED_ORIGINS` in the compose file if you expose the API beyond the bundled frontend.
+
+## Kubernetes Progressive Delivery
+
+Kubernetes scaffolding lives under `ops/k8s/` with base resources and overlays.
+
+- Staging overlay: `ops/k8s/overlays/staging-canary`
+- Production overlay: `ops/k8s/overlays/prod-bluegreen`
+
+Apply an overlay:
+
+```bash
+./scripts/apply_k8s_overlay.sh ops/k8s/overlays/staging-canary spot-scam
+```
+
+Promotion and health checks use Argo Rollouts commands such as:
+
+```bash
+argo-rollouts get rollout spot-scam-api -n spot-scam
+argo-rollouts promote spot-scam-api -n spot-scam
+argo-rollouts terminate spot-scam-api -n spot-scam
+```
+
+## Observability Checklist
+
+The repo includes several hooks, but production readiness still depends on your runtime environment.
+
+Recommended checks:
+
+- Logging is enabled and aggregated.
+- A metrics endpoint exists and is scraped.
+- Alerting rules match your SLOs.
+- Latency and error budgets are monitored during rollout.
+- Tracking data retention is intentional and documented.
+
+The `ops/` directory includes k6 scripts and monitoring scaffolding you can adapt.
+
+## Security and Privacy Considerations
+
+The system handles user-provided text. Treat it accordingly.
+
+- Avoid logging raw payloads in external systems unless necessary.
+- Keep secrets in environment variables or a secret manager.
+- Add rate limiting if the API is exposed publicly.
+- Review third-party API usage, especially for `/chat`.
+
+## Production Promotion Checklist
+
+A simple, reliable promotion workflow:
+
+1. Train and confirm metrics in `artifacts/metadata.json`.
+2. Inspect key plots under `experiments/figs/`.
+3. Run sanity checks via the UI or `curl`.
+4. Deploy API and frontend.
+5. Monitor latency, error rate, and review queue behavior.
+
+## Rollback Strategy
+
+Have a rollback plan before you need it.
+
+- Keep the previous artifact set and image tag available.
+- If using MLflow, retain prior run IDs.
+- Roll back by reverting to the prior artifact bundle or image tag.
+
+## Related Documentation
+
+- End-to-end setup: [INSTRUCTIONS.md](../INSTRUCTIONS.md)
+- MLOps lifecycle: [MLOPS.md](../MLOPS.md)
+- System design: [ARCHITECTURE.md](../ARCHITECTURE.md)
+- Training strategy: [TRAINING_ANALYSIS.md](../TRAINING_ANALYSIS.md)
+- Metrics and diagnostics: [RESULTS.md](../RESULTS.md)
+- Pipeline narrative: [docs/pipeline_walkthrough.md](pipeline_walkthrough.md)
+- Explainability details: [docs/explainability.md](explainability.md)
+- DevOps scaffolding: [docs/DEVOPS_READINESS.md](DEVOPS_READINESS.md)

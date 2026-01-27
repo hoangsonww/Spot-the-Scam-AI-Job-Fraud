@@ -1,93 +1,118 @@
 # Optuna Quick Start Guide
 
-## What is Optuna?
+This is the shortest path to running Optuna tuning in this repository. It is intentionally focused on what the included tuning script supports today.
 
-Optuna is an automatic hyperparameter optimization framework that uses Bayesian optimization to intelligently search for the best hyperparameters. Unlike grid search which tries all combinations, Optuna learns from previous trials to focus on promising regions of the search space.
+## Table of Contents
 
-## Installation
+- [What Optuna Is Doing Here](#what-optuna-is-doing-here)
+- [Prerequisites](#prerequisites)
+- [Run Tuning Commands](#run-tuning-commands)
+- [What Gets Optimized](#what-gets-optimized)
+- [How to Use the Results](#how-to-use-the-results)
+- [Optional: Visualize Studies](#optional-visualize-studies)
+- [When to Use Optuna vs Grid Search](#when-to-use-optuna-vs-grid-search)
+- [Related Documentation](#related-documentation)
 
-Already included in project dependencies:
+## What Optuna Is Doing Here
+
+Optuna is an automatic hyperparameter optimization framework that uses Bayesian optimization (TPE sampling) to explore continuous hyperparameter spaces more efficiently than grid search.
+
+In this repo, Optuna tuning is implemented in:
+
+- `src/spot_scam/tuning/optuna_tuner.py`
+- `scripts/tune_with_optuna.py`
+
+## Prerequisites
+
+Optuna is already included in the project dependencies.
+
+Install dependencies:
+
 ```bash
-pip install -e .
+pip install -e '.[dev]'
 ```
 
-## Basic Usage
+## Run Tuning Commands
 
-### 1. Tune Logistic Regression
+### Tune Logistic Regression
+
 ```bash
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20
 ```
 
-### 2. Tune Linear SVM
+### Tune Linear SVM
+
 ```bash
 PYTHONPATH=src python scripts/tune_with_optuna.py --model-type svm --n-trials 20
 ```
 
-## Example Output
+### Use a custom config name
 
-```
-[INFO] Starting Optuna optimization for Logistic Regression (20 trials)
-[I 2024-11-15] Trial 0: F1=0.8234 (C=1.23, max_iter=500)
-[I 2024-11-15] Trial 1: F1=0.8156 (C=0.45, max_iter=700)
-...
-[I 2024-11-15] Trial 19: F1=0.8345 (C=2.34, max_iter=400)
+The tuning script accepts a config filename via `-c` or `--config-name`:
 
-============================================================
-OPTUNA OPTIMIZATION RESULTS
-============================================================
-Model: logistic
-Best F1: 0.8345
-Best params: {'C': 2.34, 'max_iter': 400}
-Trials: 20
-Time: 45.2s
-============================================================
+```bash
+PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 30 -c defaults.yaml
 ```
 
-## What Gets Optimized?
+## What Gets Optimized
 
 ### Logistic Regression
-- `C`: Regularization strength (0.01 to 100.0, log scale)
-- `max_iter`: Maximum iterations (300 to 1000)
+
+- `C`: regularization strength (log scale from 0.01 to 100.0)
+- `max_iter`: maximum iterations (300 to 1000)
 
 ### Linear SVM
-- `C`: Regularization strength (0.01 to 100.0, log scale)
-- `max_iter`: Maximum iterations (1000 to 3000)
 
-## Why Use Optuna?
+- `C`: regularization strength (log scale from 0.01 to 100.0)
+- `max_iter`: maximum iterations (1000 to 3000)
 
-**Grid Search (current default):**
-- Tests fixed values: C = [0.1, 1.0, 10.0]
-- 3 trials only
-- Fast but limited
+## How to Use the Results
 
-**Optuna:**
-- Tests continuous range: C = 0.01 to 100.0
-- Can find optimal values like C=2.34 or C=0.78
-- 20+ trials, intelligently sampled
-- Takes longer but finds better hyperparameters
+A simple, reliable workflow:
 
-## Using Results
+1. Run Optuna tuning.
+2. Copy the best parameters from the logs.
+3. Update `configs/defaults.yaml` (or your custom config).
+4. Re-run training normally.
 
-After finding best hyperparameters:
+Example config update:
 
-1. Copy the best params from Optuna output
-2. Update `configs/defaults.yaml`:
-   ```yaml
-   models:
-     classical:
-       logistic_regression:
-         Cs: [2.34]  # Use Optuna's best value
-         max_iter: 400
-   ```
-3. Run full training: `make train`
+```yaml
+models:
+  classical:
+    logistic_regression:
+      Cs: [2.34]
+      max_iter: 400
+```
 
-## When to Use
+Then retrain:
 
-- **Use Optuna if:** You want to squeeze out extra 1-2% F1 performance
-- **Use Grid Search if:** You need quick results (<1 minute)
-- **Use Both:** Grid search for baseline, Optuna for refinement
+```bash
+make train-fast
+```
 
-## See Also
+## Optional: Visualize Studies
 
-- Full documentation: [docs/optuna_tuning.md](optuna_tuning.md)
-- Optuna website: https://optuna.org/
+Optuna studies are stored in `optuna_study.db` by default.
+
+Run the dashboard locally:
+
+```bash
+OMP_NUM_THREADS=1 optuna-dashboard sqlite:///optuna_study.db --server wsgiref --host 127.0.0.1 --port 8080
+```
+
+## When to Use Optuna vs Grid Search
+
+Grid search is already built into the training pipeline and is faster for quick iteration.
+
+Use Optuna when you want to:
+
+- Explore continuous spaces beyond fixed grid values.
+- Squeeze out additional performance after a baseline run.
+- Investigate sensitivity around a known good region.
+
+## Related Documentation
+
+- Full tuning guide: `docs/optuna_tuning.md`
+- Training strategy: `TRAINING_ANALYSIS.md`
+- Setup and workflows: `INSTRUCTIONS.md`

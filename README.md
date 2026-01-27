@@ -27,175 +27,135 @@
 ![Kaggle](https://img.shields.io/badge/Kaggle-20BEFF?logo=kaggle&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-2E2E2E)
 
-Spot the Scam is an uncertainty-aware fraud detector for job postings. It combines calibrated classical ML, optional transformer fine-tuning, and explainable outputs so reviewers can act fast and confidently.
+Spot the Scam is a full-stack, uncertainty-aware fraud detector for job postings. It combines calibrated classical ML, optional transformer fine-tuning, explainable outputs, and a human-in-the-loop review queue so teams can act fast with confidence.
 
 <p align="center">
   <img src="docs/images/ui.png" alt="Spot the Scam dashboard screenshot" width="100%"/>
 </p>
 
-## Why it matters
+## Table of Contents
 
-Job seekers nowadays face increasingly sophisticated scams. This project focuses on high-precision detection, calibrated confidence scores, and a human-in-the-loop workflow that keeps false alarms low while catching real threats.
+- [Executive Overview](#executive-overview)
+- [Design Goals and Principles](#design-goals-and-principles)
+- [Current Model Snapshot (Repo-Grounded)](#current-model-snapshot-repo-grounded)
+- [End-to-End System Flow](#end-to-end-system-flow)
+- [Quickstart](#quickstart)
+- [Common Workflows](#common-workflows)
+- [Data Sources, Fields, and Footprint](#data-sources-fields-and-footprint)
+- [Feature Engineering and Signals](#feature-engineering-and-signals)
+- [Model Stack, Calibration, and Decision Policy](#model-stack-calibration-and-decision-policy)
+- [Artifacts, Reports, and Tracking](#artifacts-reports-and-tracking)
+- [API Surface and Contracts](#api-surface-and-contracts)
+- [Frontend Experience (Next.js)](#frontend-experience-nextjs)
+- [AI Chat Assistant Routing](#ai-chat-assistant-routing)
+- [MLOps, Packaging, and Deployment Surfaces](#mlops-packaging-and-deployment-surfaces)
+- [Reproducibility and Experiment Hygiene](#reproducibility-and-experiment-hygiene)
+- [Repository Map](#repository-map)
+- [Documentation Map](#documentation-map)
+- [Limitations and Responsible Use](#limitations-and-responsible-use)
+- [FAQ](#faq)
+- [License and Citation](#license-and-citation)
 
-The system can be deployed by recruiting teams, trust and safety groups, fraud analysts, and educators to screen job postings on boards and marketplaces. An interactive dashboard supports scoring, review, and AI-assisted analysis with Google Generative AI.
+## Executive Overview
 
-## Design principles
+This repository is not just a model. It is a complete fraud-detection system with:
 
-The system prioritizes precision so that reviewers can act on alerts without drowning in false positives. It emphasizes calibration so probability thresholds can be trusted for triage. It also favors transparency, which is why every prediction includes interpretable feature contributions.
+- Offline training produces a clear artifact contract under `artifacts/`.
+- Online serving loads those artifacts through `FraudPredictor`.
+- A FastAPI service exposes predictions, insights, review queues, and chat.
+- A Next.js dashboard provides scoring, review, and AI-assisted analysis.
+- A review loop logs predictions, captures feedback, and supports retraining with overrides.
 
-Technically, the pipeline balances fast classical models with optional transformer fine-tuning for richer semantics. The architecture is modular and configuration-driven, making it easy to extend the model suite and adapt to new domains.
+## Design Goals and Principles
 
-## Use cases
+The architecture reflects operational realities of trust and safety workflows:
 
-- Teams can screen inbound postings on job boards or marketplaces.
-- Trust and safety groups can triage reports for recruiting and HR operations.
-- Analysts can run fraud research and benchmarking on job posting datasets.
-- Educators can use the dashboard as a demo-ready interface for stakeholders.
+- Precision-first defaults so alerts are actionable.
+- Calibration as a first-class requirement so probabilities are trustworthy.
+- A gray-zone policy so ambiguous cases route to review, not guesswork.
+- Explainability on every prediction so decisions are auditable.
+- Artifact-driven serving to avoid train/serve drift.
 
-## Core capabilities
+## Current Model Snapshot (Repo-Grounded)
 
-- **High-precision ensemble** combines TF-IDF text features with tabular signals.
-- **Calibration-first design** uses Platt or isotonic calibration for reliable scores.
-- **Classical and transformer options** include Logistic Regression, Linear SVM, XGBoost, LightGBM, and optional DistilBERT.
-- **Gray-zone policy** routes low-confidence cases to manual review.
-- **Explainability** provides token-level contributions for transparent decisions.
-- **Interactive dashboard** supports scoring, review, and AI-assisted analysis.
-- **Production-ready packaging** ships models via ONNX, MLflow, FastAPI, and Docker.
-- **Optuna tuning** enables Bayesian hyperparameter optimization.
-- **Human-in-the-loop feedback** captures reviewer labels for retraining.
+All values below are derived directly from the checked-in artifact set, especially `artifacts/metadata.json` and `artifacts/test_predictions.csv`.
 
-## Model stack and decision policy
+### Winner identity
 
-The default inference path uses calibrated classical models because they are fast, interpretable, and reliable on short-text job postings. The pipeline can also fine-tune DistilBERT for richer semantic signals when GPU resources are available. The best validation performer can be selected directly or blended into a weighted ensemble that improves stability.
+- Model: `ensemble_top3`
+- Model type: `classical`
+- Feature type: `tfidf+tabular`
+- Decision threshold: `0.5802`
+- Gray-zone width: `0.10`
+- Test calibration error (ECE): `0.0066`
 
-The decision policy combines a primary threshold with a gray-zone band. Scores that fall inside the band are routed to human review, which keeps precision high while still surfacing ambiguous cases for analyst attention.
+### Metrics summary
 
-## Results at a glance
+| Split | F1 | Precision | Recall | ROC-AUC | PR-AUC | Brier |
+|------|----:|----------:|-------:|--------:|-------:|------:|
+| Validation | 0.8561 | 0.9297 | 0.7933 | 0.9890 | 0.9053 | 0.0103 |
+| Test | 0.7721 | 0.8537 | 0.7047 | 0.9863 | 0.8659 | 0.0143 |
 
-| Metric    | Validation | Test  |
-|-----------|------------|-------|
-| F1        | 0.856      | 0.772 |
-| Precision | 0.930      | 0.854 |
-| ROC-AUC   | 0.989      | 0.986 |
-| Brier     | 0.010      | 0.014 |
+### Test confusion matrix at the selected threshold
 
-Calibration is strong (ECE: 0.0066), making confidence thresholds meaningful for triage.
-The project intentionally prioritizes precision to reduce false positives while still maintaining strong recall. Brier score and calibration metrics help validate that predicted probabilities can be used for operational decisions. You can adjust thresholds and gray-zone bands in configuration when your risk tolerance changes.
+Derived from `artifacts/test_predictions.csv` with the artifact threshold:
 
-## Live demo
+| | Pred Legit | Pred Fraud |
+|---|-----------:|-----------:|
+| True Legit | 3156 | 18 |
+| True Fraud | 44 | 105 |
 
-- The frontend demo is available at https://spot-the-scam-job-fraud.vercel.app/ and uses demo data and a demo model.
-- The demo video is available at https://drive.google.com/file/d/15RXs3h79aPqJ6X6BtHP0u3mTl1gkYqVE/view?usp=sharing.
+### Gray-zone behavior on the test split
 
-## System overview
+Using the current policy and artifacts:
 
-The training pipeline follows these steps:
-1. Ingest and preprocess Kaggle job posting data with stratified splits.
-2. Build TF-IDF and tabular features.
-3. Train calibrated classical models and optional DistilBERT.
-4. Select or ensemble best candidates, then persist artifacts and reports.
+- Test set size: 3,323
+- Decisions: 3,200 legit, 118 fraud, 5 review
+- Precision on fraud decisions (post gray-zone routing): 105/118 = 0.8898
 
-The serving pipeline follows these steps:
-1. FastAPI loads a cached `FraudPredictor` with vectorizers, models, and metadata.
-2. Requests are scored, calibrated, and passed through the gray-zone policy.
-3. Responses include labels, probabilities, and explainability outputs.
+For deeper results, see `RESULTS.md` and `experiments/report.md`.
 
-The AI assistant behaves as follows:
-- The `/chat` route delegates to Gemini when available and injects model context for detected job posts.
-- The dashboard streams responses via SSE and keeps recent context on the client.
-- The assistant can operate without prediction context, but responses are richer when scoring has occurred.
+## End-to-End System Flow
 
-The diagram below summarizes the training and serving flow.
+The system has two tightly coupled loops connected by a stable artifact contract.
 
 ```mermaid
 flowchart LR
-    A[Raw Kaggle CSVs] --> B[Preprocess + Split]
-    B --> C[TF-IDF + Tabular Features]
-    C --> D[Classical Models + Calibration]
-    C --> E[DistilBERT Fine-tune]
-    D --> F[Ensemble + Thresholds]
-    E --> F
-    F --> G[Artifacts + Reports]
-    G --> H[FastAPI FraudPredictor]
-    H --> I[Dashboard + API Clients]
+    A[Raw CSVs in data/] --> B[Ingest + Preprocess]
+    B --> C[Split + Persist]
+    C --> D[TF-IDF + Tabular Features]
+    D --> E[Classical Models + XGBoost Variants]
+    D --> F[DistilBERT Fine-tune]
+    E --> G[Calibration + Thresholding]
+    F --> G
+    G --> H[Ensembles + Selection]
+    H --> I[Artifacts + Reports + Benchmarks]
+    I --> J[FraudPredictor]
+    J --> K[FastAPI]
+    K --> L[Frontend + API Clients]
+    L --> M[Review Feedback]
+    M --> B
 ```
-
-## Explainability and decision rationale
-
-Every prediction includes a compact rationale that highlights the most influential tokens and signals. The API returns these contributions and the dashboard renders them in the decision rationale card. See `docs/explainability.md` for implementation details and examples.
-
-Explanations include both positive and negative drivers, plus an optional intercept and a natural-language summary. Token contributions are labeled with their source, so reviewers can see whether evidence came from the text or engineered tabular features.
-
-## Human-in-the-loop workflow
-
-Low-confidence predictions are routed to the gray zone and can be reviewed by a human analyst. Review feedback is stored for retraining runs, which allows the system to improve over time with real-world labels. The review UI in the dashboard is designed to make this workflow straightforward.
-
-The workflow includes the following steps.
-- The API logs predictions for review and persists them under `tracking/`.
-- Reviewers label cases as fraud, legit, or unsure and optionally add rationale.
-- The retraining pipeline can incorporate confirmed labels to refresh calibration and thresholds.
-
-## Evaluation and calibration
-
-The project tracks precision, F1, ROC-AUC, and Brier scores, and it uses reliability checks to validate calibration quality. Calibration options include Platt scaling and isotonic regression, and the results are summarized in `experiments/` after each run. This focus ensures that probability thresholds are meaningful for triage decisions.
-
-The evaluation suite also supports threshold sweeps and slice metrics, which help teams understand how performance varies across posting attributes. These analyses are useful when deploying to new domains or when monitoring for drift.
-
-## Data and training
-
-- The source dataset is the Kaggle job posting fraud collection (`fake_job_postings.csv`, `Fake_Real_Job_Posting.csv`).
-- Data files are included in `data/` for convenience, and you can re-download them with `./scripts/download_data.py` if needed.
-- Full training runs with `PYTHONPATH=src python -m spot_scam.pipeline.train`.
-- Classical-only training runs with `PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer`.
-- Hyperparameter tuning runs with `PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20`.
-
-The pipeline writes stratified splits to `data/processed/` for reproducibility, and it stores artifacts and reports under `artifacts/` and `experiments/`. This structure makes it easy to compare runs, inspect errors, and trace decisions back to their sources.
-
-## Feature engineering and signals
-
-Text fields are concatenated into a unified `text_all` representation and vectorized with TF-IDF for classical models. Tabular features capture lengths, counts, and binary flags such as telecommuting and company logo presence. The feature builder combines these signals into a single sparse matrix, and tabular features are scaled before model training.
-
-## Serving, review, and chat
-
-- The scoring endpoints `/predict/single` and `/predict` return calibrated scores and explanations.
-- The insights endpoints under `/insights/*` expose token importance and slice analytics for the dashboard.
-- The review workflow logs predictions for human review and feedback-driven retraining.
-- The `/chat` endpoint streams Gemini responses with model context and requires `GEMINI_API_KEY`.
-
-These endpoints power the dashboard experience, including the decision rationale card, review queue, and streaming assistant.
-
-The diagram below shows the request lifecycle for a single prediction.
-
-```mermaid
-sequenceDiagram
-    participant UI as Dashboard
-    participant API as FastAPI
-    participant Model as FraudPredictor
-    participant Store as Tracking Store
-
-    UI->>API: POST /predict/single
-    API->>Model: preprocess + vectorize
-    Model-->>API: probability + decision + explanation
-    API->>Store: log prediction + features
-    API-->>UI: PredictionResponse
-```
-
-## Frontend experience
-
-The Next.js dashboard surfaces three primary experiences: scoring, review, and chat. The score page is optimized for quick input and fast feedback, the review page supports case triage, and the chat page provides AI-assisted explanations that stream in real time. Styling is built with Tailwind and shadcn to keep the interface consistent and lightweight.
 
 ## Quickstart
 
-### Option A: Docker (fastest end-to-end)
+You have two fast paths depending on whether you prefer containers or local development.
+
+### Option A: Docker Compose (fastest end-to-end)
 
 ```bash
 docker compose build
 docker compose up -d
 ```
 
-FastAPI runs on `http://localhost:8000` and the dashboard on `http://localhost:3000`. If you do not have trained artifacts yet, follow the training step below or see `DOCKER.md`.
+- API: `http://localhost:8000`
+- Dashboard: `http://localhost:3000`
+
+If artifacts are missing, run training first (locally or in the container).
 
 ### Option B: Local development
+
+Backend setup:
 
 ```bash
 python3 -m venv .venv
@@ -203,19 +163,19 @@ source .venv/bin/activate
 pip install -e '.[dev]'
 ```
 
-Train a classical-only model for faster iterations with the command below.
+Train quickly (classical only):
 
 ```bash
 PYTHONPATH=src python -m spot_scam.pipeline.train --skip-transformer
 ```
 
-Run the API with the command below.
+Serve the API:
 
 ```bash
 PYTHONPATH=src uvicorn spot_scam.api.app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Run the frontend with the commands below.
+Run the frontend:
 
 ```bash
 cd frontend
@@ -223,12 +183,36 @@ npm install
 npm run dev
 ```
 
-For full setup details, environment variables, and GPU guidance, see `INSTRUCTIONS.md`.
-If you want the chat assistant, add `GEMINI_API_KEY` to `.env` before starting the API.
+## Common Workflows
 
-## API quick test
+The easiest way to navigate the repo is by workflow.
 
-The request below scores a single posting and returns the calibrated decision with explanations.
+### Workflow 1: Train and evaluate
+
+- Command: `make train` or `make train-fast`
+- Entrypoint: `src/spot_scam/pipeline/train.py`
+- Outputs: `artifacts/`, `experiments/`, `tracking/runs.csv`
+
+### Workflow 2: Serve and score
+
+- Command: `make serve`
+- Entrypoint: `src/spot_scam/api/app.py`
+- Runtime: `src/spot_scam/inference/predictor.py`
+
+### Workflow 3: Review and feedback
+
+- Command: `make serve-queue`
+- Review endpoints: `/cases` and `/feedback`
+- Storage: `tracking/predictions/` and `tracking/feedback/`
+- Retrain with overrides: `make retrain-with-feedback`
+
+### Workflow 4: Tune hyperparameters
+
+- Command: `PYTHONPATH=src python scripts/tune_with_optuna.py --model-type logistic --n-trials 20`
+- Tuner: `src/spot_scam/tuning/optuna_tuner.py`
+- Study DB: `optuna_study.db`
+
+### Minimal API smoke test
 
 ```bash
 curl -X POST http://localhost:8000/predict/single \
@@ -240,146 +224,362 @@ curl -X POST http://localhost:8000/predict/single \
       }'
 ```
 
-## Example prediction response
+## Data Sources, Fields, and Footprint
 
-The response schema is defined in `src/spot_scam/api/schemas.py`, and the example below is an abridged response for a single posting.
+### Data sources
 
-```json
-{
-  "request_id": "req_8f3d2c1a",
-  "probability_fraud": 0.91,
-  "binary_label": 1,
-  "decision": "fraud",
-  "threshold": 0.5,
-  "gray_zone": {
-    "width": 0.1,
-    "lower": 0.45,
-    "upper": 0.55,
-    "positive_label": "fraud",
-    "negative_label": "legit",
-    "review_label": "review"
-  },
-  "meta": {
-    "model_type": "classical",
-    "model_name": "linear_svm"
-  },
-  "explanation": {
-    "top_positive": [
-      { "feature": "wire transfer", "source": "token", "contribution": 0.42 }
-    ],
-    "top_negative": [
-      { "feature": "benefits", "source": "token", "contribution": -0.18 }
-    ],
-    "intercept": -0.12,
-    "summary": "Wire transfer pushed the score toward fraud."
-  }
-}
+The pipeline merges two Kaggle-derived datasets included in `data/`:
+
+- `data/fake_job_postings.csv`
+- `data/Fake_Real_Job_Posting.csv`
+
+### Observed class balance (raw)
+
+From the primary raw CSV (`data/fake_job_postings.csv`):
+
+- Rows: 17,880
+- Fraudulent rows: 866
+- Fraud rate: 4.84%
+
+### Fields used in modeling
+
+Key text fields (concatenated into `text_all`):
+
+- `title`
+- `company_profile`
+- `description`
+- `requirements`
+- `benefits`
+
+Key structured fields used for signals and missingness flags include:
+
+- `telecommuting`, `has_company_logo`, `has_questions`
+- `employment_type`, `required_experience`, `required_education`, `industry`, `function`
+
+### Split persistence for reproducibility
+
+Training persists both indices and full snapshots:
+
+- Indices: `data/processed/split_indices.npz`
+- Snapshots: `data/processed/train.parquet`, `val.parquet`, `test.parquet`
+
+## Feature Engineering and Signals
+
+Feature engineering is deliberately simple, auditable, and effective for this domain.
+
+### Text features (TF-IDF)
+
+- Vectorizer: `sklearn.feature_extraction.text.TfidfVectorizer`
+- Defaults (from `configs/defaults.yaml`):
+  - N-grams: 1-2
+  - `min_df`: 3
+  - `max_df`: 0.9
+  - Sublinear TF: enabled
+  - Max vocabulary size: 100,000
+
+### Tabular features (engineered signals)
+
+`src/spot_scam/features/tabular.py` creates signals such as:
+
+- Text length, uppercase ratio, digit count
+- Currency, exclamation, question, and URL counts
+- Scam-term counters (10 configured terms by default)
+- Binary metadata flags
+- Missingness flags on key categorical fields
+
+With defaults enabled, the tabular block contains 25 features.
+
+### Feature bundle contract
+
+`src/spot_scam/features/builders.py` returns a `FeatureBundle` that includes:
+
+- TF-IDF matrices for train/val/test
+- Tabular matrices for train/val/test
+- A fitted `StandardScaler`
+- A stable feature-name list used for inference-time validation
+
+## Model Stack, Calibration, and Decision Policy
+
+The training pipeline evaluates multiple model families under a shared decision framework.
+
+### Training pipeline (candidate generation to selection)
+
+```mermaid
+flowchart TD
+    A[Feature Bundle] --> B[Classical Candidates]
+    A --> C[XGBoost Variants]
+    A --> D[Transformer Candidate]
+    B --> E[Calibration + Thresholding]
+    C --> E
+    D --> E
+    E --> F[Ensemble Candidates]
+    F --> G[Best Validation F1]
+    G --> H[Artifacts + Reports]
 ```
 
-## Configuration
+### Classical candidates
 
-- Backend environment variables live in `.env`, and `INSTRUCTIONS.md` provides a template.
-- Frontend environment variables live in `frontend/.env.local`.
-- YAML config defaults live in `configs/defaults.yaml`, and you can override them as needed.
-- Key environment variables include `GEMINI_API_KEY`, `SPOT_SCAM_ALLOWED_ORIGINS`, and `SPOT_SCAM_USE_QUANTIZED`.
+Implemented in `src/spot_scam/models/classical.py`:
 
-## Input schema
+- Logistic Regression (L2)
+- Logistic Regression (L1, optional)
+- Linear SVM
+- LightGBM (tabular-only)
 
-The API accepts a structured job posting payload defined in `src/spot_scam/api/schemas.py`. The `title` field is required, and optional fields include `location`, `department`, `salary_range`, `company_profile`, `description`, `requirements`, `benefits`, `employment_type`, `required_experience`, `required_education`, `industry`, and `function`. Boolean-style flags such as `telecommuting`, `has_company_logo`, and `has_questions` help capture quick heuristics about posting quality.
+### XGBoost variants
 
-## Common make targets
+Implemented in `src/spot_scam/models/xgboost_model.py` and orchestrated in `pipeline/train.py`:
 
-The Makefile provides convenient entry points for common tasks. You can use `make train` for full training, `make train-fast` for classical-only training, `make serve` for the API, and `make frontend` for the dashboard. The same Makefile includes quality checks such as `make test`, `make check-all`, and `make frontend-check`.
+- Generates a large candidate grid but caps variants (default cap: 12)
+- Persists per-variant artifacts under `artifacts/xgboost_variants/`
+- Persists the best XGBoost artifact under `artifacts/xgboost/`
 
-## Artifacts and outputs
+### Transformer candidate (optional)
 
-| Location | Contents |
-|----------|----------|
-| `artifacts/model.joblib` | This file stores the calibrated estimator used for inference. |
-| `artifacts/metadata.json` | This file stores metrics, thresholds, and the gray-zone policy. |
-| `artifacts/features/` | This folder stores the TF-IDF vectorizer, scaler, and feature names. |
-| `artifacts/transformer/` | This folder stores DistilBERT checkpoints when transformer training runs. |
-| `experiments/` | This folder stores reports, figures, and evaluation tables. |
-| `data/processed/` | This folder stores persisted train, validation, and test splits. |
+Implemented in `src/spot_scam/models/transformer.py`:
 
-## Reproducibility and versioning
+- Base: `distilbert-base-uncased`
+- Max length: 128 tokens
+- Epochs: 3 (with early stopping support)
+- FP16: enabled where supported (disabled on macOS)
 
-The pipeline persists dataset splits, configurations, and training artifacts so that runs can be reproduced and compared. This structure makes it easier to track performance changes across experiments, and it supports auditing when you need to explain why a decision was made.
+### Calibration
 
-For instructions on running and reproducing experiments, see [INSTRUCTIONS.md](INSTRUCTIONS.md) and [TRAINING_ANALYSIS.md](TRAINING_ANALYSIS.md).
+Implemented in `src/spot_scam/evaluation/calibration.py`:
 
-## Extending the model suite
+- Platt scaling (`sigmoid`)
+- Isotonic regression
 
-The pipeline is configuration-driven, which makes it straightforward to introduce new models and feature variations. `ADD_MODELS.md` walks through the steps to register a model, log metrics, and export artifacts. This approach keeps experimental changes consistent with the existing evaluation and reporting pipeline.
+Calibration is selected on validation performance (Brier score and ECE).
 
-## MLOps and deployment
+### Thresholding and gray-zone policy
 
-- **Docker Compose** runs FastAPI and Next.js together for local deployment.
-- **ONNX exports** enable portable inference for classical and transformer models.
-- **MLflow pyfunc packaging** bundles preprocessing and gray-zone logic for serving parity.
-- **Quantization** is supported for faster transformer inference on CPU.
+Implemented in:
 
-See `DOCKER.md` and `docs/deployment_guide.md` for production-oriented deployment guidance.
-The frontend is compatible with Vercel and standard Node hosting environments, and the API can run as a containerized service behind a reverse proxy. The MLflow export path is useful when you want to serve the model without the full FastAPI application.
+- Threshold search: `src/spot_scam/evaluation/metrics.py`
+- Policy routing: `src/spot_scam/policy/gray_zone.py`
 
-## Observability and tracking
+Thresholds are optimized on validation data. The gray-zone policy then routes ambiguous probabilities to `review`.
 
-The training pipeline records metrics, artifacts, and plots in `experiments/`, and it can publish models to MLflow for registry and serving parity. The API logs prediction events for review workflows, and these records can be used to audit decisions and retrain on confirmed labels.
+### Ensembles and selection
 
-## Testing and quality
+The pipeline can build:
 
-- Python checks run with `make test` and `make check-all`.
-- Frontend checks run with `make frontend-check`.
-- Formatting and linting run with `make format`, `make lint`, `make frontend-format`, and `make frontend-lint`.
+- `ensemble_top3` (uniform mean over top classical models)
+- `ensemble_weighted_top3` (coarse weight search when helpful)
 
-Run the checks locally before opening a pull request to keep the repository consistent.
+The winner is the candidate with the best validation F1.
 
-## Security and privacy notes
+## Artifacts, Reports, and Tracking
 
-Job postings can include sensitive personal and corporate information. You should review data handling practices before deploying and avoid logging raw user-submitted content without a clear retention policy. If you plan to use the chat assistant, ensure that your use of third-party APIs complies with your data governance requirements.
-Avoid sending sensitive data to external services unless you have explicit approval and a documented retention policy.
+The repo is designed around a stable artifact contract.
 
-## Limitations and considerations
+### Artifact contract (train to serve)
 
-The current models are trained on a public Kaggle dataset, so real-world distributions may drift over time. Performance can vary across regions, industries, and posting formats, so calibration should be revisited when deploying to new domains. Transformer training and inference require significantly more resources than classical models, which can impact iteration speed.
+```mermaid
+flowchart LR
+    A[pipeline.train] --> B[artifacts/model.joblib]
+    A --> C[artifacts/metadata.json]
+    A --> D[artifacts/config_used.yaml]
+    A --> E[artifacts/features/*]
+    C --> F[FraudPredictor]
+    D --> F
+    B --> F
+    E --> F
+    F --> G[FastAPI Responses]
+```
+
+### Artifacts that power serving
+
+| Location | Purpose |
+|------|------|
+| `artifacts/metadata.json` | Model identity, metrics, thresholds, policy, extra metadata |
+| `artifacts/config_used.yaml` | Frozen preprocessing and training configuration |
+| `artifacts/model.joblib` | Calibrated runtime model |
+| `artifacts/base_model.joblib` | Uncalibrated base model (when available) |
+| `artifacts/features/*` | TF-IDF vectorizer, scaler, and feature names |
+| `artifacts/test_predictions.csv` | Held-out predictions with decisions |
+
+`FraudPredictor` will refuse to serve if feature dimensions do not align with the bundled artifacts.
+
+### Experiment outputs
+
+The training pipeline writes diagnostics under `experiments/`:
+
+- Figures: `experiments/figs/*`
+- Tables: `experiments/tables/*`
+- Summary: `experiments/report.md`
+
+### Tracking outputs
+
+The system logs operational metadata under `tracking/`:
+
+- Model runs: `tracking/runs.csv`
+- Predictions: `tracking/predictions/date=*/part-*.parquet`
+- Feedback: `tracking/feedback/date=*/part-*.parquet`
+
+## API Surface and Contracts
+
+The backend is a single FastAPI service (`src/spot_scam/api/app.py`) with typed contracts defined in `src/spot_scam/api/schemas.py`.
+
+### Prediction request lifecycle
+
+```mermaid
+sequenceDiagram
+    participant UI as Frontend or Client
+    participant API as FastAPI
+    participant Model as FraudPredictor
+    participant Track as Tracking Store
+
+    UI->>API: POST /predict/single
+    API->>Model: preprocess + features + score
+    Model-->>API: probability + decision + explanation
+    API->>Track: log_predictions(...)
+    API-->>UI: PredictionResponse (with request_id)
+```
+
+### Core endpoints
+
+| Endpoint | Purpose |
+|------|------|
+| `GET /health` | Liveness and basic model info |
+| `GET /metadata` | Model metrics, thresholds, and policy |
+| `GET /models` | Recent model candidates from tracking |
+| `POST /predict` | Batch scoring |
+| `POST /predict/single` | Single scoring |
+| `GET /insights/token-importance` | Token coefficient insights |
+| `GET /insights/token-frequency` | Token frequency deltas |
+| `GET /insights/threshold-metrics` | Validation threshold sweep |
+| `GET /insights/latency` | Latency summaries from benchmarks |
+| `GET /insights/slice-metrics` | Slice-level performance summaries |
+| `GET /cases` | Review queue sampling |
+| `POST /feedback` | Reviewer feedback ingestion |
+| `POST /chat` | Streaming AI assistant with optional auto-scoring |
+
+### Prediction response design
+
+Every prediction includes:
+
+- A calibrated probability
+- A binary label at the selected threshold
+- A gray-zone-aware decision
+- Model metadata
+- A structured explanation payload
+
+## Frontend Experience (Next.js)
+
+The frontend lives under `frontend/` and is built with Next.js App Router, Tailwind CSS, and shadcn/ui components.
+
+### Key pages
+
+- `/`: scoring and decision rationale
+- `/review`: triage queue and reviewer feedback
+- `/chat`: AI-assisted analysis (streaming)
+
+### Offline-friendly behavior
+
+When the backend is unreachable, the frontend can fall back to demo/mock data so the UI remains explorable.
+
+## AI Chat Assistant Routing
+
+The `/chat` endpoint blends LLM routing with the trained fraud model.
+
+High-level behavior:
+
+- A lightweight LLM classifier first checks whether the message looks like a job posting.
+- If it looks like a job post and no explicit prediction context is supplied, the backend auto-runs the fraud predictor.
+- The assistant prompt is then assembled with classification results, fraud signals, and any provided job context.
+- Responses stream back to the frontend via Server-Sent Events (SSE).
+
+## MLOps, Packaging, and Deployment Surfaces
+
+The repo includes multiple deployment and packaging pathways. For the full operational lifecycle, see [MLOPS.md](MLOPS.md).
+
+### Packaging surfaces
+
+- ONNX export for classical and transformer variants
+- MLflow pyfunc packaging that preserves preprocessing and gray-zone policy logic
+- Transformer quantization via `spot_scam.pipeline.quantize`
+
+### Deployment scaffolding
+
+- Docker and Docker Compose for local stacks
+- Kubernetes manifests under `ops/k8s/`
+- CI/CD scaffolding under `ops/ci/`
+- Load testing hooks under `ops/observability/` and `scripts/`
+
+## Reproducibility and Experiment Hygiene
+
+The repository includes several mechanisms to reduce train/serve drift and improve auditability.
+
+- Config snapshots: `artifacts/config_used.yaml`
+- Config hashing: `config.loader.config_hash(...)`
+- Persisted splits: `data/processed/*.parquet`
+- Run logs: `tracking/runs.csv`
+- Artifact compatibility checks: `FraudPredictor._validate_classical_artifacts`
+
+## Repository Map
+
+Top-level layout:
+
+| Path | Purpose |
+|------|---------|
+| `src/spot_scam/` | Core ML pipeline, inference runtime, API, tracking, and export logic |
+| `configs/` | YAML defaults and overrides |
+| `data/` | Raw CSVs and persisted processed splits |
+| `artifacts/` | Trained models, vectorizers, metadata, and exports |
+| `experiments/` | Figures, tables, and reports from training runs |
+| `tracking/` | Prediction logs, feedback, and run history |
+| `scripts/` | Helper CLIs for data, training, tuning, and sampling |
+| `frontend/` | Next.js dashboard |
+| `docs/` | Deep-dive documentation and guides |
+| `ops/` | Deployment, CI/CD, and observability assets |
+
+## Documentation Map
+
+Start here, then dive deeper as needed:
+
+- [INSTRUCTIONS.md](INSTRUCTIONS.md): end-to-end setup, training, serving, and ops workflows
+- [MLOPS.md](MLOPS.md): end-to-end MLOps lifecycle, artifact contract, and operations guide
+- [RESULTS.md](RESULTS.md): curated results, diagnostics, and artifact guide
+- [ARCHITECTURE.md](ARCHITECTURE.md): module-level system design and data flow
+- [TRAINING_ANALYSIS.md](TRAINING_ANALYSIS.md): training strategy, model selection logic, and trade-offs
+- [docs/pipeline_walkthrough.md](docs/pipeline_walkthrough.md): step-by-step pipeline narrative
+- [docs/explainability.md](docs/explainability.md): interpretability design and outputs
+- [docs/deployment_guide.md](docs/deployment_guide.md): deployment checklist and serving options
+- [docs/optuna_quickstart.md](docs/optuna_quickstart.md) and [docs/optuna_tuning.md](docs/optuna_tuning.md): Optuna guides
+- [docs/DEVOPS_READINESS.md](docs/DEVOPS_READINESS.md): DevOps scaffolding overview
+- [DOCKER.md](DOCKER.md): container-focused setup details
+- [ADD_MODELS.md](ADD_MODELS.md): how to add new models cleanly
+
+## Limitations and Responsible Use
+
+This system is trained on public data and should be treated as a decision support tool, not a final authority.
+
+- Real-world distributions can drift.
+- Performance can vary by region, industry, and posting style.
+- Chat assistant behavior depends on third-party LLMs.
+- You should review privacy and retention policies before logging user-submitted content.
 
 ## FAQ
 
-- **Do I need a Gemini API key?** You can run the system without Gemini, but the `/chat` endpoint will be unavailable without `GEMINI_API_KEY`.
-- **Do I need a GPU?** You can train and serve models without a GPU, although transformer fine-tuning will take significantly longer.
-- **Does the demo run the full model?** The hosted demo uses demo data and a demo model rather than the full trained artifacts.
-- **Can I skip transformers entirely?** You can run classical-only training with the `--skip-transformer` flag when you want faster iteration.
+### Do I need a Gemini API key?
 
-## Repository map
+No for scoring, yes for `/chat`. The chat endpoint requires `GEMINI_API_KEY` in `.env`.
 
-| Path | Description |
-|------|-------------|
-| `src/spot_scam/` | This directory holds the core pipeline for ingest, features, models, evaluation, inference, and the API. |
-| `configs/` | This directory stores YAML configuration defaults and overrides. |
-| `scripts/` | This directory provides CLI helpers for training, tuning, and utilities. |
-| `artifacts/` | This directory stores trained models, vectorizers, metadata, and ONNX exports. |
-| `experiments/` | This directory stores metrics, plots, and reports. |
-| `frontend/` | This directory contains the Next.js and Tailwind dashboard. |
-| `docs/` | This directory contains deep-dive documentation, deployment guidance, and explainability notes. |
+### Do I need a GPU?
 
-## Documentation map
+No for classical models. A GPU helps for transformer fine-tuning and inference.
 
-- `INFO.md` provides a project overview and feature summary. See [INFO.md](INFO.md).
-- `ARCHITECTURE.md` documents the system design and data flow. See [ARCHITECTURE.md](ARCHITECTURE.md).
-- `INSTRUCTIONS.md` provides full setup, training, and operations guidance. See [INSTRUCTIONS.md](INSTRUCTIONS.md).
-  - `RESULTS.md` captures metrics and visualizations. See [RESULTS.md](RESULTS.md).
-- `TRAINING_ANALYSIS.md` explains the training pipeline analysis. See [TRAINING_ANALYSIS.md](TRAINING_ANALYSIS.md).
-- `ADD_MODELS.md` shows how to add new models. See [ADD_MODELS.md](ADD_MODELS.md).
-- `DOCKER.md` documents containerized deployment details. See [DOCKER.md](DOCKER.md).
-- `docs/explainability.md` describes the interpretability approach. See [docs/explainability.md](docs/explainability.md).
-- `docs/pipeline_walkthrough.md` provides an end-to-end pipeline walkthrough. See [docs/pipeline_walkthrough.md](docs/pipeline_walkthrough.md).
-- `docs/optuna_quickstart.md` and `docs/optuna_tuning.md` explain hyperparameter tuning. See [docs/optuna_quickstart.md](docs/optuna_quickstart.md) and [docs/optuna_tuning.md](docs/optuna_tuning.md).
-- `docs/deployment_guide.md` covers deployment guidance. See [docs/deployment_guide.md](docs/deployment_guide.md).
+### Why is there a gray zone?
 
-## Citing
+It is a deliberate product decision. Ambiguous cases should route to review instead of being forced into a hard label.
 
-If you use this project in research, cite it via `CITATION.cff`. The file is in the repository root.
+### Can I skip transformers entirely?
 
-## License
+Yes. Use `--skip-transformer` or `make train-fast` for fast iteration.
 
-This project is licensed under the MIT License. See `LICENSE` for details.
+## License and Citation
+
+- License: MIT License ([LICENSE](LICENSE))
+- Citation: [CITATION.cff](CITATION.cff)
