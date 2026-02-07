@@ -24,6 +24,7 @@
   --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
   --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1);
   --shadow-glow: 0 0 20px rgba(37, 99, 235, 0.3);
+  --navbar-height: 80px;
 }
 
 /* Reset & Base */
@@ -251,7 +252,9 @@ body {
 
 /* Hero Section */
 .hero {
-  min-height: 70vh;
+  min-height: calc(100vh - var(--navbar-height));
+  min-height: calc(100svh - var(--navbar-height));
+  min-height: calc(100dvh - var(--navbar-height));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -825,7 +828,9 @@ footer {
 
 @media (max-width: 768px) {
   .hero {
-    min-height: 60vh;
+    min-height: calc(100vh - var(--navbar-height));
+    min-height: calc(100svh - var(--navbar-height));
+    min-height: calc(100dvh - var(--navbar-height));
     padding: 3rem 1rem;
   }
 
