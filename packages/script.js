@@ -3,6 +3,7 @@
 // ============================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeViewportOffsets();
   initializeScrollProgress();
   initializeScrollAnimations();
   initializeSmoothScroll();
@@ -15,6 +16,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initializeActiveNavigation();
   initializeHamburgerMenu();
 });
+
+// ============================================
+// Viewport and Layout Offsets
+// ============================================
+function initializeViewportOffsets() {
+  const updateNavbarHeight = () => {
+    const navbar = document.querySelector('.navbar');
+    if (!navbar) return;
+    document.documentElement.style.setProperty('--navbar-height', `${navbar.offsetHeight}px`);
+  };
+
+  updateNavbarHeight();
+  window.addEventListener('resize', updateNavbarHeight);
+  window.addEventListener('orientationchange', updateNavbarHeight);
+}
 
 // ============================================
 // Scroll Progress Bar
