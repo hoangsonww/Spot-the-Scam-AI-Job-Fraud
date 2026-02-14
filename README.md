@@ -25,6 +25,14 @@
 ![Vercel](https://img.shields.io/badge/Vercel-000000?logo=vercel&logoColor=white)
 ![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2.304.0-2088FF?logo=githubactions&logoColor=white)
 ![Kaggle](https://img.shields.io/badge/Kaggle-20BEFF?logo=kaggle&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-2-232F3E?logo=amazonaws&logoColor=white)
+![Azure](https://img.shields.io/badge/Azure-2-0078D4?logo=microsoftazure&logoColor=white)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-2-4285F4?logo=googlecloud&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-2-F80000?logo=oracle&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-1.27-326CE5?logo=kubernetes&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.5-623CE4?logo=terraform&logoColor=white)
+![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-1.3-5B21B6?logo=argo&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo_CD-GitOps-EF7B4D?logo=argo&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-2E2E2E)
 
 Spot the Scam is a full-stack, uncertainty-aware fraud detector for job postings. It combines calibrated classical ML, optional transformer fine-tuning, explainable outputs, and a human-in-the-loop review queue so teams can act fast with confidence.
@@ -506,6 +514,7 @@ The repo includes multiple deployment and packaging pathways. For the full opera
 
 - Docker and Docker Compose for local stacks
 - Kubernetes manifests under `ops/k8s/`
+- Argo CD GitOps assets under `ops/argo/`
 - CI/CD scaffolding under `ops/ci/`
 - Production Jenkins pipeline via `Jenkinsfile` and `ops/ci/jenkins/README.md`
 - Deployment asset validation script at `ops/ci/validate_deployment_assets.sh`
@@ -571,6 +580,7 @@ Start here, then dive deeper as needed:
 - [docs/deployment_guide.md](docs/deployment_guide.md): deployment checklist and serving options
 - [DEPLOYMENT.md](DEPLOYMENT.md): full multi-cloud deployment runbook and ops baseline
 - [aws/README.md](aws/README.md), [azure/README.md](azure/README.md), [gcp/README.md](gcp/README.md), [oci/README.md](oci/README.md): provider-specific deployment guides
+- [ops/argo/README.md](ops/argo/README.md): Argo CD GitOps bootstrap and sync workflow
 - [ops/ci/jenkins/README.md](ops/ci/jenkins/README.md): Jenkins production CI/CD configuration
 - [docs/optuna_quickstart.md](docs/optuna_quickstart.md) and [docs/optuna_tuning.md](docs/optuna_tuning.md): Optuna guides
 - [docs/DEVOPS_READINESS.md](docs/DEVOPS_READINESS.md): DevOps scaffolding overview

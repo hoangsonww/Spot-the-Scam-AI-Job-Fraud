@@ -63,6 +63,13 @@ rendered_file="$(mktemp)"
 trap 'rm -f "${rendered_file}"' EXIT
 kubectl kustomize "${OVERLAY_PATH}" > "${rendered_file}"
 
+# Ensure Argo Rollouts CRD exists before attempting rollout deployment.
+if ! kubectl get crd rollouts.argoproj.io >/dev/null 2>&1; then
+  echo "Preflight failed: Argo Rollouts CRD (rollouts.argoproj.io) is not installed in this cluster." >&2
+  echo "Install Argo Rollouts controller before deployment." >&2
+  exit 1
+fi
+
 # Block deployment when placeholder domains remain in ingress/origin config.
 if rg -n "example\.com" "${rendered_file}" >/dev/null 2>&1; then
   echo "Preflight failed: placeholder domain 'example.com' found in rendered manifests." >&2

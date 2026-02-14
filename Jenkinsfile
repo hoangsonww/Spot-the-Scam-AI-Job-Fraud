@@ -10,7 +10,7 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'ACTION', choices: ['deploy', 'promote', 'abort', 'undo'], description: 'Pipeline action to execute.')
+    choice(name: 'ACTION', choices: ['deploy', 'promote', 'abort', 'undo', 'argocd_sync'], description: 'Pipeline action to execute.')
     choice(name: 'PROVIDER', choices: ['aws', 'azure', 'gcp', 'oci'], description: 'Cloud provider pack to use.')
     choice(name: 'STRATEGY', choices: ['canary', 'bluegreen'], description: 'Deployment strategy for deploy action.')
     string(name: 'NAMESPACE', defaultValue: 'spot-scam', description: 'Kubernetes namespace.')
@@ -20,6 +20,9 @@ pipeline {
     string(name: 'MODEL_IMAGE_REPO', defaultValue: '', description: 'Model image repository (optional).')
     string(name: 'GCP_PROJECT_ID', defaultValue: '', description: 'Required when PROVIDER=gcp.')
     string(name: 'KUBECONFIG_COMMAND', defaultValue: '', description: 'Optional command to configure kubectl context (used for manual actions and deploys without terraform apply).')
+    string(name: 'ARGOCD_APP_NAME', defaultValue: '', description: 'Required when ACTION=argocd_sync.')
+    string(name: 'ARGOCD_SERVER', defaultValue: '', description: 'Optional Argo CD API server for argocd CLI.')
+    string(name: 'ARGOCD_TIMEOUT_SEC', defaultValue: '600', description: 'Timeout seconds for argocd sync/wait.')
     booleanParam(name: 'RUN_QUALITY_GATES', defaultValue: true, description: 'Run backend/frontend quality gates for deploy action.')
     booleanParam(name: 'RUN_TERRAFORM_APPLY', defaultValue: true, description: 'Execute terraform apply for deploy action.')
     booleanParam(name: 'RUN_IMAGE_BUILD_PUSH', defaultValue: true, description: 'Build and push images for deploy action.')
@@ -66,6 +69,10 @@ pipeline {
             if (!params.RUN_IMAGE_BUILD_PUSH && !params.IMAGE_TAG?.trim()) {
               error('IMAGE_TAG must be explicitly provided when RUN_IMAGE_BUILD_PUSH=false to avoid deploying a non-existent image tag.')
             }
+          } else if (params.ACTION == 'argocd_sync') {
+            if (!params.ARGOCD_APP_NAME?.trim()) {
+              error('ARGOCD_APP_NAME is required when ACTION=argocd_sync.')
+            }
           }
         }
 
@@ -75,13 +82,13 @@ pipeline {
           test -x scripts/deploy_multi_cloud.sh
           test -x ops/ci/validate_deployment_assets.sh
           test -x ops/ci/preflight_deploy_checks.sh
-          command -v kubectl >/dev/null
         '''
 
         script {
           if (params.ACTION == 'deploy') {
             sh '''#!/usr/bin/env bash
               set -euo pipefail
+              command -v kubectl >/dev/null
               if [[ "${RUN_IMAGE_BUILD_PUSH}" == "true" ]]; then
                 command -v docker >/dev/null
               fi
@@ -89,6 +96,18 @@ pipeline {
                 test -f "${TERRAFORM_DIR}/main.tf"
                 command -v terraform >/dev/null
               fi
+            '''
+          } else if (params.ACTION == 'promote' || params.ACTION == 'abort' || params.ACTION == 'undo') {
+            sh '''#!/usr/bin/env bash
+              set -euo pipefail
+              command -v kubectl >/dev/null
+              command -v argo-rollouts >/dev/null
+            '''
+          } else if (params.ACTION == 'argocd_sync') {
+            sh '''#!/usr/bin/env bash
+              set -euo pipefail
+              command -v argocd >/dev/null
+              test -x ops/ci/argocd_sync_wait.sh
             '''
           }
         }
@@ -417,6 +436,32 @@ pipeline {
         '''
       }
     }
+
+    stage('Argo CD Sync') {
+      when {
+        expression { params.ACTION == 'argocd_sync' }
+      }
+      steps {
+        script {
+          if (params.ARGOCD_SERVER?.trim()) {
+            sh '''#!/usr/bin/env bash
+              set -euo pipefail
+              ./ops/ci/argocd_sync_wait.sh \
+                --app "${ARGOCD_APP_NAME}" \
+                --timeout-sec "${ARGOCD_TIMEOUT_SEC}" \
+                --server "${ARGOCD_SERVER}"
+            '''
+          } else {
+            sh '''#!/usr/bin/env bash
+              set -euo pipefail
+              ./ops/ci/argocd_sync_wait.sh \
+                --app "${ARGOCD_APP_NAME}" \
+                --timeout-sec "${ARGOCD_TIMEOUT_SEC}"
+            '''
+          }
+        }
+      }
+    }
   }
 
   post {
@@ -427,6 +472,7 @@ pipeline {
       echo "Strategy: ${params.STRATEGY}"
       echo "Namespace: ${params.NAMESPACE}"
       echo "Tag: ${env.EFFECTIVE_TAG ?: 'n/a'}"
+      echo "ArgoCD App: ${params.ARGOCD_APP_NAME ?: 'n/a'}"
     }
     success {
       echo 'Pipeline completed successfully.'

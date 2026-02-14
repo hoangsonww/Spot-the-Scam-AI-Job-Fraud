@@ -8,6 +8,7 @@ The pipeline supports:
 
 - Multi-cloud deployment (`aws`, `azure`, `gcp`, `oci`).
 - Progressive deployment strategy selection (`canary`, `bluegreen`).
+- Optional Argo CD app synchronization (`argocd_sync` action).
 - Quality gates for Python and frontend code.
 - Container build and push.
 - Terraform plan/apply.
@@ -33,9 +34,12 @@ flowchart TD
     F --> G[Push images]
     G --> H[Terraform plan/apply]
     H --> I[Configure kubectl]
-    I --> J[Deploy provider overlay]
-    J --> K[Patch rollout image]
-    K --> L[Promote/Abort/Undo]
+    I --> J[Validate overlay render]
+    J --> K[Preflight deploy checks]
+    K --> L[Deploy provider overlay]
+    L --> M[Patch rollout image]
+    M --> N[Promote/Abort/Undo]
+    I --> O[Argo CD Sync action]
 ```
 
 ## Jenkins Credentials
@@ -59,7 +63,13 @@ Build agents that run this pipeline should have:
 - `terraform`
 - `kubectl`, `kustomize`, `helm`
 - `argo-rollouts`
+- `argocd` (required when using `ACTION=argocd_sync`)
 - Provider CLIs (`aws`, `az`, `gcloud`, `oci`)
+
+Action-path note:
+
+- `argocd_sync` requires `argocd` CLI and Argo CD authentication.
+- `deploy|promote|abort|undo` require Kubernetes access (`kubectl`, and `argo-rollouts` for rollout control actions).
 
 ## Recommended Jenkins Job Settings
 
@@ -67,10 +77,11 @@ Build agents that run this pipeline should have:
 - Concurrency disabled (already enforced in pipeline options).
 - Build retention aligned with compliance policy.
 - Protected manual input steps for production applies.
+- Ensure Jenkins agents are already authenticated to Argo CD before running `ACTION=argocd_sync`.
 
 ## Security Notes
 
 - Do not store cloud credentials in repository files.
 - Keep Jenkins credentials scoped to job/folder with least privilege.
 - Enable audit logging for credential usage and deploy actions.
-- Restrict who can run `promote`, `abort`, and `undo` actions.
+- Restrict who can run `promote`, `abort`, `undo`, and `argocd_sync` actions.

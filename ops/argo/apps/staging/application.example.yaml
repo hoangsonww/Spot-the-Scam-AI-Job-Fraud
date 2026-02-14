@@ -1,0 +1,25 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spot-scam-staging
+  namespace: argocd
+spec:
+  project: spot-scam
+  source:
+    repoURL: https://github.com/<org>/<repo>.git
+    targetRevision: main
+    path: ops/k8s/overlays/staging-canary
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spot-scam
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/template/spec/containers
+  revisionHistoryLimit: 10
