@@ -189,6 +189,10 @@ Have a rollback plan before you need it.
 
 ## Related Documentation
 
+- Multi-cloud production runbook: [DEPLOYMENT.md](../DEPLOYMENT.md)
+- Jenkins CI/CD runbook: [ops/ci/jenkins/README.md](../ops/ci/jenkins/README.md)
+- Deployment validation script: [ops/ci/validate_deployment_assets.sh](../ops/ci/validate_deployment_assets.sh)
+- Deployment preflight checks: [ops/ci/preflight_deploy_checks.sh](../ops/ci/preflight_deploy_checks.sh)
 - End-to-end setup: [INSTRUCTIONS.md](../INSTRUCTIONS.md)
 - MLOps lifecycle: [MLOPS.md](../MLOPS.md)
 - System design: [ARCHITECTURE.md](../ARCHITECTURE.md)

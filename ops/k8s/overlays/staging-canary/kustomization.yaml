@@ -3,7 +3,7 @@ kind: Kustomization
 namespace: spot-scam
 resources:
   - ../../base
-  - ../../base/rollout-canary.yaml
+  - rollout-canary.yaml
 patches:
   - path: rollout-patch.yaml
   - path: configmap-patch.yaml

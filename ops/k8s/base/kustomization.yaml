@@ -5,7 +5,6 @@ resources:
   - namespace.yaml
   - serviceaccount.yaml
   - configmap-api.yaml
-  - secret-api.yaml
   - service.yaml
   - preview-service.yaml
   - ingress.yaml

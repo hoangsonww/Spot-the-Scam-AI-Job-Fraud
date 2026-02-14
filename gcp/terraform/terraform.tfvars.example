@@ -1,0 +1,8 @@
+project_id        = "my-gcp-project"
+region            = "us-central1"
+zone              = "us-central1-a"
+project_name      = "spot-scam"
+environment       = "prod"
+gke_version       = "1.30.4-gke.1451000"
+node_count        = 3
+node_machine_type = "e2-standard-4"

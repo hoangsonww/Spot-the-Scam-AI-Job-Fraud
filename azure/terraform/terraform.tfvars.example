@@ -1,0 +1,6 @@
+location           = "eastus"
+project_name       = "spotscam"
+environment        = "prod"
+kubernetes_version = "1.30.3"
+node_count         = 3
+node_vm_size       = "Standard_D4s_v5"
