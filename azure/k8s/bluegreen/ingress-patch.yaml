@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: spot-scam-api
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  tls:
+    - hosts:
+        - api.azure.spot-scam.example.com
+      secretName: spot-scam-api-tls
+  rules:
+    - host: api.azure.spot-scam.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: spot-scam-api
+                port:
+                  number: 80

@@ -1,4 +1,4 @@
-# Results and Diagnostics
+# Results and Diagnostics - Spot the Scam Project
 
 This document summarizes the current repository results, explains how to interpret them, and points to every supporting artifact that the training pipeline generates.
 

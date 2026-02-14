@@ -1,0 +1,7 @@
+region            = "us-east-1"
+project_name      = "spot-scam"
+environment       = "prod"
+cluster_version   = "1.30"
+node_desired_size = 3
+node_min_size     = 3
+node_max_size     = 8

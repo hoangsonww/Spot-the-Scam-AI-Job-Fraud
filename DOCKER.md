@@ -1,4 +1,4 @@
-# Docker Usage Guide
+# Docker Usage Guide for Spot the Scam Project
 
 This guide covers local container workflows, GitHub Actions automation, and publishing Spot the Scam images to GitHub Container Registry (GHCR).
 

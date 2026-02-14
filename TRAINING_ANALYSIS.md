@@ -1,4 +1,4 @@
-# Training Analysis, Strategy, and Operational Trade-offs
+# Training Analysis, Strategy, and Operational Trade-offs - Spot the Scam Project
 
 This document explains how training works in this repository, why it is designed this way, and how to modify it without breaking serving parity. It is grounded in the actual orchestrator (`src/spot_scam/pipeline/train.py`), the default configuration (`configs/defaults.yaml`), and the currently checked-in artifact set under `artifacts/` and `experiments/`.
 

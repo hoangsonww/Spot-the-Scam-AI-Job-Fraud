@@ -2,12 +2,14 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: spot-scam
 resources:
-  - ../../base
+  - ../../../ops/k8s/base
   - rollout-bluegreen.yaml
 patches:
   - path: rollout-patch.yaml
+  - path: pvc-patch.yaml
+  - path: ingress-patch.yaml
   - path: configmap-patch.yaml
 images:
   - name: ghcr.io/example/spot-scam/api
-    newName: ghcr.io/your-org/spot-scam-api
-    newTag: prod
+    newName: spotscamacr.azurecr.io/spot-scam-api
+    newTag: prod-bluegreen

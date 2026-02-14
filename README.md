@@ -49,6 +49,7 @@ Spot the Scam is a full-stack, uncertainty-aware fraud detector for job postings
 - [Frontend Experience (Next.js)](#frontend-experience-nextjs)
 - [AI Chat Assistant Routing](#ai-chat-assistant-routing)
 - [MLOps, Packaging, and Deployment Surfaces](#mlops-packaging-and-deployment-surfaces)
+- [Multi-Cloud Deployment Packs](#multi-cloud-deployment-packs)
 - [Reproducibility and Experiment Hygiene](#reproducibility-and-experiment-hygiene)
 - [Repository Map](#repository-map)
 - [Documentation Map](#documentation-map)
@@ -506,7 +507,26 @@ The repo includes multiple deployment and packaging pathways. For the full opera
 - Docker and Docker Compose for local stacks
 - Kubernetes manifests under `ops/k8s/`
 - CI/CD scaffolding under `ops/ci/`
+- Production Jenkins pipeline via `Jenkinsfile` and `ops/ci/jenkins/README.md`
+- Deployment asset validation script at `ops/ci/validate_deployment_assets.sh`
+- Deployment preflight guard at `ops/ci/preflight_deploy_checks.sh`
 - Load testing hooks under `ops/observability/` and `scripts/`
+
+## Multi-Cloud Deployment Packs
+
+Production-ready multi-cloud deployment packs are now included for AWS, Azure, GCP, and OCI.
+
+- Global deployment playbook: [DEPLOYMENT.md](DEPLOYMENT.md)
+- AWS pack: [aws/README.md](aws/README.md)
+- Azure pack: [azure/README.md](azure/README.md)
+- GCP pack: [gcp/README.md](gcp/README.md)
+- OCI pack: [oci/README.md](oci/README.md)
+
+Each provider pack includes:
+
+- Terraform infrastructure stack
+- Provider-tuned Kubernetes overlays for canary and blue/green rollouts
+- Provider-specific deployment runbook
 
 ## Reproducibility and Experiment Hygiene
 
@@ -534,6 +554,8 @@ Top-level layout:
 | `frontend/` | Next.js dashboard |
 | `docs/` | Deep-dive documentation and guides |
 | `ops/` | Deployment, CI/CD, and observability assets |
+| `aws/`, `azure/`, `gcp/`, `oci/` | Provider-specific Terraform + Kubernetes deployment packs |
+| `DEPLOYMENT.md` | End-to-end production deployment standard across all providers |
 
 ## Documentation Map
 
@@ -547,6 +569,9 @@ Start here, then dive deeper as needed:
 - [docs/pipeline_walkthrough.md](docs/pipeline_walkthrough.md): step-by-step pipeline narrative
 - [docs/explainability.md](docs/explainability.md): interpretability design and outputs
 - [docs/deployment_guide.md](docs/deployment_guide.md): deployment checklist and serving options
+- [DEPLOYMENT.md](DEPLOYMENT.md): full multi-cloud deployment runbook and ops baseline
+- [aws/README.md](aws/README.md), [azure/README.md](azure/README.md), [gcp/README.md](gcp/README.md), [oci/README.md](oci/README.md): provider-specific deployment guides
+- [ops/ci/jenkins/README.md](ops/ci/jenkins/README.md): Jenkins production CI/CD configuration
 - [docs/optuna_quickstart.md](docs/optuna_quickstart.md) and [docs/optuna_tuning.md](docs/optuna_tuning.md): Optuna guides
 - [docs/DEVOPS_READINESS.md](docs/DEVOPS_READINESS.md): DevOps scaffolding overview
 - [DOCKER.md](DOCKER.md): container-focused setup details

@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spot-scam-artifacts
+spec:
+  storageClassName: oci-fss
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spot-scam-tracking
+spec:
+  storageClassName: oci-fss
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: spot-scam-mlruns
+spec:
+  storageClassName: oci-fss
