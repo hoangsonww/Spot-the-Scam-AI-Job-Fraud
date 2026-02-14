@@ -6,15 +6,17 @@ It is designed for:
 
 - Repeatable environment provisioning with Terraform.
 - Progressive API delivery with canary and blue/green rollouts.
+- Optional GitOps control plane with Argo CD.
 - Provider-neutral release process with provider-specific overlays.
 - Production security, observability, and rollback readiness.
 
-[![AWS](https://img.shields.io/badge/AWS-Deployments-orange?logo=amazonaws)](aws/README.md)
-[![Azure](https://img.shields.io/badge/Azure-Deployments-blue?logo=microsoftazure)](azure/README.md)
-[![GCP](https://img.shields.io/badge/GCP-Deployments-green?logo=googlecloud)](gcp/README.md)
-[![OCI](https://img.shields.io/badge/OCI-Deployments-red?logo=oracle)](oci/README.md)
-[![Jenkins](https://img.shields.io/badge/Jenkins-CI%2FCD-blue?logo=jenkins)](ops/ci/jenkins/README.md)
-[![Vercel](https://img.shields.io/badge/Frontend-Vercel-purple?logo=vercel)](frontend/README.md)
+![AWS](https://img.shields.io/badge/AWS-2-232F3E?logo=amazonaws&logoColor=white)
+![Azure](https://img.shields.io/badge/Azure-2-0078D4?logo=microsoftazure&logoColor=white)
+![Google Cloud](https://img.shields.io/badge/Google_Cloud-2-4285F4?logo=googlecloud&logoColor=white)
+![Oracle Cloud](https://img.shields.io/badge/Oracle_Cloud-2-F80000?logo=oracle&logoColor=white)
+![Kubernetes](https://img.shields.io/badge/Kubernetes-1.27-326CE5?logo=kubernetes&logoColor=white)
+![Terraform](https://img.shields.io/badge/Terraform-1.5-623CE4?logo=terraform&logoColor=white)
+![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-1.3-5B21B6?logo=argo&logoColor=white)
 
 ## Table of Contents
 
@@ -90,6 +92,7 @@ Primary deployment assets in this repository:
 - `ops/k8s/base/secret-api.example.yaml`: example secret only (not auto-applied).
 - `ops/k8s/base/rollout-canary.yaml`: canary strategy baseline.
 - `ops/k8s/base/rollout-bluegreen.yaml`: blue/green strategy baseline.
+- `ops/argo/`: Argo CD project/application templates and kustomize layers.
 - `aws/`, `azure/`, `gcp/`, `oci/`: provider deployment packs.
 - `scripts/deploy_multi_cloud.sh`: provider+strategy deploy helper.
 - `ops/ci/preflight_deploy_checks.sh`: hard gate for placeholders and required runtime secret.
@@ -124,6 +127,7 @@ Minimum required tooling:
 - kustomize 5+
 - helm 3.14+
 - argo-rollouts CLI
+- argocd CLI (for GitOps sync/wait operations)
 - Provider CLI (`aws`, `az`, `gcloud`, `oci`)
 
 Production operator access requirements:
@@ -223,6 +227,7 @@ Pipeline capabilities:
 - Optional Terraform apply.
 - Deployment through `scripts/deploy_multi_cloud.sh`.
 - Rollout control actions (`deploy`, `promote`, `abort`, `undo`).
+- Optional Argo CD app sync action (`argocd_sync`).
 - Deployment asset validation through `ops/ci/validate_deployment_assets.sh`.
 
 Pipeline safety guards:
@@ -230,6 +235,7 @@ Pipeline safety guards:
 - Deploys without build/push require explicit `IMAGE_TAG`.
 - `KUBECONFIG_COMMAND` supports deploys where Terraform apply is intentionally skipped.
 - Preflight checks block deploys with placeholder domains/values and missing runtime secrets.
+- Argo CD app examples are templates; bootstrap script requires explicit repo URL and revision.
 
 Pipeline model:
 
@@ -247,6 +253,7 @@ flowchart TD
     P9 --> P10{Auto-promote?}
     P10 -->|yes| P11[Promote]
     P10 -->|no| P12[Manual decision]
+    P6 --> P13[Optional Argo CD app sync]
 ```
 
 ## 10. Deployment Runbook
@@ -308,6 +315,18 @@ kubectl -n spot-scam patch rollout spot-scam-api \
   -p '{"spec":{"template":{"spec":{"containers":[{"name":"api","image":"<API_IMAGE_REPO>:<TAG>"}]}}}}'
 
 argo-rollouts get rollout spot-scam-api -n spot-scam
+```
+
+### Optional: Argo CD GitOps bootstrap and sync
+
+```bash
+./ops/ci/bootstrap_argocd.sh \
+  --env staging \
+  --provider aws \
+  --repo-url https://github.com/<org>/<repo>.git \
+  --revision main
+
+./ops/ci/argocd_sync_wait.sh --app spot-scam-staging-aws --timeout-sec 900
 ```
 
 ## 11. Promotion, Rollback, and Incident Response
@@ -384,6 +403,7 @@ Recovery objectives:
 - Azure: [`azure/README.md`](azure/README.md)
 - GCP: [`gcp/README.md`](gcp/README.md)
 - OCI: [`oci/README.md`](oci/README.md)
+- Argo CD assets: [`ops/argo/README.md`](ops/argo/README.md)
 
 ## 16. Troubleshooting
 

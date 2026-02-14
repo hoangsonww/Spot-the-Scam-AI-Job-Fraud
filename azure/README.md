@@ -13,8 +13,9 @@ Production deployment guide for Spot the Scam on Azure using AKS, ACR, and Azure
 - [7. Runtime Secret Bootstrap](#7-runtime-secret-bootstrap)
 - [8. End-to-End Runbook](#8-end-to-end-runbook)
 - [9. Jenkins Integration](#9-jenkins-integration)
-- [10. Security Hardening Checklist](#10-security-hardening-checklist)
-- [11. Operations and Troubleshooting](#11-operations-and-troubleshooting)
+- [10. Argo CD GitOps (Optional)](#10-argo-cd-gitops-optional)
+- [11. Security Hardening Checklist](#11-security-hardening-checklist)
+- [12. Operations and Troubleshooting](#12-operations-and-troubleshooting)
 
 ## 1. Azure Architecture
 
@@ -153,7 +154,25 @@ Credentials expected by Jenkins for Azure runs:
 - `spot-scam-azure-tenant` (secret text)
 - `spot-scam-azure-subscription` (secret text)
 
-## 10. Security Hardening Checklist
+## 10. Argo CD GitOps (Optional)
+
+Bootstrap Argo CD and create an Azure staging/prod app:
+
+```bash
+./ops/ci/bootstrap_argocd.sh \
+  --env staging \
+  --provider azure \
+  --repo-url https://github.com/<org>/<repo>.git \
+  --revision main
+```
+
+Sync and wait:
+
+```bash
+./ops/ci/argocd_sync_wait.sh --app spot-scam-staging-azure --timeout-sec 900
+```
+
+## 11. Security Hardening Checklist
 
 - Use managed identities for workload access.
 - Scope ACR pull rights to AKS kubelet identity only.
@@ -161,7 +180,7 @@ Credentials expected by Jenkins for Azure runs:
 - Store secrets in Azure Key Vault with sync into Kubernetes.
 - Restrict inbound network exposure through approved ingress paths.
 
-## 11. Operations and Troubleshooting
+## 12. Operations and Troubleshooting
 
 ```bash
 kubectl get pods -n spot-scam

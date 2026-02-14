@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: spot-scam
+  namespace: argocd
+spec:
+  description: Spot the Scam deployment project
+  sourceRepos:
+    - https://github.com/davidnguyen/Spot-the-Scam-AI-Job-Fraud.git
+  destinations:
+    - namespace: spot-scam
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  orphanedResources:
+    warn: true

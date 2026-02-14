@@ -13,8 +13,9 @@ Production deployment guide for Spot the Scam on Google Cloud using GKE, Artifac
 - [7. Runtime Secret Bootstrap](#7-runtime-secret-bootstrap)
 - [8. End-to-End Runbook](#8-end-to-end-runbook)
 - [9. Jenkins Integration](#9-jenkins-integration)
-- [10. Security Hardening Checklist](#10-security-hardening-checklist)
-- [11. Operations and Troubleshooting](#11-operations-and-troubleshooting)
+- [10. Argo CD GitOps (Optional)](#10-argo-cd-gitops-optional)
+- [11. Security Hardening Checklist](#11-security-hardening-checklist)
+- [12. Operations and Troubleshooting](#12-operations-and-troubleshooting)
 
 ## 1. GCP Architecture
 
@@ -144,7 +145,25 @@ Credentials expected by Jenkins for GCP runs:
 
 - `spot-scam-gcp-sa` (file credential, service account key JSON)
 
-## 10. Security Hardening Checklist
+## 10. Argo CD GitOps (Optional)
+
+Bootstrap Argo CD and create a GCP staging/prod app:
+
+```bash
+./ops/ci/bootstrap_argocd.sh \
+  --env staging \
+  --provider gcp \
+  --repo-url https://github.com/<org>/<repo>.git \
+  --revision main
+```
+
+Sync and wait:
+
+```bash
+./ops/ci/argocd_sync_wait.sh --app spot-scam-staging-gcp --timeout-sec 900
+```
+
+## 11. Security Hardening Checklist
 
 - Use least-privileged service accounts and Workload Identity.
 - Keep Artifact Registry private and scoped.
@@ -152,7 +171,7 @@ Credentials expected by Jenkins for GCP runs:
 - Keep Filestore and network ranges private.
 - Store runtime secrets in Secret Manager and sync to Kubernetes.
 
-## 11. Operations and Troubleshooting
+## 12. Operations and Troubleshooting
 
 ```bash
 kubectl get pods -n spot-scam

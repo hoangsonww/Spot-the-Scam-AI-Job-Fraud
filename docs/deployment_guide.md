@@ -10,6 +10,7 @@ This document provides a practical checklist for promoting Spot the Scam from lo
 - [Frontend Deployment Notes](#frontend-deployment-notes)
 - [Docker Compose Stack](#docker-compose-stack)
 - [Kubernetes Progressive Delivery](#kubernetes-progressive-delivery)
+- [Argo CD GitOps (Optional)](#argo-cd-gitops-optional)
 - [Observability Checklist](#observability-checklist)
 - [Security and Privacy Considerations](#security-and-privacy-considerations)
 - [Production Promotion Checklist](#production-promotion-checklist)
@@ -146,6 +147,20 @@ argo-rollouts promote spot-scam-api -n spot-scam
 argo-rollouts terminate spot-scam-api -n spot-scam
 ```
 
+## Argo CD GitOps (Optional)
+
+Argo CD assets live under `ops/argo/` and can be bootstrapped with:
+
+```bash
+./ops/ci/bootstrap_argocd.sh --env staging --provider aws --repo-url https://github.com/<org>/<repo>.git --revision main
+```
+
+After bootstrap, sync and wait:
+
+```bash
+./ops/ci/argocd_sync_wait.sh --app spot-scam-staging-aws --timeout-sec 900
+```
+
 ## Observability Checklist
 
 The repo includes several hooks, but production readiness still depends on your runtime environment.
@@ -193,6 +208,7 @@ Have a rollback plan before you need it.
 - Jenkins CI/CD runbook: [ops/ci/jenkins/README.md](../ops/ci/jenkins/README.md)
 - Deployment validation script: [ops/ci/validate_deployment_assets.sh](../ops/ci/validate_deployment_assets.sh)
 - Deployment preflight checks: [ops/ci/preflight_deploy_checks.sh](../ops/ci/preflight_deploy_checks.sh)
+- Argo CD GitOps assets: [ops/argo/README.md](../ops/argo/README.md)
 - End-to-end setup: [INSTRUCTIONS.md](../INSTRUCTIONS.md)
 - MLOps lifecycle: [MLOPS.md](../MLOPS.md)
 - System design: [ARCHITECTURE.md](../ARCHITECTURE.md)
