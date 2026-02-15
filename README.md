@@ -209,10 +209,10 @@ The easiest way to navigate the repo is by workflow.
 - Runtime: `src/spot_scam/inference/predictor.py`
 
 ### Workflow 3: Review and feedback
-
 - Command: `make serve-queue`
 - Review endpoints: `/cases` and `/feedback`
 - Storage: `tracking/predictions/` and `tracking/feedback/`
+- **Consensus Logic**: Implements a Multi-Reviewer Consensus Feedback loop where flagged cases are routed to a human-in-the-loop queue. Retraining triggers only occur once a majority consensus is reached, ensuring high-quality ground truth for model overrides.
 - Retrain with overrides: `make retrain-with-feedback`
 
 ### Workflow 4: Tune hyperparameters
