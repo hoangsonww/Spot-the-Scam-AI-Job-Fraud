@@ -45,29 +45,292 @@ body {
 /* Animated Background */
 .animated-background {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  inset: 0;
   z-index: -1;
-  background: var(--dark-bg);
+  pointer-events: none;
   overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(1200px 800px at 12% -10%, rgba(37, 99, 235, 0.3), transparent 62%),
+    radial-gradient(1000px 700px at 90% 8%, rgba(16, 185, 129, 0.24), transparent 58%),
+    linear-gradient(160deg, #020617 0%, #0b1224 35%, #0f172a 100%);
+}
+
+.animated-background::before,
+.animated-background::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
 }
 
 .animated-background::before {
-  content: '';
-  position: absolute;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at 20% 50%, rgba(37, 99, 235, 0.1) 0%, transparent 50%),
-              radial-gradient(circle at 80% 80%, rgba(16, 185, 129, 0.1) 0%, transparent 50%);
-  animation: float 20s ease-in-out infinite;
+  background:
+    radial-gradient(circle at 18% 30%, rgba(37, 99, 235, 0.36) 0%, transparent 42%),
+    radial-gradient(circle at 72% 68%, rgba(16, 185, 129, 0.3) 0%, transparent 45%),
+    radial-gradient(circle at 60% 20%, rgba(59, 130, 246, 0.26) 0%, transparent 40%);
+  filter: blur(44px) saturate(140%);
+  animation: auroraDrift 16s ease-in-out infinite alternate;
 }
 
-@keyframes float {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(30px, -50px) rotate(120deg); }
-  66% { transform: translate(-20px, 20px) rotate(240deg); }
+.animated-background::after {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px, 44px 44px;
+  mask-image: radial-gradient(circle at 50% 25%, rgba(0, 0, 0, 0.9), transparent 72%);
+  opacity: 0.34;
+  animation: gridPulse 12s ease-in-out infinite;
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(1px);
+  opacity: 0.82;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+
+.bg-orb-1 {
+  width: min(42vw, 520px);
+  height: min(42vw, 520px);
+  top: 12%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.42) 0%, rgba(56, 189, 248, 0) 72%);
+  animation: orbFloatA 12s ease-in-out infinite, orbGlowA 4.6s ease-in-out infinite;
+}
+
+.bg-orb-2 {
+  width: min(34vw, 460px);
+  height: min(34vw, 460px);
+  top: 58%;
+  right: -8%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.36) 0%, rgba(16, 185, 129, 0) 75%);
+  animation: orbFloatB 11s ease-in-out infinite, orbGlowB 4.2s ease-in-out infinite;
+}
+
+.bg-orb-3 {
+  width: min(28vw, 360px);
+  height: min(28vw, 360px);
+  bottom: -8%;
+  left: 28%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.34) 0%, rgba(37, 99, 235, 0) 72%);
+  animation: orbFloatC 13s ease-in-out infinite, orbGlowC 5s ease-in-out infinite;
+}
+
+.bg-particles {
+  position: absolute;
+  inset: -24%;
+  pointer-events: none;
+  will-change: background-position, opacity, transform;
+}
+
+.bg-particles-1 {
+  background-image:
+    radial-gradient(circle at center, rgba(248, 250, 252, 0.86) 1.2px, transparent 1.9px),
+    radial-gradient(circle at center, rgba(56, 189, 248, 0.82) 1.8px, transparent 2.6px),
+    radial-gradient(circle at center, rgba(167, 139, 250, 0.6) 1.4px, transparent 2.1px);
+  background-size: 96px 96px, 180px 180px, 260px 260px;
+  background-position: 0 0, 60px 100px, 30px 140px;
+  opacity: 0.78;
+  filter: saturate(125%) drop-shadow(0 0 8px rgba(56, 189, 248, 0.25));
+  animation: particleDriftA 24s linear infinite, particleTwinkleA 3.2s ease-in-out infinite;
+}
+
+.bg-particles-2 {
+  background-image:
+    radial-gradient(circle at center, rgba(16, 185, 129, 0.8) 1.7px, transparent 2.5px),
+    radial-gradient(circle at center, rgba(96, 165, 250, 0.72) 1.3px, transparent 2px),
+    radial-gradient(circle at center, rgba(251, 191, 36, 0.64) 1.1px, transparent 1.8px);
+  background-size: 140px 140px, 220px 220px, 320px 320px;
+  background-position: 40px 20px, 140px 70px, 80px 200px;
+  opacity: 0.66;
+  filter: saturate(130%) drop-shadow(0 0 10px rgba(16, 185, 129, 0.24));
+  mix-blend-mode: screen;
+  animation: particleDriftB 28s linear infinite reverse, particleTwinkleB 3.8s ease-in-out infinite;
+}
+
+.bg-wave {
+  position: absolute;
+  inset: -35% -25%;
+  background:
+    conic-gradient(from 210deg at 55% 50%, rgba(56, 189, 248, 0.2), rgba(16, 185, 129, 0.14), rgba(37, 99, 235, 0.12), rgba(56, 189, 248, 0.2));
+  filter: blur(68px);
+  opacity: 0.38;
+  transform: translate3d(0, 0, 0);
+  animation: waveSweep 12s ease-in-out infinite alternate;
+}
+
+@keyframes auroraDrift {
+  0% {
+    transform: translate3d(-6%, 4%, 0) scale(1) rotate(-4deg);
+  }
+  100% {
+    transform: translate3d(7%, -5%, 0) scale(1.15) rotate(6deg);
+  }
+}
+
+@keyframes gridPulse {
+  0%, 100% {
+    opacity: 0.26;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes orbFloatA {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  25% {
+    transform: translate3d(60px, -40px, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(100px, -70px, 0) scale(1.16);
+  }
+  75% {
+    transform: translate3d(36px, -18px, 0) scale(1.06);
+  }
+}
+
+@keyframes orbFloatB {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  30% {
+    transform: translate3d(-56px, -34px, 0) scale(1.08);
+  }
+  60% {
+    transform: translate3d(-88px, -56px, 0) scale(1.13);
+  }
+  82% {
+    transform: translate3d(-30px, -14px, 0) scale(1.03);
+  }
+}
+
+@keyframes orbFloatC {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  35% {
+    transform: translate3d(38px, -58px, 0) scale(1.1);
+  }
+  65% {
+    transform: translate3d(62px, -92px, 0) scale(1.14);
+  }
+  85% {
+    transform: translate3d(20px, -32px, 0) scale(1.04);
+  }
+}
+
+@keyframes orbGlowA {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.96;
+  }
+}
+
+@keyframes orbGlowB {
+  0%, 100% {
+    opacity: 0.64;
+  }
+  50% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes orbGlowC {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.88;
+  }
+}
+
+@keyframes particleDriftA {
+  0% {
+    background-position: 0 0, 60px 100px, 30px 140px;
+    opacity: 0.58;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    background-position: -320px 190px, 220px -240px, -160px -120px;
+    opacity: 0.58;
+  }
+}
+
+@keyframes particleDriftB {
+  0% {
+    background-position: 40px 20px, 140px 70px, 80px 200px;
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.78;
+  }
+  100% {
+    background-position: 380px -240px, -200px 320px, 260px -120px;
+    opacity: 0.5;
+  }
+}
+
+@keyframes particleTwinkleA {
+  0%, 100% {
+    filter: saturate(118%) drop-shadow(0 0 6px rgba(56, 189, 248, 0.22));
+  }
+  50% {
+    filter: saturate(145%) drop-shadow(0 0 14px rgba(56, 189, 248, 0.4));
+  }
+}
+
+@keyframes particleTwinkleB {
+  0%, 100% {
+    filter: saturate(122%) drop-shadow(0 0 7px rgba(16, 185, 129, 0.22));
+  }
+  50% {
+    filter: saturate(150%) drop-shadow(0 0 14px rgba(251, 191, 36, 0.4));
+  }
+}
+
+@keyframes waveSweep {
+  0% {
+    transform: translate3d(-6%, 3%, 0) scale(1) rotate(-10deg);
+    opacity: 0.28;
+  }
+  100% {
+    transform: translate3d(6%, -4%, 0) scale(1.14) rotate(28deg);
+    opacity: 0.46;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-background::before,
+  .animated-background::after,
+  .bg-orb,
+  .bg-particles,
+  .bg-wave {
+    animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .bg-orb {
+    opacity: 0.66;
+  }
+
+  .bg-particles-1,
+  .bg-particles-2 {
+    opacity: 0.5;
+  }
+
+  .bg-wave {
+    opacity: 0.26;
+  }
 }
 
 /* Scroll Progress Bar */
@@ -813,6 +1076,17 @@ footer {
   margin-top: 2rem;
   border-top: 1px solid var(--dark-border);
   color: var(--text-muted);
+}
+
+.footer-bottom a {
+  color: var(--text-secondary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 0.3s ease;
+}
+
+.footer-bottom a:hover {
+  color: var(--primary-color);
 }
 
 /* Responsive */
