@@ -519,6 +519,7 @@ The repo includes multiple deployment and packaging pathways. For the full opera
 - Production Jenkins pipeline via `Jenkinsfile` and `ops/ci/jenkins/README.md`
 - Deployment asset validation script at `ops/ci/validate_deployment_assets.sh`
 - Deployment preflight guard at `ops/ci/preflight_deploy_checks.sh`
+- Cluster add-on bootstrap script at `ops/ci/bootstrap_cluster_addons.sh`
 - Load testing hooks under `ops/observability/` and `scripts/`
 
 ## Multi-Cloud Deployment Packs

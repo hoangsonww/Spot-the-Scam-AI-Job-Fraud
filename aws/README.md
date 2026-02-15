@@ -74,7 +74,15 @@ terraform output -raw configure_kubectl
 kubectl get nodes
 ```
 
-### 4.4 Validate storage class
+### 4.4 Bootstrap cluster add-ons (ingress + Argo Rollouts)
+
+```bash
+# from repository root
+./ops/ci/bootstrap_cluster_addons.sh
+kubectl get crd rollouts.argoproj.io
+```
+
+### 4.5 Validate storage class
 
 ```bash
 kubectl get storageclass efs-sc
