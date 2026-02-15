@@ -61,6 +61,14 @@ terraform output -raw configure_kubectl
 kubectl get nodes
 ```
 
+Bootstrap required add-ons:
+
+```bash
+# from repository root
+./ops/ci/bootstrap_cluster_addons.sh
+kubectl get crd rollouts.argoproj.io
+```
+
 Validate file storage class presence (`oci-fss`) in-cluster.
 
 ## 5. Container Registry and Image Strategy

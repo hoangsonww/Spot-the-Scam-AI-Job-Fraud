@@ -10,6 +10,7 @@ required_files=(
   "scripts/deploy_multi_cloud.sh"
   "scripts/apply_k8s_overlay.sh"
   "ops/ci/preflight_deploy_checks.sh"
+  "ops/ci/bootstrap_cluster_addons.sh"
   "ops/ci/bootstrap_argocd.sh"
   "ops/ci/argocd_sync_wait.sh"
   "ops/k8s/base/secret-api.example.yaml"
@@ -34,8 +35,30 @@ done
 bash -n scripts/deploy_multi_cloud.sh
 bash -n scripts/apply_k8s_overlay.sh
 bash -n ops/ci/preflight_deploy_checks.sh
+bash -n ops/ci/bootstrap_cluster_addons.sh
 bash -n ops/ci/bootstrap_argocd.sh
 bash -n ops/ci/argocd_sync_wait.sh
+
+for provider in aws azure gcp oci; do
+  for tf_file in main.tf variables.tf versions.tf outputs.tf; do
+    if [[ ! -f "${provider}/terraform/${tf_file}" ]]; then
+      echo "Missing Terraform file: ${provider}/terraform/${tf_file}" >&2
+      exit 1
+    fi
+  done
+
+  if ! rg -n 'output "configure_kubectl"' "${provider}/terraform/outputs.tf" >/dev/null 2>&1; then
+    echo "Missing configure_kubectl output in ${provider}/terraform/outputs.tf" >&2
+    exit 1
+  fi
+done
+
+if command -v terraform >/dev/null 2>&1; then
+  terraform fmt -check -recursive aws/terraform azure/terraform gcp/terraform oci/terraform >/dev/null
+  echo "Terraform formatting check passed."
+else
+  echo "terraform not found; skipping terraform fmt check."
+fi
 
 # Validate base overlays
 for overlay in \

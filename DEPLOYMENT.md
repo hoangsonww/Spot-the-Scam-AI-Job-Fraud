@@ -17,6 +17,7 @@ It is designed for:
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-1.27-326CE5?logo=kubernetes&logoColor=white)
 ![Terraform](https://img.shields.io/badge/Terraform-1.5-623CE4?logo=terraform&logoColor=white)
 ![Argo Rollouts](https://img.shields.io/badge/Argo_Rollouts-1.3-5B21B6?logo=argo&logoColor=white)
+![Argo CD](https://img.shields.io/badge/Argo_CD-2.8-5B21B6?logo=argo&logoColor=white)
 
 ## Table of Contents
 
@@ -96,6 +97,7 @@ Primary deployment assets in this repository:
 - `aws/`, `azure/`, `gcp/`, `oci/`: provider deployment packs.
 - `scripts/deploy_multi_cloud.sh`: provider+strategy deploy helper.
 - `ops/ci/preflight_deploy_checks.sh`: hard gate for placeholders and required runtime secret.
+- `ops/ci/bootstrap_cluster_addons.sh`: installs ingress-nginx and Argo Rollouts controller in-cluster.
 - `Jenkinsfile`: production CI/CD pipeline for this deployment model.
 
 ## 4. Environment Model
@@ -278,7 +280,18 @@ terraform output -raw configure_kubectl
 kubectl get nodes
 ```
 
-### Step 3: Build and push release images
+### Step 3: Bootstrap required cluster add-ons
+
+```bash
+# from repository root
+./ops/ci/bootstrap_cluster_addons.sh
+
+kubectl get crd rollouts.argoproj.io
+```
+
+This will get the cluster ready with an ingress controller and Argo Rollouts controller, which are required for the deployment manifests in this repository to work correctly.
+
+### Step 4: Build and push release images
 
 ```bash
 docker build -t <API_IMAGE_REPO>:<TAG> .
@@ -288,7 +301,7 @@ docker push <API_IMAGE_REPO>:<TAG>
 docker push <FRONTEND_IMAGE_REPO>:<TAG>
 ```
 
-### Step 4: Create runtime secret (required)
+### Step 5: Create runtime secret (required)
 
 `spot-scam-api-secrets` is intentionally not auto-applied from kustomize. Create it before deploy:
 
@@ -298,7 +311,7 @@ kubectl -n spot-scam create secret generic spot-scam-api-secrets \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-### Step 5: Deploy selected provider/strategy
+### Step 6: Deploy selected provider/strategy
 
 ```bash
 ./scripts/deploy_multi_cloud.sh \
@@ -307,7 +320,7 @@ kubectl -n spot-scam create secret generic spot-scam-api-secrets \
   --namespace spot-scam
 ```
 
-### Step 6: Patch release image and watch rollout
+### Step 7: Patch release image and watch rollout
 
 ```bash
 kubectl -n spot-scam patch rollout spot-scam-api \

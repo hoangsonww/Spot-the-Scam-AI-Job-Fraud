@@ -133,6 +133,13 @@ Kubernetes scaffolding lives under `ops/k8s/` with base resources and overlays.
 - Staging overlay: `ops/k8s/overlays/staging-canary`
 - Production overlay: `ops/k8s/overlays/prod-bluegreen`
 
+Bootstrap ingress and Argo Rollouts controller first:
+
+```bash
+./ops/ci/bootstrap_cluster_addons.sh
+kubectl get crd rollouts.argoproj.io
+```
+
 Apply an overlay:
 
 ```bash
@@ -144,7 +151,7 @@ Promotion and health checks use Argo Rollouts commands such as:
 ```bash
 argo-rollouts get rollout spot-scam-api -n spot-scam
 argo-rollouts promote spot-scam-api -n spot-scam
-argo-rollouts terminate spot-scam-api -n spot-scam
+argo-rollouts abort spot-scam-api -n spot-scam
 ```
 
 ## Argo CD GitOps (Optional)

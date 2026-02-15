@@ -23,6 +23,7 @@ Key deploy safeguards:
 - `KUBECONFIG_COMMAND` can be supplied to configure cluster context when Terraform apply is skipped.
 - Deploys are blocked if placeholder domains/values remain in rendered manifests.
 - Deploys are blocked when `spot-scam-api-secrets` or `GEMINI_API_KEY` is missing in the target namespace.
+- Deploys are blocked when Argo Rollouts CRD is missing; bootstrap with `ops/ci/bootstrap_cluster_addons.sh`.
 
 ```mermaid
 flowchart TD

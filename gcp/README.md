@@ -62,6 +62,14 @@ kubectl get nodes
 kubectl get storageclass filestore-rwx
 ```
 
+Bootstrap required add-ons:
+
+```bash
+# from repository root
+./ops/ci/bootstrap_cluster_addons.sh
+kubectl get crd rollouts.argoproj.io
+```
+
 ## 5. Container Registry and Image Strategy
 
 ```bash

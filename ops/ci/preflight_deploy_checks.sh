@@ -67,6 +67,7 @@ kubectl kustomize "${OVERLAY_PATH}" > "${rendered_file}"
 if ! kubectl get crd rollouts.argoproj.io >/dev/null 2>&1; then
   echo "Preflight failed: Argo Rollouts CRD (rollouts.argoproj.io) is not installed in this cluster." >&2
   echo "Install Argo Rollouts controller before deployment." >&2
+  echo "Recommended bootstrap: ./ops/ci/bootstrap_cluster_addons.sh --skip-ingress" >&2
   exit 1
 fi
 
