@@ -2,13 +2,19 @@ import logging
 import sys
 from typing import Optional
 
+DEFAULT_LOGGER_NAME = "spot_scam"
+
+
+def _resolve_logger_name(name: Optional[str]) -> str:
+    return name or DEFAULT_LOGGER_NAME
+
 
 def configure_logging(level: int = logging.INFO, name: Optional[str] = None) -> logging.Logger:
     if isinstance(level, str):
         name = level
         level = logging.INFO
 
-    logger_name = name or "spot_scam"
+    logger_name = _resolve_logger_name(name)
     logger = logging.getLogger(logger_name)
     if logger.handlers:
         # Already configured
