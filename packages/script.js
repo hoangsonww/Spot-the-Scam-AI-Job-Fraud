@@ -293,51 +293,77 @@ function initializeBackToTop() {
 }
 
 // ============================================
-// Copy Code Buttons
+// macOS-style Code Windows with Copy Buttons
 // ============================================
 function initializeCopyButtons() {
+  const copyIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const checkIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+
   document.querySelectorAll('pre').forEach((block) => {
-    const button = document.createElement('button');
-    button.className = 'copy-btn';
-    button.textContent = 'Copy';
-    button.style.cssText = `
-      position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
-      padding: 0.5rem 1rem;
-      background: var(--primary-color);
-      color: white;
-      border: none;
-      border-radius: 0.5rem;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      opacity: 0;
-      transition: all 0.3s ease;
-    `;
+    // Skip if already wrapped or inside mermaid
+    if (block.closest('.code-window') || block.closest('.mermaid')) return;
 
-    block.style.position = 'relative';
-    block.appendChild(button);
+    const codeText = (block.querySelector('code')?.textContent || block.textContent).trim();
 
-    block.addEventListener('mouseenter', () => {
-      button.style.opacity = '1';
-    });
+    // Detect a title from content
+    let title = 'Terminal';
+    if (codeText.startsWith('spot-the-scam') || codeText.match(/^[├└│]/m)) {
+      title = 'Project Structure';
+    } else if (codeText.startsWith('git clone')) {
+      title = 'Terminal — git';
+    } else if (codeText.startsWith('docker') || codeText.includes('docker-compose')) {
+      title = 'Terminal — docker';
+    } else if (codeText.startsWith('cd frontend') || codeText.includes('npm ')) {
+      title = 'Terminal — npm';
+    } else if (codeText.includes('python') || codeText.includes('pip ')) {
+      title = 'Terminal — python';
+    }
 
-    block.addEventListener('mouseleave', () => {
-      button.style.opacity = '0';
-    });
+    // Build wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'code-window';
 
-    button.addEventListener('click', () => {
+    // Header
+    const header = document.createElement('div');
+    header.className = 'code-window-header';
+
+    // Traffic-light dots
+    const dots = document.createElement('div');
+    dots.className = 'code-window-dots';
+    dots.innerHTML =
+      '<span class="code-window-dot code-window-dot--close"></span>' +
+      '<span class="code-window-dot code-window-dot--minimize"></span>' +
+      '<span class="code-window-dot code-window-dot--maximize"></span>';
+
+    // Title
+    const titleEl = document.createElement('span');
+    titleEl.className = 'code-window-title';
+    titleEl.textContent = title;
+
+    // Copy button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'copy-btn';
+    copyBtn.innerHTML = copyIcon + ' Copy';
+    copyBtn.addEventListener('click', () => {
       const code = block.querySelector('code')?.textContent || block.textContent;
       navigator.clipboard.writeText(code).then(() => {
-        button.textContent = 'Copied!';
-        button.style.background = 'var(--secondary-color)';
+        copyBtn.innerHTML = checkIcon + ' Copied!';
+        copyBtn.classList.add('copied');
         setTimeout(() => {
-          button.textContent = 'Copy';
-          button.style.background = 'var(--primary-color)';
+          copyBtn.innerHTML = copyIcon + ' Copy';
+          copyBtn.classList.remove('copied');
         }, 2000);
       });
     });
+
+    header.appendChild(dots);
+    header.appendChild(titleEl);
+    header.appendChild(copyBtn);
+
+    // Wrap the pre element
+    block.parentNode.insertBefore(wrapper, block);
+    wrapper.appendChild(header);
+    wrapper.appendChild(block);
   });
 }
 
